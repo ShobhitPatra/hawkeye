@@ -2,13 +2,13 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { buildPrompt } from "./contract/prompt.js";
 import { parseReviewResult } from "./contract/schema.js";
-import type { GitHubClient } from "./github/client.js";
+import { GitHubRequestError, type GitHubClient } from "./github/client.js";
 import type { PullRequestReference } from "./github/pull-request-reference.js";
 import type { HarnessSpec } from "./harness/harness.js";
-import { writeHarnessSettings } from "./harness/claude-code.js";
 import { commentableLines } from "./review/diff-lines.js";
 import { alreadyReviewed } from "./review/idempotency.js";
 import { renderReview, type RenderedReview } from "./review/render.js";
+import { removeTrustedConfig } from "./worktree/trusted-files.js";
 import type { createWorktree, readRepositoryRules } from "./worktree/worktree.js";
 
 export type RunReviewInput = {
@@ -76,6 +76,7 @@ export async function runReview(
       deps.github.linkedIssue(reference, pullRequest.body, token),
       deps.readRepositoryRules(worktree.path),
     ]);
+    await removeTrustedConfig(worktree.path);
     const promptPath = join(runDirectory, "prompt.md");
     const resultPath = join(runDirectory, "result.json");
     const settingsPath = join(runDirectory, "settings.json");
@@ -102,7 +103,6 @@ export async function runReview(
           : { contractOverride: input.contractOverride }),
       }),
     );
-    await writeHarnessSettings(settingsPath, resultPath);
 
     const streamLines: string[] = [];
     const harnessResult = await deps.harness.run({
@@ -137,7 +137,11 @@ export async function runReview(
 
     if (input.dryRun) return { kind: "dry-run", review, headSha: pullRequest.headSha };
     const posted = await deps.github.postReview(reference, review, token).catch(async (error) => {
-      if (!(error as Error).message.includes("422") || review.comments.length === 0) throw error;
+      if (
+        !(error instanceof GitHubRequestError && error.status === 422) ||
+        review.comments.length === 0
+      )
+        throw error;
       deps.log("inline anchors rejected (422); posting body only");
       const bodyOnly = render(new Map());
       await writeFile(reviewPath, JSON.stringify(bodyOnly, null, 2));

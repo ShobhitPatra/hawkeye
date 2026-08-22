@@ -1,9 +1,9 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { LENSES } from "./contract/schema.js";
-import type { GitHubClient } from "./github/client.js";
+import { GitHubRequestError, type GitHubClient } from "./github/client.js";
 import type { HarnessResult, HarnessSpec } from "./harness/harness.js";
 import { runReview, type RunReviewDependencies, type RunReviewInput } from "./run.js";
 
@@ -52,12 +52,21 @@ function deps(
       return { status: "ok", turns: 2 };
     }),
   };
-  const createWorktree = vi.fn(async (i: { directory: string }) => ({
-    path: i.directory,
-    diff: "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1,1 +1,2 @@\n one\n+two\n",
-    remove: vi.fn(async () => {}),
-  }));
-  const readRepositoryRules = vi.fn(async () => [{ path: "AGENTS.md", content: "rules" }]);
+  const createWorktree = vi.fn(async (i: { directory: string }) => {
+    await mkdir(join(i.directory, ".claude"), { recursive: true });
+    await mkdir(join(i.directory, "packages", "x"), { recursive: true });
+    await writeFile(join(i.directory, "CLAUDE.md"), "project memory");
+    await writeFile(join(i.directory, ".claude", "settings.json"), "{}");
+    await writeFile(join(i.directory, "packages", "x", "CLAUDE.md"), "nested memory");
+    return {
+      path: i.directory,
+      diff: "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1,1 +1,2 @@\n one\n+two\n",
+      remove: vi.fn(async () => {}),
+    };
+  });
+  const readRepositoryRules = vi.fn(async () => [
+    { path: "AGENTS.md", content: "RULES-FIXTURE-TEXT" },
+  ]);
   return {
     github,
     harness,
@@ -112,6 +121,20 @@ describe("runReview", () => {
     });
     expect(await readFile(join(i.runDirectory, "prompt.md"), "utf8")).toContain("m".repeat(40));
   });
+  it("removes Claude config from the checkout after reading the repository rules", async () => {
+    const d = deps();
+    const i = await input();
+    await runReview(i, d);
+    const checkout = join(i.runDirectory, "checkout");
+    await expect(stat(join(checkout, "CLAUDE.md"))).rejects.toThrow();
+    await expect(stat(join(checkout, ".claude"))).rejects.toThrow();
+    await expect(stat(join(checkout, "packages", "x", "CLAUDE.md"))).rejects.toThrow();
+    const prompt = await readFile(join(i.runDirectory, "prompt.md"), "utf8");
+    expect(prompt).toContain(
+      "The checkout's CLAUDE.md, CLAUDE.local.md and .claude/ were removed before review",
+    );
+    expect(prompt).toContain("RULES-FIXTURE-TEXT");
+  });
   it("passes a contract override into the prompt", async () => {
     const d = deps();
     const i = await input({ contractOverride: "CUSTOM RULES" });
@@ -154,7 +177,10 @@ describe("runReview", () => {
     d.github.postReview = vi
       .fn()
       .mockRejectedValueOnce(
-        new Error("GitHub POST /repos/o/r/pulls/1/reviews failed: 422 Unprocessable Entity"),
+        new GitHubRequestError(
+          422,
+          "GitHub POST /repos/o/r/pulls/1/reviews failed: 422 Unprocessable Entity",
+        ),
       )
       .mockResolvedValueOnce({ url: "https://github.com/o/r/pull/1#pullrequestreview-9" });
     const i = await input();
@@ -170,8 +196,16 @@ describe("runReview", () => {
   });
   it("propagates a non-422 post failure without retrying", async () => {
     const d = deps();
-    d.github.postReview = vi.fn().mockRejectedValue(new Error("failed: 500 Server Error"));
+    d.github.postReview = vi
+      .fn()
+      .mockRejectedValue(new GitHubRequestError(500, "failed: 500 Server Error"));
     await expect(runReview(await input(), d)).rejects.toThrow(/500/);
+    expect(d.github.postReview).toHaveBeenCalledTimes(1);
+  });
+  it("does not retry when an untyped error merely mentions 422", async () => {
+    const d = deps();
+    d.github.postReview = vi.fn().mockRejectedValue(new Error("boom 422 in the message"));
+    await expect(runReview(await input(), d)).rejects.toThrow(/422/);
     expect(d.github.postReview).toHaveBeenCalledTimes(1);
   });
   it("removes the checkout even on failure", async () => {

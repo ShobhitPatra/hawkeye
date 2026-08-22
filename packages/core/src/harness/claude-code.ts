@@ -8,10 +8,7 @@ export type SpawnLike = typeof nodeSpawn;
 const DISALLOWED_TOOLS = ["Edit", "Write", "MultiEdit", "NotebookEdit", "WebFetch", "WebSearch"];
 const KILL_GRACE_MS = 5_000;
 
-export async function writeHarnessSettings(
-  settingsPath: string,
-  resultPath: string,
-): Promise<void> {
+async function writeHarnessSettings(settingsPath: string, resultPath: string): Promise<void> {
   const command = `test -f '${resultPath}' || { echo 'Write the review result JSON to ${resultPath} before stopping.' >&2; exit 2; }`;
   await writeFile(
     settingsPath,
@@ -35,6 +32,7 @@ export function createClaudeCodeHarness(
     name: "claude-code",
     async run(input: HarnessRunInput): Promise<HarnessResult> {
       const prompt = await readFile(input.promptPath, "utf8");
+      await writeHarnessSettings(input.settingsPath, input.resultPath);
       const args = [
         "-p",
         "--output-format",
@@ -44,6 +42,8 @@ export function createClaudeCodeHarness(
         "bypassPermissions",
         "--disallowedTools",
         ...DISALLOWED_TOOLS,
+        "--setting-sources",
+        "user",
         "--settings",
         input.settingsPath,
       ];

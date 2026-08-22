@@ -2,7 +2,7 @@ import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createClaudeCodeHarness, writeHarnessSettings } from "./claude-code.js";
+import { createClaudeCodeHarness } from "./claude-code.js";
 
 async function fakeClaude(script: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "hawkeye-claude-"));
@@ -67,6 +67,7 @@ describe("claude code harness", () => {
     ])
       expect(args).toContain(flag);
     expect(args).not.toContain("--allowedTools");
+    expect(args[args.indexOf("--setting-sources") + 1]).toBe("user");
     expect(events).toContainEqual({ type: "turn", turns: 1 });
   });
   it("reports error when the process exits without a result", async () => {
@@ -104,10 +105,11 @@ describe("claude code harness", () => {
     );
     expect(result.status).toBe("timeout");
   });
-  it("writes a stop hook that blocks until the result exists", async () => {
+  it("writes a stop hook that blocks until the result exists before spawning", async () => {
     const s = await scratch();
-    await writeHarnessSettings(s.settingsPath, s.resultPath);
-    const settings = JSON.parse(await readFile(s.settingsPath, "utf8"));
+    const exe = await fakeClaude(`cat "${s.settingsPath}" > "$(dirname "$0")/settings"; exit 0`);
+    await createClaudeCodeHarness({ executable: exe }).run(input(s));
+    const settings = JSON.parse(await readFile(join(exe, "..", "settings"), "utf8"));
     const command: string = settings.hooks.Stop[0].hooks[0].command;
     expect(command).toContain(s.resultPath);
     expect(command).toContain("exit 2");

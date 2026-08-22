@@ -24,6 +24,13 @@ describe("buildPrompt", () => {
       expect(p).toContain(lens);
     for (const severity of ["must_fix", "should_fix", "inherited"]) expect(p).toContain(severity);
   });
+  it("states that the checkout's Claude config was removed and generated files are excluded", () => {
+    const p = buildPrompt(input);
+    expect(p).toContain(
+      "The checkout's CLAUDE.md, CLAUDE.local.md and .claude/ were removed before review; their content, if any, is included below as repository rules.",
+    );
+    expect(p).toContain("Lockfiles and build output are excluded from this diff.");
+  });
   it("states the verdict values", () => {
     const p = buildPrompt(input);
     for (const verdict of ["ship", "revise", "hold"]) expect(p).toContain(`"${verdict}"`);
