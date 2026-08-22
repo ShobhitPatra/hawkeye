@@ -77,7 +77,7 @@ GitHub App ─────── webhooks ──▶ Control plane   (Next.js + P
 job: (repo, pr, head sha, merge base sha, previously reviewed sha?, open finding ids)
         │   starts after quiet window (default 3 min, 0 = immediate)
         ▼
- git worktree of PR head (shallow, temp) + diff from the merge base / interdiff, PR title/body, linked issue
+ git worktree of PR head (shallow, temp; its CLAUDE.md and .claude/ are captured as repository rules, then removed) + diff from the merge base / interdiff (lockfiles and build output excluded), PR title/body, linked issue
         │
         ▼
  claude -p --output-format stream-json … (prompt on stdin; contract is the prompt)
