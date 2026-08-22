@@ -71,7 +71,8 @@ CREATE TABLE "run" (
 	"ended_at" timestamp with time zone,
 	"status" "run_status" DEFAULT 'running' NOT NULL,
 	"turns" integer DEFAULT 0 NOT NULL,
-	"error" text
+	"error" text,
+	"stream_path" text
 );
 --> statement-breakpoint
 CREATE TABLE "runner" (

@@ -62,5 +62,15 @@ describe("schema migrations", () => {
         `insert into job (armed_pr_id, head_sha, base_sha, not_before) values ('${armedPrId}', 'c', 'b', now())`,
       ),
     ).rejects.toThrow(/job_open_per_armed_pr/);
+    await db.exec("update job set state = 'done'");
+    await db.exec(
+      `insert into job (armed_pr_id, head_sha, base_sha, not_before) values ('${armedPrId}', 'd', 'b', now())`,
+    );
+  });
+  it("adds stream_path to run", async () => {
+    const { rows } = await db.query<{ column_name: string }>(
+      "select column_name from information_schema.columns where table_name = 'run'",
+    );
+    expect(rows.map((r) => r.column_name)).toContain("stream_path");
   });
 });

@@ -84,7 +84,10 @@ export const job = pgTable(
     claimedByRunnerId: text("claimed_by_runner_id"),
     claimedAt: timestamp("claimed_at", { withTimezone: true }),
     heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
     ...timestamps,
   },
   (t) => [
@@ -121,6 +124,7 @@ export const run = pgTable("run", {
   status: runStatus("status").notNull().default("running"),
   turns: integer("turns").notNull().default(0),
   error: text("error"),
+  streamPath: text("stream_path"),
 });
 
 export const finding = pgTable(

@@ -1,5 +1,5 @@
 {
-  "id": "f76a099c-d5c7-4d06-9ac7-4a486f7bc3c6",
+  "id": "fca728f0-eb25-4953-8b6d-ea4695e57f5b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -565,6 +565,12 @@
         },
         "error": {
           "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stream_path": {
+          "name": "stream_path",
           "type": "text",
           "primaryKey": false,
           "notNull": false
