@@ -1,0 +1,13 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: hawkeye
+      POSTGRES_PASSWORD: hawkeye
+      POSTGRES_DB: hawkeye
+    ports:
+      - "5432:5432"
+    volumes:
+      - hawkeye-db:/var/lib/postgresql/data
+volumes:
+  hawkeye-db:

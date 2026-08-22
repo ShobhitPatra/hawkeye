@@ -135,7 +135,9 @@ Everything is scoped by `user_id` from day one; no orgs, teams, or roles.
 
 TypeScript, pnpm monorepo: `packages/core` (contract, harness interface, render, dedupe, posting), `packages/runner` (CLI + daemon), `apps/web` (Next.js control plane).
 
-## Run it (milestone 1)
+## Run it
+
+### Runner (milestone 1)
 
 1. Register a GitHub App (permissions: pull requests read/write, contents read, issues read, metadata read; no webhook), generate a private key, install it on your repos.
 2. `~/.config/hawkeye/config.json`: `{ "appId": <id>, "appSlug": "<app-slug>", "privateKeyPath": "~/.config/hawkeye/app.pem" }` (`~` is expanded; env overrides: `HAWKEYE_APP_ID`, `HAWKEYE_APP_SLUG`, `HAWKEYE_APP_PRIVATE_KEY_PATH`).
@@ -143,6 +145,11 @@ TypeScript, pnpm monorepo: `packages/core` (contract, harness interface, render,
 4. Optional: put your own review contract at `~/.config/hawkeye/contract.md` (or point `HAWKEYE_CONTRACT_PATH` at it, or pass `--contract <path>`) to replace the built-in lens and finding rules.
 
 Reviews post as `<app-slug>[bot]` (the author's instance: `hawkeye-review[bot]`). Run artifacts land in `~/.cache/hawkeye/runs/`.
+
+### Control plane (milestone 2, in progress)
+
+Local: `docker compose up -d db`, copy `apps/web/.env.example` to `apps/web/.env`, `pnpm --filter web db:migrate`, `pnpm --filter web dev`.
+Hosted: Vercel project rooted at `apps/web` with a Neon Postgres; env: `DATABASE_URL` (later: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `BETTER_AUTH_SECRET`). Run `pnpm --filter web db:migrate` against Neon before the first deploy.
 
 ## Milestones
 
