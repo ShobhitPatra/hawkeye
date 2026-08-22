@@ -86,6 +86,14 @@ describe("claude code harness", () => {
     expect(result.turns).toBeGreaterThanOrEqual(3);
     expect(result.turns).toBeLessThanOrEqual(3);
   });
+  it("counts one turn per assistant message id", async () => {
+    const s = await scratch();
+    const exe = await fakeClaude(
+      `echo '{"type":"assistant","message":{"id":"a"}}'; echo '{"type":"assistant","message":{"id":"a"}}'; echo '{"type":"assistant","message":{"id":"b"}}'; echo '{"ok":true}' > "${s.resultPath}"`,
+    );
+    const result = await createClaudeCodeHarness({ executable: exe }).run(input(s));
+    expect(result).toEqual({ status: "ok", turns: 2 });
+  });
   it("times out on the wall clock", async () => {
     const s = await scratch();
     const exe = await fakeClaude(`sleep 5`);

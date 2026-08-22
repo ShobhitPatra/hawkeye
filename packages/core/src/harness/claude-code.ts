@@ -57,6 +57,7 @@ export function createClaudeCodeHarness(
       });
 
       let turns = 0;
+      let lastMessageId: string | undefined;
       let stopReason: "max-turns" | "timeout" | undefined;
       const stderrTail: string[] = [];
 
@@ -85,13 +86,16 @@ export function createClaudeCodeHarness(
 
       createInterface({ input: child.stdout! }).on("line", (line) => {
         input.onEvent({ type: "stdout", line });
-        let parsed: { type?: string } | undefined;
+        let parsed: { type?: string; message?: { id?: string } } | undefined;
         try {
-          parsed = JSON.parse(line) as { type?: string };
+          parsed = JSON.parse(line) as { type?: string; message?: { id?: string } };
         } catch {
           return;
         }
         if (parsed?.type === "assistant") {
+          const messageId = parsed.message?.id;
+          if (messageId !== undefined && messageId === lastMessageId) return;
+          lastMessageId = messageId;
           turns += 1;
           input.onEvent({ type: "turn", turns });
           if (turns >= input.maxTurns) terminate("max-turns");
