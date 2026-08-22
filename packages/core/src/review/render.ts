@@ -1,4 +1,4 @@
-import { type Finding, type ReviewResult } from "../contract/schema.js";
+import { type Finding, type ReviewResult, type Severity } from "../contract/schema.js";
 import { findingId } from "./finding-id.js";
 import { encodeMarker } from "./marker.js";
 
@@ -16,14 +16,20 @@ export type RenderInput = {
   repositoryUrl: string;
 };
 
-const CLASS_ORDER = ["blocking", "polish", "pre_existing"] as const;
+const SEVERITY_ORDER = ["must_fix", "should_fix", "inherited"] as const;
+
+const SEVERITY_BADGE: Record<Severity, string> = {
+  must_fix: "must-fix",
+  should_fix: "should-fix",
+  inherited: "inherited",
+};
 
 function tableCell(text: string): string {
   return text.replaceAll("|", "\\|").replace(/\r?\n/g, " ");
 }
 
 function findingBody(finding: Finding): string {
-  const parts = [`**${finding.class}** · ${finding.claim}`, "", finding.detail];
+  const parts = [`**${SEVERITY_BADGE[finding.severity]}** · ${finding.claim}`, "", finding.detail];
   if (finding.suggestion !== undefined) parts.push("", "```suggestion", finding.suggestion, "```");
   return parts.join("\n");
 }
@@ -64,18 +70,14 @@ export function renderReview({
     `**Verdict:** ${result.verdict}`,
     "",
     result.summary,
-    "",
-    "| Dimension | Assessment |",
-    "|---|---|",
   ];
-  for (const d of result.dimensions) lines.push(`| ${d.name} | ${tableCell(d.assessment)} |`);
 
   if (inBody.length > 0) {
     lines.push("", "## Findings");
-    for (const cls of CLASS_ORDER) {
-      const group = inBody.filter((f) => f.class === cls);
+    for (const severity of SEVERITY_ORDER) {
+      const group = inBody.filter((f) => f.severity === severity);
       if (group.length === 0) continue;
-      lines.push("", `### ${cls}`);
+      lines.push("", `### ${SEVERITY_BADGE[severity]}`);
       for (const f of group) {
         const location =
           f.path === undefined ? "" : ` — \`${f.path}${f.line === undefined ? "" : `:${f.line}`}\``;
@@ -86,6 +88,17 @@ export function renderReview({
       }
     }
   }
+
+  lines.push(
+    "",
+    "<details>",
+    "<summary>Review lenses</summary>",
+    "",
+    "| Lens | Assessment |",
+    "|---|---|",
+  );
+  for (const lens of result.lenses) lines.push(`| ${lens.name} | ${tableCell(lens.assessment)} |`);
+  lines.push("", "</details>");
 
   lines.push("", "---", `Reviewed by [Hawkeye](${repositoryUrl}) on the author's own plan.`);
   return { event: "COMMENT", commit_id: headSha, body: lines.join("\n"), comments };

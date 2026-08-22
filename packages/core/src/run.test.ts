@@ -2,17 +2,17 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { DIMENSIONS } from "./contract/schema.js";
+import { LENSES } from "./contract/schema.js";
 import type { GitHubClient } from "./github/client.js";
 import type { HarnessResult, HarnessSpec } from "./harness/harness.js";
 import { runReview, type RunReviewDependencies, type RunReviewInput } from "./run.js";
 
 const sha = "a".repeat(40);
 const result = {
-  verdict: "needs-work",
+  verdict: "revise",
   summary: "s",
-  dimensions: DIMENSIONS.map((name) => ({ name, assessment: "ok" })),
-  findings: [{ path: "a.txt", line: 2, class: "polish", claim: "c", detail: "d" }],
+  lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
+  findings: [{ path: "a.txt", line: 2, severity: "should_fix", claim: "c", detail: "d" }],
 };
 
 function deps(
@@ -109,6 +109,12 @@ describe("runReview", () => {
       directory: join(i.runDirectory, "checkout"),
     });
   });
+  it("passes a contract override into the prompt", async () => {
+    const d = deps();
+    const i = await input({ contractOverride: "CUSTOM RULES" });
+    await runReview(i, d);
+    expect(await readFile(join(i.runDirectory, "prompt.md"), "utf8")).toContain("CUSTOM RULES");
+  });
   it("skips when already reviewed unless forced", async () => {
     const reviews = [{ authorLogin: "hawkeye-review[bot]", body: `<!-- hawkeye: head=${sha} -->` }];
     const d = deps({ reviews });
@@ -127,7 +133,7 @@ describe("runReview", () => {
     const failing = deps({ harnessStatus: "error" });
     await expect(runReview(await input(), failing)).rejects.toThrow(/boom/);
     expect(failing.github.postReview).not.toHaveBeenCalled();
-    const invalid = deps({ resultJson: { verdict: "ready" } });
+    const invalid = deps({ resultJson: { verdict: "ship" } });
     await expect(runReview(await input(), invalid)).rejects.toThrow(/Invalid review result/);
     expect(invalid.github.postReview).not.toHaveBeenCalled();
   });

@@ -1,22 +1,24 @@
 import { z } from "zod";
 
-export const DIMENSIONS = [
-  "necessity",
-  "correctness",
-  "tests",
-  "conventions",
-  "side_effects",
-  "parity",
-  "governance",
+export const LENSES = [
+  "intent",
+  "behavior",
+  "blast_radius",
+  "verification",
+  "fit",
+  "hygiene",
 ] as const;
-export type Dimension = (typeof DIMENSIONS)[number];
+export type Lens = (typeof LENSES)[number];
+
+export const SEVERITIES = ["must_fix", "should_fix", "inherited"] as const;
+export type Severity = (typeof SEVERITIES)[number];
 
 const FindingSchema = z
   .object({
     path: z.string().min(1).optional(),
     line: z.number().int().positive().optional(),
     side: z.enum(["RIGHT", "LEFT"]).optional(),
-    class: z.enum(["blocking", "polish", "pre_existing"]),
+    severity: z.enum(SEVERITIES),
     claim: z.string().min(1),
     detail: z.string().min(1),
     suggestion: z.string().optional(),
@@ -27,16 +29,13 @@ const FindingSchema = z
   });
 
 export const ReviewResultSchema = z.object({
-  verdict: z.enum(["ready", "needs-work", "blocking"]),
+  verdict: z.enum(["ship", "revise", "hold"]),
   summary: z.string().min(1),
-  dimensions: z
-    .array(z.object({ name: z.enum(DIMENSIONS), assessment: z.string().min(1) }))
+  lenses: z
+    .array(z.object({ name: z.enum(LENSES), assessment: z.string().min(1) }))
     .refine(
-      (d) =>
-        d.length === DIMENSIONS.length && new Set(d.map((x) => x.name)).size === DIMENSIONS.length,
-      {
-        message: "dimensions must list each of the seven dimensions exactly once",
-      },
+      (l) => l.length === LENSES.length && new Set(l.map((x) => x.name)).size === LENSES.length,
+      { message: "lenses must list each of the six lenses exactly once" },
     ),
   findings: z.array(FindingSchema),
 });

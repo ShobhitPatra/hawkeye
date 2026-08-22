@@ -18,19 +18,15 @@ const input = {
 };
 
 describe("buildPrompt", () => {
-  it("names every dimension and finding class", () => {
+  it("names every lens and severity", () => {
     const p = buildPrompt(input);
-    for (const d of [
-      "necessity",
-      "correctness",
-      "tests",
-      "conventions",
-      "side_effects",
-      "parity",
-      "governance",
-    ])
-      expect(p).toContain(d);
-    for (const c of ["blocking", "polish", "pre_existing"]) expect(p).toContain(c);
+    for (const lens of ["intent", "behavior", "blast_radius", "verification", "fit", "hygiene"])
+      expect(p).toContain(lens);
+    for (const severity of ["must_fix", "should_fix", "inherited"]) expect(p).toContain(severity);
+  });
+  it("states the verdict values", () => {
+    const p = buildPrompt(input);
+    for (const verdict of ["ship", "revise", "hold"]) expect(p).toContain(`"${verdict}"`);
   });
   it("fences untrusted text and the result path", () => {
     const p = buildPrompt(input);
@@ -48,5 +44,16 @@ describe("buildPrompt", () => {
     const p = buildPrompt(input);
     expect(p).toMatch(/line.*only.*changed lines/i);
     expect(p).toMatch(/suggestion.*only.*exact/i);
+  });
+  it("replaces the built-in lens and findings guidance with a contract override", () => {
+    const p = buildPrompt({ ...input, contractOverride: "CUSTOM RULES" });
+    expect(p).toContain("CUSTOM RULES");
+    expect(p).toContain('<untrusted_data source="diff">');
+    expect(p).toContain('<repository_rules path="AGENTS.md">');
+    expect(p).toContain("# Output");
+    expect(p).toContain('"must_fix" | "should_fix" | "inherited"');
+    expect(p).not.toContain("# Lenses");
+    expect(p).not.toContain("Assess each of these six lenses once");
+    expect(p).not.toContain("# Findings");
   });
 });

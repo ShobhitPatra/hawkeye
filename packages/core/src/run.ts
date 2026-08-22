@@ -20,6 +20,7 @@ export type RunReviewInput = {
   wallClockMs: number;
   dryRun: boolean;
   force: boolean;
+  contractOverride?: string;
 };
 export type RunReviewDependencies = {
   github: GitHubClient;
@@ -89,6 +90,9 @@ export async function runReview(
         repositoryRules,
         diff: worktree.diff,
         resultPath,
+        ...(input.contractOverride === undefined
+          ? {}
+          : { contractOverride: input.contractOverride }),
       }),
     );
     await writeHarnessSettings(settingsPath, resultPath);

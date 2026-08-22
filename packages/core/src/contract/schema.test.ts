@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { DIMENSIONS, parseReviewResult } from "./schema.js";
+import { LENSES, parseReviewResult } from "./schema.js";
 
 const valid = () => ({
-  verdict: "needs-work",
+  verdict: "revise",
   summary: "One bug.",
-  dimensions: DIMENSIONS.map((name) => ({ name, assessment: "ok" })),
+  lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
   findings: [
     {
       path: "src/a.ts",
       line: 3,
-      class: "blocking",
+      severity: "must_fix",
       claim: "Null deref",
       detail: "x may be undefined",
     },
@@ -20,26 +20,31 @@ describe("parseReviewResult", () => {
   it("accepts a valid result", () => {
     expect(parseReviewResult(valid()).findings).toHaveLength(1);
   });
-  it("rejects a missing dimension", () => {
+  it("rejects a missing lens", () => {
     const r = valid();
-    r.dimensions = r.dimensions.slice(1);
-    expect(() => parseReviewResult(r)).toThrow(/dimension/);
+    r.lenses = r.lenses.slice(1);
+    expect(() => parseReviewResult(r)).toThrow(/lens/);
   });
-  it("rejects a duplicated dimension", () => {
+  it("rejects a duplicated lens", () => {
     const r = valid();
-    r.dimensions[0] = { name: "correctness", assessment: "dup" };
-    expect(() => parseReviewResult(r)).toThrow(/dimension/);
+    r.lenses[0] = { name: "behavior", assessment: "dup" };
+    expect(() => parseReviewResult(r)).toThrow(/lens/);
   });
-  it("rejects an unknown finding class", () => {
+  it("rejects an unknown finding severity", () => {
     const r = valid();
-    (r.findings[0] as { class: string }).class = "nit";
+    (r.findings[0] as { severity: string }).severity = "nit";
+    expect(() => parseReviewResult(r)).toThrow();
+  });
+  it("rejects an unknown verdict", () => {
+    const r = valid();
+    r.verdict = "needs-work";
     expect(() => parseReviewResult(r)).toThrow();
   });
   it("rejects a suggestion without a line", () => {
     const r = valid();
     r.findings[0] = {
       path: "a",
-      class: "polish",
+      severity: "should_fix",
       claim: "c",
       detail: "d",
       suggestion: "x",
@@ -48,7 +53,7 @@ describe("parseReviewResult", () => {
   });
   it("rejects a line without a path", () => {
     const r = valid();
-    r.findings[0] = { line: 2, class: "polish", claim: "c", detail: "d" } as never;
+    r.findings[0] = { line: 2, severity: "should_fix", claim: "c", detail: "d" } as never;
     expect(() => parseReviewResult(r)).toThrow(/path/);
   });
 });

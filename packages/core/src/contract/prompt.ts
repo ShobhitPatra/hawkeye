@@ -1,4 +1,4 @@
-import { DIMENSIONS } from "./schema.js";
+import { LENSES } from "./schema.js";
 
 export type PromptInput = {
   repository: { owner: string; repo: string };
@@ -14,23 +14,21 @@ export type PromptInput = {
   repositoryRules: { path: string; content: string }[];
   diff: string;
   resultPath: string;
+  contractOverride?: string;
 };
 
-const DIMENSION_GUIDE: Record<(typeof DIMENSIONS)[number], string> = {
-  necessity:
-    "Is the change needed, and scoped to the problem it claims to solve? Flag scope creep and unmotivated changes.",
-  correctness:
-    "Does the code do what it claims? Look for logic errors, unhandled states, races, wrong types, broken invariants.",
-  tests:
-    "Are the changed behaviours covered by tests at the right seam? Are the tests meaningful rather than mirroring the code?",
-  conventions:
-    "Does the change follow the repository's own conventions and rules (see repository_rules)? Naming, structure, formatting owned by tooling.",
-  side_effects:
-    "What else does the change touch: public surfaces, configuration, migrations, performance, security, dependencies?",
-  parity:
-    "If the PR description or linked issue promises something, does the code deliver all of it and nothing contradictory?",
-  governance:
-    "Commit hygiene, PR description quality, documentation kept in lockstep, licensing, secrets, anything a maintainer must gate on.",
+const LENS_GUIDE: Record<(typeof LENSES)[number], string> = {
+  intent:
+    "Does the change do what the pull request and any linked issue say, and only that? Flag scope creep, unmotivated changes, and promised pieces that are missing.",
+  behavior:
+    "Does the code hold up when it runs? Look for logic errors, edge cases, failure modes, races, and broken invariants.",
+  blast_radius:
+    "What else does the change reach: public surface, configuration, migrations, performance, security, dependencies?",
+  verification:
+    "Are the changed behaviours proven by meaningful tests at the right seam, rather than tests that mirror the code?",
+  fit: "Does the change follow this repository's own rules and patterns (see repository_rules), including naming and structure?",
+  hygiene:
+    "Commit quality, documentation kept in lockstep, licensing, secrets, anything a maintainer must gate on.",
 };
 
 function fence(tag: string, attributes: string, content: string): string {
@@ -60,37 +58,41 @@ ${fence("untrusted_data", 'source="linked_issue"', linkedIssue.body || "(empty)"
 
   if (repositoryRules.length > 0) {
     sections.push(`# Repository rules
-Judge the conventions and governance dimensions against these files.
+Judge the fit and hygiene lenses against these files.
 ${repositoryRules.map((r) => fence("repository_rules", `path="${r.path}"`, r.content)).join("\n")}`);
   }
 
   sections.push(`# Diff (base...head)
 ${fence("untrusted_data", 'source="diff"', diff)}`);
 
-  sections.push(`# Dimensions
-Assess each of these seven dimensions once:
-${DIMENSIONS.map((d) => `- ${d}: ${DIMENSION_GUIDE[d]}`).join("\n")}`);
+  if (input.contractOverride === undefined) {
+    sections.push(`# Lenses
+Assess each of these six lenses once:
+${LENSES.map((lens) => `- ${lens}: ${LENS_GUIDE[lens]}`).join("\n")}`);
 
-  sections.push(`# Findings
-Each finding has a class:
-- blocking: must be fixed before merge (bugs, broken promises, security, data loss).
-- polish: worth fixing, not gating.
-- pre_existing: a problem in code the PR touches but did not introduce.
+    sections.push(`# Findings
+Each finding has a severity:
+- must_fix: must be fixed before merge (bugs, broken promises, security, data loss).
+- should_fix: worth fixing, not gating.
+- inherited: a problem in code the PR touches but did not introduce.
 Rules:
 - Give path and line only when the finding is about specific changed lines; line is the line number in the head version (RIGHT side). Otherwise omit path and line.
 - Give suggestion only when an exact textual replacement of that line range fully fixes the finding; suggestion is the replacement text, no fences.
 - claim is one sentence; detail explains why and how to fix.
 - Do not repeat the same finding for every occurrence; state it once and list the other locations in detail.`);
+  } else {
+    sections.push(input.contractOverride);
+  }
 
   sections.push(`# Output
 When you are done, write the result as JSON to ${resultPath} and stop. Write nothing else. Schema:
 {
-  "verdict": "ready" | "needs-work" | "blocking",
+  "verdict": "ship" | "revise" | "hold",
   "summary": string,
-  "dimensions": [{ "name": "necessity" | "correctness" | "tests" | "conventions" | "side_effects" | "parity" | "governance", "assessment": string }],
-  "findings": [{ "path"?: string, "line"?: number, "side"?: "RIGHT" | "LEFT", "class": "blocking" | "polish" | "pre_existing", "claim": string, "detail": string, "suggestion"?: string }]
+  "lenses": [{ "name": "intent" | "behavior" | "blast_radius" | "verification" | "fit" | "hygiene", "assessment": string }],
+  "findings": [{ "path"?: string, "line"?: number, "side"?: "RIGHT" | "LEFT", "severity": "must_fix" | "should_fix" | "inherited", "claim": string, "detail": string, "suggestion"?: string }]
 }
-verdict is blocking if any finding is blocking, ready if there are no blocking or polish findings, otherwise needs-work.`);
+lenses must list each of the six lenses exactly once. verdict is hold if any finding is must_fix, ship if there are no must_fix or should_fix findings, otherwise revise.`);
 
   return sections.join("\n\n");
 }
