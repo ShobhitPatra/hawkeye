@@ -52,7 +52,7 @@ export function renderReview({
       comments.push({
         path: finding.path,
         line: finding.line,
-        side: finding.side ?? "RIGHT",
+        side: "RIGHT",
         body: findingBody(finding),
       });
     else inBody.push(finding);

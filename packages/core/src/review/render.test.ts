@@ -51,6 +51,12 @@ describe("renderReview", () => {
     expect(r.comments[0]!.body).toContain("```suggestion\nconst y = x ?? 0;\n```");
     expect(r.comments[0]!.body).toContain("**blocking**");
   });
+  it("forces RIGHT side even when the finding asks for LEFT", () => {
+    const result = base();
+    result.findings[0]!.side = "LEFT";
+    const r = renderReview({ ...input(), result });
+    expect(r.comments[0]).toMatchObject({ path: "src/a.ts", line: 3, side: "RIGHT" });
+  });
   it("demotes out-of-diff and unanchored findings into the body with their ids", () => {
     const r = renderReview(input());
     expect(r.body).toContain("Rename");
