@@ -1,5 +1,8 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "rootDir": "src", "outDir": "dist" },
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": { "@hawkeye/core": ["../core/src/index.ts"] }
+  },
   "include": ["src"]
 }
