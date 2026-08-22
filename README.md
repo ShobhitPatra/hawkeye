@@ -83,7 +83,7 @@ job: (repo, pr, head sha, merge base sha, previously reviewed sha?, open finding
  claude -p --output-format stream-json … (prompt on stdin; contract is the prompt)
    · contract: six lenses + JSON output schema + prior open findings
    · Stop hook: refuse to stop until the result file is written
-   · tools: Read/Grep/Glob/Bash; WebFetch/WebSearch removed with --disallowedTools (bypassPermissions, so Bash is unrestricted inside the checkout)
+   · tools: bypassPermissions; Edit/Write/NotebookEdit/WebFetch/WebSearch removed with --disallowedTools; Bash runs with the user's environment and filesystem, not only the checkout
    · budget: turns (harness-enforced, default 40), wall clock 15 min (per-user tunable)
         │
         ▼
@@ -94,7 +94,7 @@ job: (repo, pr, head sha, merge base sha, previously reviewed sha?, open finding
    · dedupe against findings already posted on this PR
    · resolved_ids from the model → reply "✓ addressed in <sha>" and resolve the thread
    · POST pulls/{n}/reviews as the bot identity, event COMMENT
-       body: verdict + non-line findings + collapsed lens table + credit footer
+       body: verdict + all findings (anchored ones as one-liners) + collapsed lens table + credit footer
        comments[]: line-anchored findings, ```suggestion``` when an exact fix exists
 ```
 
@@ -102,7 +102,7 @@ Failures (CLI error, max-turns, invalid JSON, timeout) never touch the PR; they 
 
 ## Review contract
 
-Six **lenses**, each assessed once: **intent** (does the change do what the PR and linked issue say, and only that), **behavior** (logic, edge cases, failure modes, races, broken invariants), **blast radius** (public surface, configuration, migrations, performance, security, dependencies), **verification** (are the changed behaviours proven by meaningful tests at the right seam), **fit** (this repository's own rules and patterns), **hygiene** (commit quality, docs in lockstep, licensing, secrets, anything a maintainer must gate on). Finding severities: must-fix / should-fix / inherited (a problem in code the PR touches but did not introduce). Verdict: ship / revise / hold. Line-anchor only when the finding is about specific changed lines; `suggestion` only when an exact single-line replacement fully fixes it. Lenses render as a list, one line each, with any longer per-lens reasoning collapsed under "more". Findings stay short — a one-line claim plus at most two sentences of detail — and any longer reasoning or evidence goes in an optional `rationale`, collapsed under "why". The prompt is repo-agnostic ("discover the repo's layout and conventions, don't assume them"); the target repo's own `AGENTS.md` / `CLAUDE.md` / `CONTRIBUTING.md` are inlined at run time as repository rules for the fit and hygiene lenses to judge against. Any prompt that quotes PR bodies or issue text is injection-guarded.
+Six **lenses**, each assessed once: **intent** (does the change do what the PR and linked issue say, and only that), **behavior** (logic, edge cases, failure modes, races, broken invariants), **blast radius** (public surface, configuration, migrations, performance, security, dependencies), **verification** (are the changed behaviours proven by meaningful tests at the right seam), **fit** (this repository's own rules and patterns), **hygiene** (commit quality, docs in lockstep, licensing, secrets, anything a maintainer must gate on). Finding severities: must-fix / should-fix / inherited (a problem in code the PR touches but did not introduce). Verdict: ship / revise / hold. Line-anchor only when the finding is about specific changed lines; `suggestion` only when an exact single-line replacement fully fixes it. Lenses render as a table with paragraph-length assessments inside a collapsed drop-down, and the body lists every finding grouped by severity — anchored ones as a single line marked `(inline)`. Findings stay short — a one-line claim plus at most two sentences of detail — and any longer reasoning or evidence goes in an optional `rationale`, collapsed under "why". The prompt is repo-agnostic ("discover the repo's layout and conventions, don't assume them"); the target repo's own `AGENTS.md` / `CLAUDE.md` / `CONTRIBUTING.md` are inlined at run time as repository rules for the fit and hygiene lenses to judge against. Any prompt that quotes PR bodies or issue text is injection-guarded.
 
 Contract override: a private contract file replaces the built-in lens and finding rules while the untrusted-data fences, repository rules, diff and JSON output schema stay. The runner reads `--contract <path>`, else `HAWKEYE_CONTRACT_PATH`, else `~/.config/hawkeye/contract.md` when it exists.
 
@@ -138,7 +138,7 @@ TypeScript, pnpm monorepo: `packages/core` (contract, harness interface, render,
 ## Run it (milestone 1)
 
 1. Register a GitHub App (permissions: pull requests read/write, contents read, issues read, metadata read; no webhook), generate a private key, install it on your repos.
-2. `~/.config/hawkeye/config.json`: `{ "appId": <id>, "appSlug": "<app-slug>", "privateKeyPath": "~/.config/hawkeye/app.pem" }` (env overrides: `HAWKEYE_APP_ID`, `HAWKEYE_APP_SLUG`, `HAWKEYE_APP_PRIVATE_KEY_PATH`).
+2. `~/.config/hawkeye/config.json`: `{ "appId": <id>, "appSlug": "<app-slug>", "privateKeyPath": "~/.config/hawkeye/app.pem" }` (`~` is expanded; env overrides: `HAWKEYE_APP_ID`, `HAWKEYE_APP_SLUG`, `HAWKEYE_APP_PRIVATE_KEY_PATH`).
 3. `pnpm install && pnpm build`, then `node packages/runner/dist/bin.js review <pr-url> [--dry-run] [--force] [--contract <path>]`.
 4. Optional: put your own review contract at `~/.config/hawkeye/contract.md` (or point `HAWKEYE_CONTRACT_PATH` at it, or pass `--contract <path>`) to replace the built-in lens and finding rules.
 
