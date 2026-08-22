@@ -13,6 +13,7 @@ function createAuth() {
     socialProviders: {
       github: { clientId: env.githubClientId(), clientSecret: env.githubClientSecret() },
     },
+    account: { encryptOAuthTokens: true },
     plugins: [nextCookies()],
   });
 }
