@@ -58,13 +58,15 @@ describe("claude code harness", () => {
       "stream-json",
       "--permission-mode",
       "bypassPermissions",
-      "--allowedTools",
-      "Bash",
       "--disallowedTools",
+      "Edit",
+      "Write",
+      "NotebookEdit",
       "WebFetch",
       "--settings",
     ])
       expect(args).toContain(flag);
+    expect(args).not.toContain("--allowedTools");
     expect(events).toContainEqual({ type: "turn", turns: 1 });
   });
   it("reports error when the process exits without a result", async () => {

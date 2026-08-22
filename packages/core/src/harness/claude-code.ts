@@ -5,8 +5,7 @@ import type { HarnessResult, HarnessRunInput, HarnessSpec } from "./harness.js";
 
 export type SpawnLike = typeof nodeSpawn;
 
-const ALLOWED_TOOLS = ["Read", "Grep", "Glob", "Bash"];
-const DISALLOWED_TOOLS = ["WebFetch", "WebSearch"];
+const DISALLOWED_TOOLS = ["Edit", "Write", "MultiEdit", "NotebookEdit", "WebFetch", "WebSearch"];
 const KILL_GRACE_MS = 5_000;
 
 export async function writeHarnessSettings(
@@ -43,8 +42,6 @@ export function createClaudeCodeHarness(
         "--verbose",
         "--permission-mode",
         "bypassPermissions",
-        "--allowedTools",
-        ...ALLOWED_TOOLS,
         "--disallowedTools",
         ...DISALLOWED_TOOLS,
         "--settings",
