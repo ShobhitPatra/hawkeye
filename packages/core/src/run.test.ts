@@ -131,6 +131,33 @@ describe("runReview", () => {
     await expect(runReview(await input(), invalid)).rejects.toThrow(/Invalid review result/);
     expect(invalid.github.postReview).not.toHaveBeenCalled();
   });
+  it("retries body-only when GitHub rejects the inline anchors with 422", async () => {
+    const d = deps();
+    const logged: string[] = [];
+    d.log = (line) => logged.push(line);
+    d.github.postReview = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new Error("GitHub POST /repos/o/r/pulls/1/reviews failed: 422 Unprocessable Entity"),
+      )
+      .mockResolvedValueOnce({ url: "https://github.com/o/r/pull/1#pullrequestreview-9" });
+    const i = await input();
+    const outcome = await runReview(i, d);
+    expect(outcome.kind).toBe("posted");
+    const calls = (d.github.postReview as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[1]![1].comments).toEqual([]);
+    expect(calls[1]![1].body).toContain("**c**");
+    expect(logged).toContain("inline anchors rejected (422); posting body only");
+    const written = JSON.parse(await readFile(join(i.runDirectory, "review.json"), "utf8"));
+    expect(written.comments).toEqual([]);
+  });
+  it("propagates a non-422 post failure without retrying", async () => {
+    const d = deps();
+    d.github.postReview = vi.fn().mockRejectedValue(new Error("failed: 500 Server Error"));
+    await expect(runReview(await input(), d)).rejects.toThrow(/500/);
+    expect(d.github.postReview).toHaveBeenCalledTimes(1);
+  });
   it("removes the checkout even on failure", async () => {
     const d = deps({ harnessStatus: "error" });
     await runReview(await input(), d).catch(() => {});

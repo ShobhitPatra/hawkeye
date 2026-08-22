@@ -113,16 +113,25 @@ export async function runReview(
       );
 
     const result = parseReviewResult(JSON.parse(await readFile(resultPath, "utf8")));
-    const review = renderReview({
-      result,
-      headSha: pullRequest.headSha,
-      commentable: commentableLines(worktree.diff),
-      repositoryUrl: input.repositoryUrl,
-    });
-    await writeFile(join(runDirectory, "review.json"), JSON.stringify(review, null, 2));
+    const render = (commentable: Map<string, Set<number>>) =>
+      renderReview({
+        result,
+        headSha: pullRequest.headSha,
+        commentable,
+        repositoryUrl: input.repositoryUrl,
+      });
+    const reviewPath = join(runDirectory, "review.json");
+    const review = render(commentableLines(worktree.diff));
+    await writeFile(reviewPath, JSON.stringify(review, null, 2));
 
     if (input.dryRun) return { kind: "dry-run", review, headSha: pullRequest.headSha };
-    const posted = await deps.github.postReview(reference, review, token);
+    const posted = await deps.github.postReview(reference, review, token).catch(async (error) => {
+      if (!(error as Error).message.includes("422") || review.comments.length === 0) throw error;
+      deps.log("inline anchors rejected (422); posting body only");
+      const bodyOnly = render(new Map());
+      await writeFile(reviewPath, JSON.stringify(bodyOnly, null, 2));
+      return deps.github.postReview(reference, bodyOnly, token);
+    });
     return {
       kind: "posted",
       url: posted.url,
