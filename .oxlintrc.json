@@ -1,5 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "categories": { "correctness": "error", "suspicious": "warn" },
+  "rules": { "preserve-caught-error": "off" },
   "ignorePatterns": ["dist", "workspace"]
 }
