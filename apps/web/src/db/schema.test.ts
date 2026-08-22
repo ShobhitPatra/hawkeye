@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
+import { eq } from "drizzle-orm";
 import { describe, expect, it, beforeAll } from "vitest";
 import * as schema from "./schema";
 
@@ -80,5 +81,102 @@ describe("schema migrations", () => {
       .values({ armedPrId, headSha: "d", baseSha: "b", notBefore: new Date() });
     const jobs = await db.select().from(schema.job);
     expect(jobs).toHaveLength(2);
+  });
+  it("round-trips every remaining table through the Drizzle objects", async () => {
+    await db
+      .insert(schema.installation)
+      .values({ id: "3", accountLogin: "o3", accountType: "User" });
+    const armedPrReturned = await db
+      .insert(schema.armedPr)
+      .values({ userId: "u3", installationId: "3", owner: "o3", repo: "r3", number: 1 })
+      .returning({ id: schema.armedPr.id });
+    const armedPrId = armedPrReturned[0]!.id;
+    const jobReturned = await db
+      .insert(schema.job)
+      .values({ armedPrId, headSha: "a3", baseSha: "b3", notBefore: new Date() })
+      .returning({ id: schema.job.id });
+    const jobId = jobReturned[0]!.id;
+
+    const runnerReturned = await db
+      .insert(schema.runner)
+      .values({ id: "runner-3", userId: "u3", name: "runner-3", tokenHash: "hash-3" })
+      .returning();
+    expect(runnerReturned[0]).toMatchObject({
+      id: "runner-3",
+      userId: "u3",
+      name: "runner-3",
+      tokenHash: "hash-3",
+    });
+    const [selectedRunner] = await db
+      .select()
+      .from(schema.runner)
+      .where(eq(schema.runner.id, "runner-3"));
+    expect(selectedRunner).toMatchObject({
+      id: "runner-3",
+      userId: "u3",
+      name: "runner-3",
+      tokenHash: "hash-3",
+    });
+
+    const runReturned = await db
+      .insert(schema.run)
+      .values({ jobId, runnerId: "runner-3", turns: 3 })
+      .returning({ id: schema.run.id });
+    const runId = runReturned[0]!.id;
+    const [selectedRun] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
+    expect(selectedRun).toMatchObject({ id: runId, jobId, runnerId: "runner-3", turns: 3 });
+
+    await db.insert(schema.finding).values({
+      armedPrId,
+      stableId: "finding-3",
+      severity: "must_fix",
+      claim: "claim-3",
+      firstSeenSha: "a3",
+    });
+    const [selectedFinding] = await db
+      .select()
+      .from(schema.finding)
+      .where(eq(schema.finding.stableId, "finding-3"));
+    expect(selectedFinding).toMatchObject({
+      armedPrId,
+      stableId: "finding-3",
+      severity: "must_fix",
+      claim: "claim-3",
+      firstSeenSha: "a3",
+    });
+
+    await db
+      .insert(schema.reviewPosted)
+      .values({ runId, armedPrId, headSha: "a3", githubReviewId: "gh-review-3" });
+    const [selectedReviewPosted] = await db
+      .select()
+      .from(schema.reviewPosted)
+      .where(eq(schema.reviewPosted.runId, runId));
+    expect(selectedReviewPosted).toMatchObject({
+      runId,
+      armedPrId,
+      headSha: "a3",
+      githubReviewId: "gh-review-3",
+    });
+
+    await db.insert(schema.userSettings).values({ userId: "u3" });
+    const [selectedUserSettings] = await db
+      .select()
+      .from(schema.userSettings)
+      .where(eq(schema.userSettings.userId, "u3"));
+    expect(selectedUserSettings).toMatchObject({
+      userId: "u3",
+      maxTurns: 40,
+      wallClockMinutes: 15,
+      quietWindowSeconds: 180,
+      reviewDrafts: false,
+    });
+
+    await db.insert(schema.installationUser).values({ installationId: "3", userId: "u3" });
+    const [selectedInstallationUser] = await db
+      .select()
+      .from(schema.installationUser)
+      .where(eq(schema.installationUser.installationId, "3"));
+    expect(selectedInstallationUser).toMatchObject({ installationId: "3", userId: "u3" });
   });
 });
