@@ -1,5 +1,5 @@
 {
-  "id": "21d3ce9c-8c74-478b-b916-3b164cde4e55",
+  "id": "1324bb42-92ee-4709-9e9d-fd3919a30b42",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -397,7 +397,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"job\".\"state\" in ('queued', 'claimed')",
+          "where": "\"job\".\"state\" = 'queued'",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -743,7 +743,7 @@
     "public.run_status": {
       "name": "run_status",
       "schema": "public",
-      "values": ["running", "ok", "max_turns", "timeout", "error", "invalid_output"]
+      "values": ["running", "ok", "max-turns", "timeout", "error", "invalid-output"]
     }
   },
   "schemas": {},

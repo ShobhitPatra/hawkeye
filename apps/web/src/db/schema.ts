@@ -14,10 +14,10 @@ export const jobState = pgEnum("job_state", ["queued", "claimed", "done", "faile
 export const runStatus = pgEnum("run_status", [
   "running",
   "ok",
-  "max_turns",
+  "max-turns",
   "timeout",
   "error",
-  "invalid_output",
+  "invalid-output",
 ]);
 export const findingSeverity = pgEnum("finding_severity", ["must_fix", "should_fix", "inherited"]);
 
@@ -105,7 +105,7 @@ export const job = pgTable(
   (t) => [
     uniqueIndex("job_open_per_armed_pr")
       .on(t.armedPrId)
-      .where(sql`${t.state} in ('queued', 'claimed')`),
+      .where(sql`${t.state} = 'queued'`),
   ],
 );
 

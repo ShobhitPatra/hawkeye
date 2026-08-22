@@ -1,6 +1,6 @@
 CREATE TYPE "public"."finding_severity" AS ENUM('must_fix', 'should_fix', 'inherited');--> statement-breakpoint
 CREATE TYPE "public"."job_state" AS ENUM('queued', 'claimed', 'done', 'failed');--> statement-breakpoint
-CREATE TYPE "public"."run_status" AS ENUM('running', 'ok', 'max_turns', 'timeout', 'error', 'invalid_output');--> statement-breakpoint
+CREATE TYPE "public"."run_status" AS ENUM('running', 'ok', 'max-turns', 'timeout', 'error', 'invalid-output');--> statement-breakpoint
 CREATE TABLE "armed_pr" (
 	"id" text PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" text NOT NULL,
@@ -106,5 +106,5 @@ ALTER TABLE "run" ADD CONSTRAINT "run_job_id_job_id_fk" FOREIGN KEY ("job_id") R
 ALTER TABLE "run" ADD CONSTRAINT "run_runner_id_runner_id_fk" FOREIGN KEY ("runner_id") REFERENCES "public"."runner"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "armed_pr_active_unique" ON "armed_pr" USING btree ("user_id","owner","repo","number") WHERE "armed_pr"."disarmed_at" is null;--> statement-breakpoint
 CREATE UNIQUE INDEX "finding_stable_per_armed_pr" ON "finding" USING btree ("armed_pr_id","stable_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "job_open_per_armed_pr" ON "job" USING btree ("armed_pr_id") WHERE "job"."state" in ('queued', 'claimed');--> statement-breakpoint
+CREATE UNIQUE INDEX "job_open_per_armed_pr" ON "job" USING btree ("armed_pr_id") WHERE "job"."state" = 'queued';--> statement-breakpoint
 CREATE UNIQUE INDEX "review_posted_per_head" ON "review_posted" USING btree ("armed_pr_id","head_sha");
