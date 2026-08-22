@@ -32,7 +32,8 @@ const LENS_GUIDE: Record<(typeof LENSES)[number], string> = {
 };
 
 function fence(tag: string, attributes: string, content: string): string {
-  return `<${tag} ${attributes}>\n${content.replaceAll("</", "<\\/")}\n</${tag}>`;
+  const closing = new RegExp(`</${tag}`, "gi");
+  return `<${tag} ${attributes}>\n${content.replaceAll(closing, `<\\/${tag}`)}\n</${tag}>`;
 }
 
 export function buildPrompt(input: PromptInput): string {
