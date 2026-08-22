@@ -88,7 +88,7 @@ export function createClaudeCodeHarness(
         if (parsed?.type === "assistant") {
           turns += 1;
           input.onEvent({ type: "turn", turns });
-          if (turns > input.maxTurns) terminate("max-turns");
+          if (turns >= input.maxTurns) terminate("max-turns");
         }
       });
       createInterface({ input: child.stderr! }).on("line", (line) => {

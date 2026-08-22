@@ -81,7 +81,8 @@ describe("claude code harness", () => {
       input(s, { maxTurns: 3 }),
     );
     expect(result.status).toBe("max-turns");
-    expect(result.turns).toBeGreaterThanOrEqual(4);
+    expect(result.turns).toBeGreaterThanOrEqual(3);
+    expect(result.turns).toBeLessThanOrEqual(3);
   });
   it("times out on the wall clock", async () => {
     const s = await scratch();
