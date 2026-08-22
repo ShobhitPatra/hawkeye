@@ -21,7 +21,7 @@ export function commentableLines(unifiedDiff: string): Map<string, Set<number>> 
       line = Number(hunk[1]);
       continue;
     }
-    if (!current || raw.startsWith("---") || raw.startsWith("+++")) continue;
+    if (!current) continue;
     if (raw.startsWith("+") || raw.startsWith(" ")) {
       current.add(line);
       line += 1;

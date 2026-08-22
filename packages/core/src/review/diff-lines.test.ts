@@ -26,6 +26,19 @@ describe("commentableLines", () => {
     expect([...lines.get("src/a.ts")!]).toEqual([1, 2, 3, 4]);
     expect([...lines.get("new.txt")!]).toEqual([1, 2]);
   });
+  it("counts added content lines that begin with plus signs", () => {
+    const diffWithPluses = `diff --git a/src/a.c b/src/a.c
+index 1..2 100644
+--- a/src/a.c
++++ b/src/a.c
+@@ -1,2 +1,4 @@
+ int a;
++++i;
++int b;
+ int c;
+`;
+    expect([...commentableLines(diffWithPluses).get("src/a.c")!]).toEqual([1, 2, 3, 4]);
+  });
   it("returns an empty map for an empty diff", () => {
     expect(commentableLines("").size).toBe(0);
   });
