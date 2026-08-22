@@ -149,7 +149,7 @@ Reviews post as `<app-slug>[bot]` (the author's instance: `hawkeye-review[bot]`)
 ### Control plane (milestone 2, in progress)
 
 Local: `docker compose up -d --wait db`, copy `apps/web/.env.example` to `apps/web/.env`, `pnpm --filter web db:migrate`, `pnpm --filter web dev`.
-Sign-in uses the GitHub App's OAuth client: in the App settings set the callback URL to `<BETTER_AUTH_URL>/api/auth/callback/github` and generate a client secret. Env (see `apps/web/.env.example`): `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`; later: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`.
+Sign-in uses the GitHub App's OAuth client: in the App settings set the callback URL to `<BETTER_AUTH_URL>/api/auth/callback/github`, generate a client secret, and grant the account permission Email addresses: read (Better Auth needs an email; GitHub hides private ones otherwise). Env (see `apps/web/.env.example`): `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`; later: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`.
 Hosted: Vercel project rooted at `apps/web` with a Neon Postgres and the same env. Run `pnpm --filter web db:migrate` against Neon before the first deploy.
 
 ## Milestones
