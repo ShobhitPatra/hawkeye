@@ -9,13 +9,12 @@ README.md          design document
 workspace/         local-only scratch, ADRs, agent-skill config (gitignored)
 packages/core      review contract, harness interface, render, dedupe, posting
 packages/runner    hawkeye CLI (daemon in milestone 2)
+apps/web           Next.js control plane (Drizzle + Postgres)
 ```
-
-Planned (not yet created): `apps/web` (Next.js control plane).
 
 ## Commands
 
-pnpm install · pnpm lint (oxlint) · pnpm format (oxfmt; run before every commit) · pnpm typecheck · pnpm test (vitest) · pnpm build (tsup). Scope to one package with pnpm --filter <name>.
+pnpm install · pnpm lint (oxlint) · pnpm format (oxfmt; run before every commit) · pnpm typecheck · pnpm test (vitest) · pnpm build (tsup). Scope to one package with pnpm --filter <name>. Control plane: `pnpm --filter web dev|build|db:generate|db:migrate`, `docker compose up -d db` (local Postgres).
 
 ## Rules
 
