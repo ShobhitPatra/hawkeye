@@ -11,7 +11,7 @@ import {
   readRepositoryRules,
   runReview,
 } from "@hawkeye/core";
-import { loadConfig } from "./config.js";
+import { expandHome, loadConfig } from "./config.js";
 import { createRunDirectory } from "./run-directory.js";
 
 const CONFIG_PATH = join(homedir(), ".config", "hawkeye", "config.json");
@@ -29,11 +29,12 @@ function positiveInteger(flag: string, value: string): number {
 export async function loadContractOverride(input: {
   explicitPath?: string;
   env: Record<string, string | undefined>;
+  home: string;
   defaultPath: string;
   readFile(path: string): Promise<string>;
 }): Promise<{ path: string; content: string } | undefined> {
   const requested = input.explicitPath ?? input.env.HAWKEYE_CONTRACT_PATH;
-  const path = requested ?? input.defaultPath;
+  const path = requested === undefined ? input.defaultPath : expandHome(requested, input.home);
   try {
     return { path, content: await input.readFile(path) };
   } catch (error) {
@@ -84,6 +85,7 @@ export function createProgram(io: {
           const reference = parsePullRequestReference(pullRequest);
           const config = await loadConfig({
             env: process.env,
+            home: homedir(),
             configPath: CONFIG_PATH,
             readFile: (p) => readFile(p, "utf8"),
           });
@@ -104,6 +106,7 @@ export function createProgram(io: {
           const contract = await loadContractOverride({
             ...(options.contract === undefined ? {} : { explicitPath: options.contract }),
             env: process.env,
+            home: homedir(),
             defaultPath: DEFAULT_CONTRACT_PATH,
             readFile: (p) => readFile(p, "utf8"),
           });

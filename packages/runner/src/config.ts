@@ -1,7 +1,14 @@
+import { join } from "node:path";
+
 export type HawkeyeConfig = { appId: string; appSlug: string; privateKeyPath: string };
+
+export function expandHome(path: string, home: string): string {
+  return path.startsWith("~/") ? join(home, path.slice(2)) : path;
+}
 
 export async function loadConfig(input: {
   env: Record<string, string | undefined>;
+  home: string;
   configPath: string;
   readFile(path: string): Promise<string>;
 }): Promise<HawkeyeConfig> {
@@ -24,6 +31,6 @@ export async function loadConfig(input: {
   return {
     appId: pick("HAWKEYE_APP_ID", "appId"),
     appSlug: pick("HAWKEYE_APP_SLUG", "appSlug"),
-    privateKeyPath: pick("HAWKEYE_APP_PRIVATE_KEY_PATH", "privateKeyPath"),
+    privateKeyPath: expandHome(pick("HAWKEYE_APP_PRIVATE_KEY_PATH", "privateKeyPath"), input.home),
   };
 }
