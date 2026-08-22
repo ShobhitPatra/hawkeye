@@ -1,6 +1,6 @@
 import { generateKeyPairSync } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { createGitHubClient, linkedIssueNumber } from "./client.js";
+import { createGitHubClient, GitHubRequestError, linkedIssueNumber } from "./client.js";
 
 const pem = generateKeyPairSync("rsa", { modulusLength: 2048 })
   .privateKey.export({ type: "pkcs1", format: "pem" })
@@ -144,6 +144,8 @@ describe("createGitHubClient", () => {
       .catch((e: Error) => e);
     expect(String(err)).toMatch(/403.*Forbidden/);
     expect(String(err)).not.toContain("ghs_secret");
+    expect(err).toBeInstanceOf(GitHubRequestError);
+    expect((err as GitHubRequestError).status).toBe(403);
   });
   it("fetches the linked issue when the body closes one", async () => {
     const { fetchImpl } = fakeFetch({
@@ -156,6 +158,28 @@ describe("createGitHubClient", () => {
       body: "desc",
     });
     await expect(client.linkedIssue(ref, "no link", "t")).resolves.toBeUndefined();
+  });
+  it("treats a missing linked issue as absent but propagates other failures", async () => {
+    const missing = fakeFetch({
+      "GET /repos/o/r/issues/9": () => ({ status: 404, json: { message: "Not Found" } }),
+    });
+    await expect(
+      createGitHubClient({
+        appId: "1",
+        privateKeyPem: pem,
+        fetch: missing.fetchImpl,
+      }).linkedIssue(ref, "Fixes #9", "t"),
+    ).resolves.toBeUndefined();
+    const broken = fakeFetch({
+      "GET /repos/o/r/issues/9": () => ({ status: 500, json: { message: "Server Error" } }),
+    });
+    await expect(
+      createGitHubClient({
+        appId: "1",
+        privateKeyPem: pem,
+        fetch: broken.fetchImpl,
+      }).linkedIssue(ref, "Fixes #9", "t"),
+    ).rejects.toThrow(/500/);
   });
 });
 

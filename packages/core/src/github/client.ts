@@ -17,6 +17,16 @@ export type PullRequestDetails = {
 };
 export type LinkedIssue = { number: number; title: string; body: string };
 
+export class GitHubRequestError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "GitHubRequestError";
+  }
+}
+
 export interface GitHubClient {
   installationToken(reference: PullRequestReference): Promise<string>;
   pullRequest(reference: PullRequestReference, token: string): Promise<PullRequestDetails>;
@@ -73,7 +83,8 @@ export function createGitHubClient(input: {
     });
     const json = (await response.json().catch(() => ({}))) as { message?: string };
     if (!response.ok)
-      throw new Error(
+      throw new GitHubRequestError(
+        response.status,
         `GitHub ${method} ${path} failed: ${response.status} ${json.message ?? ""}`.trim(),
       );
     return json as T;
@@ -139,7 +150,11 @@ export function createGitHubClient(input: {
         "GET",
         `/repos/${reference.owner}/${reference.repo}/issues/${number}`,
         bearer(token),
-      );
+      ).catch((error: unknown) => {
+        if (error instanceof GitHubRequestError && error.status === 404) return undefined;
+        throw error;
+      });
+      if (issue === undefined) return undefined;
       return { number: issue.number, title: issue.title, body: issue.body ?? "" };
     },
     async reviews(reference, token) {
