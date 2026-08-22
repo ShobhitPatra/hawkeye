@@ -3,5 +3,3 @@ packages:
   - apps/*
 allowBuilds:
   esbuild: true
-minimumReleaseAgeExclude:
-  - "@electric-sql/pglite@0.5.6"
