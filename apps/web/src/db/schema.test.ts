@@ -86,11 +86,50 @@ describe("schema migrations", () => {
     await db
       .insert(schema.installation)
       .values({ id: "3", accountLogin: "o3", accountType: "User" });
+    const [selectedInstallation] = await db
+      .select()
+      .from(schema.installation)
+      .where(eq(schema.installation.id, "3"));
+    expect(selectedInstallation).toMatchObject({
+      id: "3",
+      accountLogin: "o3",
+      accountType: "User",
+      deletedAt: null,
+    });
+    expect(selectedInstallation?.createdAt).toBeInstanceOf(Date);
+
     const armedPrReturned = await db
       .insert(schema.armedPr)
       .values({ userId: "u3", installationId: "3", owner: "o3", repo: "r3", number: 1 })
-      .returning({ id: schema.armedPr.id });
+      .returning();
     const armedPrId = armedPrReturned[0]!.id;
+    expect(armedPrReturned[0]).toMatchObject({
+      userId: "u3",
+      installationId: "3",
+      owner: "o3",
+      repo: "r3",
+      number: 1,
+      quietWindowSeconds: null,
+      disarmedAt: null,
+    });
+    expect(armedPrReturned[0]?.armedAt).toBeInstanceOf(Date);
+
+    const [selectedArmedPr] = await db
+      .select()
+      .from(schema.armedPr)
+      .where(eq(schema.armedPr.id, armedPrId));
+    expect(selectedArmedPr).toMatchObject({
+      id: armedPrId,
+      userId: "u3",
+      installationId: "3",
+      owner: "o3",
+      repo: "r3",
+      number: 1,
+      quietWindowSeconds: null,
+      disarmedAt: null,
+    });
+    expect(selectedArmedPr?.armedAt).toBeInstanceOf(Date);
+
     const jobReturned = await db
       .insert(schema.job)
       .values({ armedPrId, headSha: "a3", baseSha: "b3", notBefore: new Date() })
