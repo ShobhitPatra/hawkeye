@@ -6,6 +6,10 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it, beforeAll } from "vitest";
 import * as schema from "./schema";
 
+async function insertUser(id: string) {
+  await db.insert(schema.user).values({ id, name: id, email: `${id}@example.com` });
+}
+
 async function expectUniqueViolation(promise: Promise<unknown>, indexName: string) {
   await expect(promise).rejects.toMatchObject({
     cause: expect.objectContaining({ message: expect.stringContaining(indexName) }),
@@ -28,6 +32,7 @@ describe("schema migrations", () => {
       "select table_name from information_schema.tables where table_schema = 'public' order by 1",
     );
     expect(rows.map((r) => r.table_name)).toEqual([
+      "account",
       "armed_pr",
       "finding",
       "installation",
@@ -36,10 +41,32 @@ describe("schema migrations", () => {
       "review_posted",
       "run",
       "runner",
+      "session",
+      "user",
       "user_settings",
+      "verification",
     ]);
   });
+  it("rejects an armed pr for an unknown user and accepts it once the user exists", async () => {
+    await db
+      .insert(schema.installation)
+      .values({ id: "0", accountLogin: "o0", accountType: "User" });
+    await expect(
+      db
+        .insert(schema.armedPr)
+        .values({ userId: "ghost", installationId: "0", owner: "o0", repo: "r0", number: 1 }),
+    ).rejects.toMatchObject({
+      cause: expect.objectContaining({
+        message: expect.stringContaining("armed_pr_user_id_user_id_fk"),
+      }),
+    });
+    await insertUser("ghost");
+    await db
+      .insert(schema.armedPr)
+      .values({ userId: "ghost", installationId: "0", owner: "o0", repo: "r0", number: 1 });
+  });
   it("allows one active armed pr per user and pull request", async () => {
+    await insertUser("u");
     await db
       .insert(schema.installation)
       .values({ id: "1", accountLogin: "o", accountType: "User" });
@@ -83,6 +110,7 @@ describe("schema migrations", () => {
     expect(jobs).toHaveLength(2);
   });
   it("round-trips every remaining table through the Drizzle objects", async () => {
+    await insertUser("u3");
     await db
       .insert(schema.installation)
       .values({ id: "3", accountLogin: "o3", accountType: "User" });

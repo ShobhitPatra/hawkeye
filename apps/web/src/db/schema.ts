@@ -9,6 +9,9 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { user } from "./auth-schema.js";
+
+export * from "./auth-schema.js";
 
 export const jobState = pgEnum("job_state", ["queued", "claimed", "done", "failed"]);
 export const runStatus = pgEnum("run_status", [
@@ -39,7 +42,9 @@ export const installationUser = pgTable(
     installationId: text("installation_id")
       .notNull()
       .references(() => installation.id),
-    userId: text("user_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id),
   },
   (t) => [primaryKey({ columns: [t.installationId, t.userId] })],
 );
@@ -50,7 +55,9 @@ export const armedPr = pgTable(
     id: text("id")
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    userId: text("user_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id),
     installationId: text("installation_id")
       .notNull()
       .references(() => installation.id),
@@ -72,7 +79,9 @@ export const runner = pgTable("runner", {
   id: text("id")
     .primaryKey()
     .default(sql`gen_random_uuid()`),
-  userId: text("user_id").notNull(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id),
   name: text("name").notNull(),
   tokenHash: text("token_hash").notNull().unique(),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
@@ -168,7 +177,9 @@ export const reviewPosted = pgTable(
 );
 
 export const userSettings = pgTable("user_settings", {
-  userId: text("user_id").primaryKey(),
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id),
   promptOverride: text("prompt_override"),
   maxTurns: integer("max_turns").notNull().default(40),
   wallClockMinutes: integer("wall_clock_min").notNull().default(15),

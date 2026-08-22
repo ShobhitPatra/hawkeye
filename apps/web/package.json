@@ -9,9 +9,11 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
+    "auth:generate": "npx auth@latest generate --config src/auth.ts --output src/db/auth-schema.ts -y",
     "db:migrate": "tsx --env-file-if-exists=.env src/db/migrate.ts"
   },
   "dependencies": {
+    "better-auth": "^1.7.1",
     "drizzle-orm": "^0.45.2",
     "next": "^16.3.2",
     "pg": "^8.23.0",
