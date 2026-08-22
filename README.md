@@ -74,17 +74,17 @@ GitHub App ─────── webhooks ──▶ Control plane   (Next.js + P
 ## How a review runs
 
 ```
-job: (repo, pr, head sha, base sha, previously reviewed sha?, open finding ids)
+job: (repo, pr, head sha, merge base sha, previously reviewed sha?, open finding ids)
         │   starts after quiet window (default 3 min, 0 = immediate)
         ▼
- git worktree of PR head (shallow, temp) + base diff / interdiff, PR title/body, linked issue
+ git worktree of PR head (shallow, temp) + diff from the merge base / interdiff, PR title/body, linked issue
         │
         ▼
- claude -p --output-format stream-json --max-turns N --append-system-prompt <contract>
+ claude -p --output-format stream-json … (prompt on stdin; contract is the prompt)
    · contract: six lenses + JSON output schema + prior open findings
    · Stop hook: refuse to stop until the result file is written
-   · tools: Read/Grep/Glob/Bash on the checkout; WebFetch/WebSearch denied
-   · budget: max-turns 40, wall clock 15 min (per-user tunable)
+   · tools: Read/Grep/Glob/Bash; WebFetch/WebSearch removed with --disallowedTools (bypassPermissions, so Bash is unrestricted inside the checkout)
+   · budget: turns (harness-enforced, default 40), wall clock 15 min (per-user tunable)
         │
         ▼
  runner: parse + validate JSON (zod) → report to control plane
@@ -102,7 +102,7 @@ Failures (CLI error, max-turns, invalid JSON, timeout) never touch the PR; they 
 
 ## Review contract
 
-Six **lenses**, each assessed once: **intent** (does the change do what the PR and linked issue say, and only that), **behavior** (logic, edge cases, failure modes, races, broken invariants), **blast radius** (public surface, configuration, migrations, performance, security, dependencies), **verification** (are the changed behaviours proven by meaningful tests at the right seam), **fit** (this repository's own rules and patterns), **hygiene** (commit quality, docs in lockstep, licensing, secrets, anything a maintainer must gate on). Finding severities: must-fix / should-fix / inherited (a problem in code the PR touches but did not introduce). Verdict: ship / revise / hold. Line-anchor only when the finding is about specific changed lines; `suggestion` only when an exact textual replacement fully fixes it. The prompt is repo-agnostic ("discover the repo's layout and conventions, don't assume them"); the target repo's own `AGENTS.md` / `CLAUDE.md` / `CONTRIBUTING.md` are inlined at run time as repository rules for the fit and hygiene lenses to judge against. Any prompt that quotes PR bodies or issue text is injection-guarded.
+Six **lenses**, each assessed once: **intent** (does the change do what the PR and linked issue say, and only that), **behavior** (logic, edge cases, failure modes, races, broken invariants), **blast radius** (public surface, configuration, migrations, performance, security, dependencies), **verification** (are the changed behaviours proven by meaningful tests at the right seam), **fit** (this repository's own rules and patterns), **hygiene** (commit quality, docs in lockstep, licensing, secrets, anything a maintainer must gate on). Finding severities: must-fix / should-fix / inherited (a problem in code the PR touches but did not introduce). Verdict: ship / revise / hold. Line-anchor only when the finding is about specific changed lines; `suggestion` only when an exact single-line replacement fully fixes it. The prompt is repo-agnostic ("discover the repo's layout and conventions, don't assume them"); the target repo's own `AGENTS.md` / `CLAUDE.md` / `CONTRIBUTING.md` are inlined at run time as repository rules for the fit and hygiene lenses to judge against. Any prompt that quotes PR bodies or issue text is injection-guarded.
 
 Contract override: a private contract file replaces the built-in lens and finding rules while the untrusted-data fences, repository rules, diff and JSON output schema stay. The runner reads `--contract <path>`, else `HAWKEYE_CONTRACT_PATH`, else `~/.config/hawkeye/contract.md` when it exists.
 
