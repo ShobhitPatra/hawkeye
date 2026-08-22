@@ -43,29 +43,40 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
   };
 
   await git(undefined, "init", "--quiet", input.directory);
-  await git(input.directory, "remote", "add", "origin", authenticated(input.cloneUrl, input.token));
-  await git(
-    input.directory,
-    "fetch",
-    "--quiet",
-    "--depth",
-    "1",
-    "origin",
-    `pull/${input.pullRequestNumber}/head`,
-  );
-  await git(input.directory, "checkout", "--quiet", "--detach", "FETCH_HEAD");
-  const head = (await git(input.directory, "rev-parse", "HEAD")).trim();
-  if (head !== input.headSha)
-    throw new Error(`Head moved: expected ${input.headSha}, checkout is at ${head}`);
-  await git(input.directory, "fetch", "--quiet", "--depth", "1", "origin", input.baseSha);
-  await git(input.directory, "remote", "remove", "origin");
-  const diff = await git(input.directory, "diff", `${input.baseSha}..HEAD`);
+  try {
+    await git(
+      input.directory,
+      "remote",
+      "add",
+      "origin",
+      authenticated(input.cloneUrl, input.token),
+    );
+    await git(
+      input.directory,
+      "fetch",
+      "--quiet",
+      "--depth",
+      "1",
+      "origin",
+      `pull/${input.pullRequestNumber}/head`,
+    );
+    const fetchedHead = (await git(input.directory, "rev-parse", "FETCH_HEAD")).trim();
+    await git(input.directory, "fetch", "--quiet", "--depth", "1", "origin", input.baseSha);
+    await git(input.directory, "remote", "remove", "origin");
+    await git(input.directory, "checkout", "--quiet", "--detach", fetchedHead);
+    if (fetchedHead !== input.headSha)
+      throw new Error(`Head moved: expected ${input.headSha}, checkout is at ${fetchedHead}`);
+    const diff = await git(input.directory, "diff", `${input.baseSha}..HEAD`);
 
-  return {
-    path: input.directory,
-    diff,
-    remove: () => rm(input.directory, { recursive: true, force: true }),
-  };
+    return {
+      path: input.directory,
+      diff,
+      remove: () => rm(input.directory, { recursive: true, force: true }),
+    };
+  } catch (error) {
+    await rm(input.directory, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 export async function readRepositoryRules(

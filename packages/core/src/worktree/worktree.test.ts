@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, writeFile, readFile, mkdir } from "node:fs/promises";
+import { mkdtemp, writeFile, readFile, mkdir, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -109,7 +109,7 @@ describe("createWorktree", () => {
     expect(wt.diff).not.toContain("-main only");
     await wt.remove();
   });
-  it("fails when the head moved", async () => {
+  it("fails when the head moved and removes the checkout", async () => {
     const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
     await expect(
       createWorktree({
@@ -120,6 +120,20 @@ describe("createWorktree", () => {
         directory,
       }),
     ).rejects.toThrow(/head/i);
+    await expect(stat(directory)).rejects.toThrow();
+  });
+  it("removes the checkout when a fetch fails", async () => {
+    const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
+    await expect(
+      createWorktree({
+        cloneUrl: origin,
+        pullRequestNumber: 99,
+        headSha,
+        baseSha,
+        directory,
+      }),
+    ).rejects.toThrow(/fetch/);
+    await expect(stat(directory)).rejects.toThrow();
   });
 });
 
