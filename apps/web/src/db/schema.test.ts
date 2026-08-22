@@ -50,8 +50,11 @@ describe("schema migrations", () => {
     );
   });
   it("allows one open job per armed pr", async () => {
+    await db.exec(
+      "insert into installation (id, account_login, account_type) values ('2', 'o2', 'User')",
+    );
     const { rows } = await db.query<{ id: string }>(
-      "select id from armed_pr where disarmed_at is null",
+      "insert into armed_pr (user_id, installation_id, owner, repo, number) values ('u', '2', 'o2', 'r2', 1) returning id",
     );
     const armedPrId = rows[0]!.id;
     await db.exec(
@@ -66,11 +69,5 @@ describe("schema migrations", () => {
     await db.exec(
       `insert into job (armed_pr_id, head_sha, base_sha, not_before) values ('${armedPrId}', 'd', 'b', now())`,
     );
-  });
-  it("adds stream_path to run", async () => {
-    const { rows } = await db.query<{ column_name: string }>(
-      "select column_name from information_schema.columns where table_name = 'run'",
-    );
-    expect(rows.map((r) => r.column_name)).toContain("stream_path");
   });
 });

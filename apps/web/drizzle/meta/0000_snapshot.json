@@ -1,5 +1,5 @@
 {
-  "id": "fca728f0-eb25-4953-8b6d-ea4695e57f5b",
+  "id": "21d3ce9c-8c74-478b-b916-3b164cde4e55",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -409,6 +409,15 @@
           "tableFrom": "job",
           "tableTo": "armed_pr",
           "columnsFrom": ["armed_pr_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "job_claimed_by_runner_id_runner_id_fk": {
+          "name": "job_claimed_by_runner_id_runner_id_fk",
+          "tableFrom": "job",
+          "tableTo": "runner",
+          "columnsFrom": ["claimed_by_runner_id"],
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"

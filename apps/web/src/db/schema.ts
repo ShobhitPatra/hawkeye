@@ -68,6 +68,18 @@ export const armedPr = pgTable(
   ],
 );
 
+export const runner = pgTable("runner", {
+  id: text("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  ...timestamps,
+});
+
 export const job = pgTable(
   "job",
   {
@@ -81,7 +93,7 @@ export const job = pgTable(
     baseSha: text("base_sha").notNull(),
     notBefore: timestamp("not_before", { withTimezone: true }).notNull(),
     state: jobState("state").notNull().default("queued"),
-    claimedByRunnerId: text("claimed_by_runner_id"),
+    claimedByRunnerId: text("claimed_by_runner_id").references(() => runner.id),
     claimedAt: timestamp("claimed_at", { withTimezone: true }),
     heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -96,18 +108,6 @@ export const job = pgTable(
       .where(sql`${t.state} in ('queued', 'claimed')`),
   ],
 );
-
-export const runner = pgTable("runner", {
-  id: text("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  userId: text("user_id").notNull(),
-  name: text("name").notNull(),
-  tokenHash: text("token_hash").notNull().unique(),
-  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
-  revokedAt: timestamp("revoked_at", { withTimezone: true }),
-  ...timestamps,
-});
 
 export const run = pgTable("run", {
   id: text("id")

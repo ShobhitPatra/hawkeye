@@ -99,6 +99,7 @@ ALTER TABLE "armed_pr" ADD CONSTRAINT "armed_pr_installation_id_installation_id_
 ALTER TABLE "finding" ADD CONSTRAINT "finding_armed_pr_id_armed_pr_id_fk" FOREIGN KEY ("armed_pr_id") REFERENCES "public"."armed_pr"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "installation_user" ADD CONSTRAINT "installation_user_installation_id_installation_id_fk" FOREIGN KEY ("installation_id") REFERENCES "public"."installation"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "job" ADD CONSTRAINT "job_armed_pr_id_armed_pr_id_fk" FOREIGN KEY ("armed_pr_id") REFERENCES "public"."armed_pr"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "job" ADD CONSTRAINT "job_claimed_by_runner_id_runner_id_fk" FOREIGN KEY ("claimed_by_runner_id") REFERENCES "public"."runner"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "review_posted" ADD CONSTRAINT "review_posted_run_id_run_id_fk" FOREIGN KEY ("run_id") REFERENCES "public"."run"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "review_posted" ADD CONSTRAINT "review_posted_armed_pr_id_armed_pr_id_fk" FOREIGN KEY ("armed_pr_id") REFERENCES "public"."armed_pr"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "run" ADD CONSTRAINT "run_job_id_job_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."job"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
