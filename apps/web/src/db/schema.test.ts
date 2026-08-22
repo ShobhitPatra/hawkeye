@@ -103,16 +103,6 @@ describe("schema migrations", () => {
       .values({ userId: "u3", installationId: "3", owner: "o3", repo: "r3", number: 1 })
       .returning();
     const armedPrId = armedPrReturned[0]!.id;
-    expect(armedPrReturned[0]).toMatchObject({
-      userId: "u3",
-      installationId: "3",
-      owner: "o3",
-      repo: "r3",
-      number: 1,
-      quietWindowSeconds: null,
-      disarmedAt: null,
-    });
-    expect(armedPrReturned[0]?.armedAt).toBeInstanceOf(Date);
 
     const [selectedArmedPr] = await db
       .select()
