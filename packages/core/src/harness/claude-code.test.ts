@@ -42,7 +42,7 @@ describe("claude code harness", () => {
   it("passes the expected flags and reports ok when the result exists", async () => {
     const s = await scratch();
     const exe = await fakeClaude(
-      `printf '%s\\n' "$@" > "$(dirname "$0")/args"; echo '{"type":"assistant"}'; echo '{"type":"result"}'; echo '{"ok":true}' > "${s.resultPath}"`,
+      `printf '%s\\n' "$@" > "$(dirname "$0")/args"; cat > "$(dirname "$0")/stdin"; echo '{"type":"assistant"}'; echo '{"type":"result"}'; echo '{"ok":true}' > "${s.resultPath}"`,
     );
     const events: unknown[] = [];
     const result = await createClaudeCodeHarness({ executable: exe }).run(
@@ -50,7 +50,9 @@ describe("claude code harness", () => {
     );
     expect(result).toEqual({ status: "ok", turns: 1 });
     const args = (await readFile(join(exe, "..", "args"), "utf8")).split("\n");
-    expect(args.slice(0, 2)).toEqual(["-p", "prompt"]);
+    expect(args[0]).toBe("-p");
+    expect(args).not.toContain("prompt");
+    expect(await readFile(join(exe, "..", "stdin"), "utf8")).toBe("prompt");
     for (const flag of [
       "--output-format",
       "stream-json",

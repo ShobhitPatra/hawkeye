@@ -38,7 +38,6 @@ export function createClaudeCodeHarness(
       const prompt = await readFile(input.promptPath, "utf8");
       const args = [
         "-p",
-        prompt,
         "--output-format",
         "stream-json",
         "--verbose",
@@ -53,13 +52,20 @@ export function createClaudeCodeHarness(
       ];
       const child = spawn(executable, args, {
         cwd: input.cwd,
-        stdio: ["ignore", "pipe", "pipe"],
+        stdio: ["pipe", "pipe", "pipe"],
         detached: true,
       });
 
       let turns = 0;
       let stopReason: "max-turns" | "timeout" | undefined;
       const stderrTail: string[] = [];
+
+      child.stdin!.on("error", (error: Error) => {
+        const line = `stdin: ${error.message}`;
+        input.onEvent({ type: "stderr", line });
+        stderrTail.push(line);
+      });
+      child.stdin!.end(prompt);
 
       const killGroup = (signal: NodeJS.Signals) => {
         if (child.pid === undefined) return;
