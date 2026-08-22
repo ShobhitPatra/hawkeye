@@ -9,7 +9,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/db/migrate.ts"
+    "db:migrate": "tsx --env-file-if-exists=.env src/db/migrate.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
