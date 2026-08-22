@@ -1,3 +1,4 @@
+import { appendFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -45,6 +46,7 @@ export function createProgram(io: {
         options: { dryRun: boolean; force: boolean; maxTurns: string; wallClockMinutes: string },
       ) => {
         let runDirectory: string | undefined;
+        let log = io.stderr;
         try {
           const maxTurns = positiveInteger("--max-turns", options.maxTurns);
           const wallClockMinutes = positiveInteger(
@@ -58,15 +60,25 @@ export function createProgram(io: {
             readFile: (p) => readFile(p, "utf8"),
           });
           const privateKeyPem = await readFile(config.privateKeyPath, "utf8");
-          runDirectory = await createRunDirectory({ root: RUNS_ROOT, reference, now: new Date() });
-          io.stderr(`run directory: ${runDirectory}`);
+          const directory = await createRunDirectory({
+            root: RUNS_ROOT,
+            reference,
+            now: new Date(),
+          });
+          runDirectory = directory;
+          const logPath = join(directory, "log.txt");
+          log = (line: string) => {
+            io.stderr(line);
+            appendFileSync(logPath, `${line}\n`);
+          };
+          log(`run directory: ${directory}`);
 
           const outcome = await runReview(
             {
               reference,
               botLogin: `${config.appSlug}[bot]`,
               repositoryUrl: REPOSITORY_URL,
-              runDirectory,
+              runDirectory: directory,
               maxTurns,
               wallClockMs: wallClockMinutes * 60_000,
               dryRun: options.dryRun,
@@ -77,7 +89,7 @@ export function createProgram(io: {
               harness: createClaudeCodeHarness(),
               createWorktree,
               readRepositoryRules,
-              log: io.stderr,
+              log,
             },
           );
 
@@ -92,8 +104,8 @@ export function createProgram(io: {
           if (outcome.kind === "posted")
             io.stdout(`posted ${outcome.findings} finding(s): ${outcome.url}`);
         } catch (error) {
-          io.stderr(`error: ${(error as Error).message}`);
-          if (runDirectory) io.stderr(`run directory: ${runDirectory}`);
+          log(`error: ${(error as Error).message}`);
+          if (runDirectory) log(`run directory: ${runDirectory}`);
           process.exitCode = 1;
         }
       },
