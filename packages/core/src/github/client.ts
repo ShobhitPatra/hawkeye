@@ -160,12 +160,12 @@ export function createGitHubClient(input: {
     async reviews(reference, token) {
       const all: ExistingReview[] = [];
       for (let page = 1; ; page += 1) {
-        const list = await request<{ user: { login: string }; body: string }[]>(
+        const list = await request<{ user: { login: string } | null; body: string }[]>(
           "GET",
           `${pulls(reference)}/reviews?per_page=100&page=${page}`,
           bearer(token),
         );
-        all.push(...list.map((r) => ({ authorLogin: r.user.login, body: r.body ?? "" })));
+        all.push(...list.map((r) => ({ authorLogin: r.user?.login ?? "", body: r.body ?? "" })));
         if (list.length < 100) return all;
       }
     },
