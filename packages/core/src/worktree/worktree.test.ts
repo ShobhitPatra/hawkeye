@@ -57,6 +57,24 @@ describe("createWorktree", () => {
     await wt.remove();
     await expect(readFile(join(wt.path, "a.txt"))).rejects.toThrow();
   });
+  it("leaves no origin remote or token behind", async () => {
+    const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
+    const wt = await createWorktree({
+      cloneUrl: origin,
+      token: "ghs_secrettoken",
+      pullRequestNumber: 1,
+      headSha,
+      baseSha,
+      directory,
+    });
+    expect(wt.diff).toContain("+two");
+    const config = await readFile(join(directory, ".git", "config"), "utf8");
+    expect(config).not.toContain("x-access-token");
+    expect(config).not.toContain("ghs_secrettoken");
+    expect(config).not.toMatch(/\[remote "origin"\]/);
+    expect((await git(directory, "remote")).stdout.trim()).toBe("");
+    await wt.remove();
+  });
   it("fails when the head moved", async () => {
     const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
     await expect(

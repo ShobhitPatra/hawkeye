@@ -18,7 +18,8 @@ export type CreateWorktreeInput = {
 
 function authenticated(cloneUrl: string, token: string | undefined): string {
   if (token === undefined) return cloneUrl;
-  const url = new URL(cloneUrl);
+  const url = URL.parse(cloneUrl);
+  if (url === null || (url.protocol !== "http:" && url.protocol !== "https:")) return cloneUrl;
   url.username = "x-access-token";
   url.password = token;
   return url.toString();
@@ -57,6 +58,7 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
   if (head !== input.headSha)
     throw new Error(`Head moved: expected ${input.headSha}, checkout is at ${head}`);
   await git(input.directory, "fetch", "--quiet", "--depth", "1", "origin", input.baseSha);
+  await git(input.directory, "remote", "remove", "origin");
   const diff = await git(input.directory, "diff", `${input.baseSha}..HEAD`);
 
   return {
