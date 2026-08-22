@@ -77,7 +77,7 @@ Each finding has a severity:
 - inherited: a problem in code the PR touches but did not introduce.
 Rules:
 - Give path and line only when the finding is about specific changed lines; line is the line number in the head version (RIGHT side). Otherwise omit path and line.
-- Give suggestion only when an exact textual replacement of that line range fully fixes the finding; suggestion is the replacement text, no fences.
+- Give suggestion only when an exact textual replacement of that single line fully fixes the finding; suggestion is the replacement text, no fences.
 - claim is one sentence; detail explains why and how to fix.
 - Do not repeat the same finding for every occurrence; state it once and list the other locations in detail.`);
   } else {

@@ -44,6 +44,7 @@ describe("buildPrompt", () => {
     const p = buildPrompt(input);
     expect(p).toMatch(/line.*only.*changed lines/i);
     expect(p).toMatch(/suggestion.*only.*exact/i);
+    expect(p).toMatch(/single line/);
   });
   it("replaces the built-in lens and findings guidance with a contract override", () => {
     const p = buildPrompt({ ...input, contractOverride: "CUSTOM RULES" });
