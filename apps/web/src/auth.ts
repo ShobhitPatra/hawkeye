@@ -17,9 +17,9 @@ function createAuth() {
   });
 }
 
-let instance: ReturnType<typeof createAuth> | undefined;
+const authCache = globalThis as typeof globalThis & { hawkeyeAuth?: ReturnType<typeof createAuth> };
 
 export function getAuth() {
-  instance ??= createAuth();
-  return instance;
+  authCache.hawkeyeAuth ??= createAuth();
+  return authCache.hawkeyeAuth;
 }
