@@ -70,6 +70,23 @@ describe("createGitHubClient", () => {
       cloneUrl: "https://github.com/o/r.git",
     });
   });
+  it("resolves the merge base of the base and head shas", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      "GET /repos/o/r/compare/base...head": () => ({
+        json: { merge_base_commit: { sha: "m".repeat(40) } },
+      }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(client.mergeBase(ref, "base", "head", "t")).resolves.toBe("m".repeat(40));
+    expect(calls[0]!.url).toContain("/repos/o/r/compare/base...head");
+  });
+  it("rejects a comparison without a merge base sha", async () => {
+    const { fetchImpl } = fakeFetch({
+      "GET /repos/o/r/compare/base...head": () => ({ json: {} }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(client.mergeBase(ref, "base", "head", "t")).rejects.toThrow(/merge base/);
+  });
   it("lists reviews with author login and body, and posts a review", async () => {
     const { fetchImpl, calls } = fakeFetch({
       "GET /repos/o/r/pulls/5/reviews": () => ({

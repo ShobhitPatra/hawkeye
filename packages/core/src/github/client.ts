@@ -20,6 +20,12 @@ export type LinkedIssue = { number: number; title: string; body: string };
 export interface GitHubClient {
   installationToken(reference: PullRequestReference): Promise<string>;
   pullRequest(reference: PullRequestReference, token: string): Promise<PullRequestDetails>;
+  mergeBase(
+    reference: PullRequestReference,
+    baseSha: string,
+    headSha: string,
+    token: string,
+  ): Promise<string>;
   linkedIssue(
     reference: PullRequestReference,
     body: string,
@@ -114,6 +120,17 @@ export function createGitHubClient(input: {
         baseRef: pr.base.ref,
         cloneUrl: pr.base.repo.clone_url,
       };
+    },
+    async mergeBase(reference, baseSha, headSha, token) {
+      const path = `/repos/${reference.owner}/${reference.repo}/compare/${baseSha}...${headSha}`;
+      const comparison = await request<{ merge_base_commit?: { sha?: unknown } }>(
+        "GET",
+        path,
+        bearer(token),
+      );
+      const sha = comparison.merge_base_commit?.sha;
+      if (typeof sha !== "string") throw new Error(`GitHub GET ${path} returned no merge base sha`);
+      return sha;
     },
     async linkedIssue(reference, body, token) {
       const number = linkedIssueNumber(body);

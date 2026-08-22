@@ -38,6 +38,7 @@ function deps(
       baseRef: "main",
       cloneUrl: "https://github.com/o/r.git",
     })),
+    mergeBase: vi.fn(async () => "m".repeat(40)),
     linkedIssue: vi.fn(async () => ({ number: 2, title: "I", body: "ib" })),
     reviews: vi.fn(async () => overrides.reviews ?? []),
     postReview: vi.fn(async () => ({ url: "https://github.com/o/r/pull/1#pullrequestreview-9" })),
@@ -106,14 +107,23 @@ describe("runReview", () => {
     expect(d.createWorktree.mock.calls[0]![0]).toMatchObject({
       token: "ghs_t",
       headSha: sha,
+      baseSha: "m".repeat(40),
       directory: join(i.runDirectory, "checkout"),
     });
+    expect(await readFile(join(i.runDirectory, "prompt.md"), "utf8")).toContain("m".repeat(40));
   });
   it("passes a contract override into the prompt", async () => {
     const d = deps();
     const i = await input({ contractOverride: "CUSTOM RULES" });
     await runReview(i, d);
     expect(await readFile(join(i.runDirectory, "prompt.md"), "utf8")).toContain("CUSTOM RULES");
+  });
+  it("does not resolve the merge base when the head was already reviewed", async () => {
+    const d = deps({
+      reviews: [{ authorLogin: "hawkeye-review[bot]", body: `<!-- hawkeye: head=${sha} -->` }],
+    });
+    await runReview(await input(), d);
+    expect(d.github.mergeBase).not.toHaveBeenCalled();
   });
   it("skips when already reviewed unless forced", async () => {
     const reviews = [{ authorLogin: "hawkeye-review[bot]", body: `<!-- hawkeye: head=${sha} -->` }];

@@ -41,9 +41,6 @@ export async function runReview(
   const { reference, runDirectory } = input;
   const token = await deps.github.installationToken(reference);
   const pullRequest = await deps.github.pullRequest(reference, token);
-  deps.log(
-    `PR #${pullRequest.number} "${pullRequest.title}" head ${pullRequest.headSha.slice(0, 7)} base ${pullRequest.baseSha.slice(0, 7)}`,
-  );
 
   if (
     !input.force &&
@@ -56,12 +53,22 @@ export async function runReview(
     return { kind: "already-reviewed", headSha: pullRequest.headSha };
   }
 
+  const mergeBase = await deps.github.mergeBase(
+    reference,
+    pullRequest.baseSha,
+    pullRequest.headSha,
+    token,
+  );
+  deps.log(
+    `PR #${pullRequest.number} "${pullRequest.title}" head ${pullRequest.headSha.slice(0, 7)} merge base ${mergeBase.slice(0, 7)}`,
+  );
+
   const worktree = await deps.createWorktree({
     cloneUrl: pullRequest.cloneUrl,
     token,
     pullRequestNumber: pullRequest.number,
     headSha: pullRequest.headSha,
-    baseSha: pullRequest.baseSha,
+    baseSha: mergeBase,
     directory: join(runDirectory, "checkout"),
   });
   try {
@@ -83,7 +90,7 @@ export async function runReview(
           title: pullRequest.title,
           body: pullRequest.body,
           author: pullRequest.author,
-          baseSha: pullRequest.baseSha,
+          baseSha: mergeBase,
           headSha: pullRequest.headSha,
         },
         ...(linkedIssue ? { linkedIssue } : {}),

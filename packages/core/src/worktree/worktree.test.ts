@@ -75,6 +75,40 @@ describe("createWorktree", () => {
     expect((await git(directory, "remote")).stdout.trim()).toBe("");
     await wt.remove();
   });
+  it("diffs against the merge base when the base branch advanced", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hawkeye-wt-"));
+    const work = join(root, "work");
+    const advanced = join(root, "origin.git");
+    await mkdir(work);
+    await git(work, "init", "-q", "-b", "main");
+    await writeFile(join(work, "a.txt"), "one\n");
+    await git(work, "add", ".");
+    await git(work, "commit", "-q", "-m", "base");
+    const forkPoint = (await git(work, "rev-parse", "HEAD")).stdout.trim();
+    await git(work, "switch", "-q", "-c", "feat");
+    await writeFile(join(work, "a.txt"), "one\ntwo\n");
+    await git(work, "commit", "-q", "-am", "head");
+    const featSha = (await git(work, "rev-parse", "HEAD")).stdout.trim();
+    await git(work, "switch", "-q", "main");
+    await writeFile(join(work, "b.txt"), "main only\n");
+    await git(work, "add", ".");
+    await git(work, "commit", "-q", "-m", "advance");
+    await git(root, "clone", "-q", "--bare", work, advanced);
+    await git(root, "--git-dir", advanced, "update-ref", "refs/pull/1/head", featSha);
+
+    const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
+    const wt = await createWorktree({
+      cloneUrl: advanced,
+      pullRequestNumber: 1,
+      headSha: featSha,
+      baseSha: forkPoint,
+      directory,
+    });
+    expect(wt.diff).toContain("+two");
+    expect(wt.diff).not.toContain("b.txt");
+    expect(wt.diff).not.toContain("-main only");
+    await wt.remove();
+  });
   it("fails when the head moved", async () => {
     const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
     await expect(
