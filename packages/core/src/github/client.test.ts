@@ -113,6 +113,21 @@ describe("createGitHubClient", () => {
       comments: [],
     });
   });
+  it("tolerates reviews whose author account was deleted", async () => {
+    const { fetchImpl } = fakeFetch({
+      "GET /repos/o/r/pulls/5/reviews": () => ({
+        json: [
+          { user: null, body: "x" },
+          { user: { login: "alice" }, body: "y" },
+        ],
+      }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(client.reviews(ref, "t")).resolves.toEqual([
+      { authorLogin: "", body: "x" },
+      { authorLogin: "alice", body: "y" },
+    ]);
+  });
   it("pages through reviews until a short page", async () => {
     const { fetchImpl, calls } = fakeFetch({
       "GET /repos/o/r/pulls/5/reviews": (_init, url) => ({
