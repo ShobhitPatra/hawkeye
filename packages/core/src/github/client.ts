@@ -126,20 +126,22 @@ export function createGitHubClient(input: {
       return { number: issue.number, title: issue.title, body: issue.body ?? "" };
     },
     async reviews(reference, token) {
-      const list = await request<{ user: { login: string }; body: string }[]>(
-        "GET",
-        `${pulls(reference)}/reviews?per_page=100`,
-        bearer(token),
-      );
-      return list.map((r) => ({ authorLogin: r.user.login, body: r.body ?? "" }));
+      const all: ExistingReview[] = [];
+      for (let page = 1; ; page += 1) {
+        const list = await request<{ user: { login: string }; body: string }[]>(
+          "GET",
+          `${pulls(reference)}/reviews?per_page=100&page=${page}`,
+          bearer(token),
+        );
+        all.push(...list.map((r) => ({ authorLogin: r.user.login, body: r.body ?? "" })));
+        if (list.length < 100) return all;
+      }
     },
     async postReview(reference, review, token) {
-      const posted = await request<{ html_url: string }>(
-        "POST",
-        `${pulls(reference)}/reviews`,
-        bearer(token),
-        review,
-      );
+      const path = `${pulls(reference)}/reviews`;
+      const posted = await request<{ html_url?: unknown }>("POST", path, bearer(token), review);
+      if (typeof posted.html_url !== "string")
+        throw new Error(`GitHub POST ${path} returned no review url`);
       return { url: posted.html_url };
     },
   };

@@ -6,17 +6,20 @@ const pem = generateKeyPairSync("rsa", { modulusLength: 2048 })
   .privateKey.export({ type: "pkcs1", format: "pem" })
   .toString();
 const ref = { owner: "o", repo: "r", number: 5 };
+const reviewPage = (login: string, count: number) =>
+  Array.from({ length: count }, () => ({ user: { login }, body: "b" }));
 
 function fakeFetch(
-  routes: Record<string, (init: RequestInit) => { status?: number; json: unknown }>,
+  routes: Record<string, (init: RequestInit, url: URL) => { status?: number; json: unknown }>,
 ) {
   const calls: { url: string; init: RequestInit }[] = [];
   const fetchImpl = vi.fn(async (url: string | URL | Request, init: RequestInit = {}) => {
-    const key = `${init.method ?? "GET"} ${new URL(String(url)).pathname}`;
+    const parsed = new URL(String(url));
+    const key = `${init.method ?? "GET"} ${parsed.pathname}`;
     calls.push({ url: String(url), init });
     const route = routes[key];
     if (!route) return new Response(JSON.stringify({ message: "no route" }), { status: 404 });
-    const { status = 200, json } = route(init);
+    const { status = 200, json } = route(init, parsed);
     return new Response(JSON.stringify(json), { status });
   });
   return { fetchImpl: fetchImpl as unknown as typeof fetch, calls };
@@ -92,6 +95,28 @@ describe("createGitHubClient", () => {
       body: "b",
       comments: [],
     });
+  });
+  it("pages through reviews until a short page", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      "GET /repos/o/r/pulls/5/reviews": (_init, url) => ({
+        json: url.searchParams.get("page") === "1" ? reviewPage("a", 100) : reviewPage("b", 1),
+      }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    const reviews = await client.reviews(ref, "t");
+    expect(reviews).toHaveLength(101);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]!.url).toContain("page=1");
+    expect(calls[1]!.url).toContain("page=2");
+  });
+  it("rejects a posted review without a url", async () => {
+    const { fetchImpl } = fakeFetch({
+      "POST /repos/o/r/pulls/5/reviews": () => ({ json: {} }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(
+      client.postReview(ref, { event: "COMMENT", commit_id: "aa", body: "b", comments: [] }, "t"),
+    ).rejects.toThrow(/review url/);
   });
   it("throws without leaking the token on non-2xx", async () => {
     const { fetchImpl } = fakeFetch({
