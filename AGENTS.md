@@ -1,0 +1,53 @@
+# Hawkeye
+
+Personal AI code reviewer: a hosted control plane plus a per-user runner that reviews armed pull requests on the user's own Claude/Codex plan and posts as a bot identity. Design lives in `README.md`.
+
+## Structure
+
+```
+README.md          design document
+workspace/         local-only scratch, ADRs, agent-skill config (gitignored)
+```
+
+Planned (not yet created): pnpm monorepo with `packages/core` (review contract, harness interface, render, dedupe, posting), `packages/runner` (CLI + daemon), `apps/web` (Next.js control plane).
+
+## Commands
+
+No toolchain yet. Once the monorepo exists: `pnpm lint`, `pnpm test`, `pnpm build` at the root, with `pnpm --filter <package>` for one package. Run the formatter (`pnpm format`) before every commit.
+
+## Rules
+
+- One concern per PR. Adjacent work goes to a follow-ups list, not into the diff.
+- Commits: conventional style — `feat(scope): subject`, `fix(scope): subject`, `docs(scope): …`, `test(scope): …`; repo-level chores use bare `chore: subject`. Pick scopes from the repo's top-level areas and list them. Single short subject line, no body, no trailers of any kind.
+  - Scopes: `docs`, `adr`, `agents`, `core`, `runner`, `web`, `ci`.
+- Branch names: clean, public, descriptive (`feat/thread-scroll`, `fix/reconnect-backoff`) — never ticket numbers or internal IDs.
+- Repro tests are temporary; contract tests at public seams stay.
+- Comments: only constraints the code cannot express; no history, no restating the code.
+- Local docs and ideas are never committed. Scratch notes, ideas, specs, and tickets go in `workspace/`, which is gitignored.
+
+## Coding standards
+
+- Less is better. Solve the root cause, never mask a symptom (no swapping a value, dropping a feature, or widening a type to make an error go away). Simple is correct.
+- Public APIs fail fast: throw on invalid input, never coerce or silently fall back. Leniency only at an external boundary (wire, user input) and only where a spec prescribes it.
+- Zero comments by default. Keep one only for a *why* no reader could recover from the code (hidden invariant, upstream workaround, non-obvious constraint), written as a neutral declarative sentence. Never comment history, formatting, or what the code already says.
+- Don't add defensive checks the toolchain already enforces (type system, strict null checks, linter). Don't hand-format — the formatter owns formatting; run it before every commit.
+- Build on what the framework/repo already provides; never introduce a parallel mechanism for something that exists. Follow how the repo already solves a problem; a different approach needs a written reason, not preference.
+- No new dependencies casually — a dep needs justification; never for a minor feature; never commercially-licensed.
+- Published/public surface is append-only once shipped: re-point a moved export, never remove one.
+- Tests: colocated beside the module, import by relative path, cover the public seam and each branch of a reducer/converter; no snapshot tests; mocks spread the original and override only what the test needs.
+- Names: follow the language's idiom guide (effective-dart / Go style / PEP8 etc.); no abbreviations, no internal IDs in identifiers.
+- Keep docs in lockstep with code in the same PR: anything a change invalidates gets updated in that PR, not the next.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as local markdown files under `workspace/<feature-slug>/` (gitignored). See `workspace/docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default triage labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), recorded as a `Status:` line in each issue file. See `workspace/docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` at the repo root, ADRs in `workspace/docs/adr/` (both gitignored). See `workspace/docs/agents/domain.md`.

@@ -4,7 +4,7 @@
 
 > The sharp-eyed one. `hawkeye[bot]` looks over every PR you arm.
 
-Status: design stage, heading for open source. This README is the design document; nothing is built yet. Vocabulary lives in [`CONTEXT.md`](./CONTEXT.md); hard decisions in [`docs/adr/`](./docs/adr/).
+Status: design stage, heading for open source. This README is the design document; nothing is built yet. 
 
 ---
 
@@ -27,10 +27,10 @@ What I wanted is the Copilot-code-review *feeling*, a reviewer with its own iden
 
 ## What Hawkeye is
 
-Two halves (see [ADR-0001](./docs/adr/0001-split-brain-control-plane-and-user-runner.md)):
+Two halves:
 
 - **Control plane** — a hosted Next.js app with a small Postgres. GitHub App webhooks, the PR list across your repos, **Arm**, a job queue, run history, findings. It never runs a model and never sees a plan credential. You can use the official instance or `docker compose up` your own.
-- **Runner** — one Node process on hardware you own (laptop daemon or a VPS image). It long-polls the control plane for jobs, clones the PR head into a temp worktree, runs the Claude Code CLI headless (`claude -p`) under your own login with a strict **review contract**, and returns validated findings JSON. The control plane renders and posts the review as `hawkeye[bot]` ([ADR-0002](./docs/adr/0002-control-plane-posts-reviews.md)).
+- **Runner** — one Node process on hardware you own (laptop daemon or a VPS image). It long-polls the control plane for jobs, clones the PR head into a temp worktree, runs the Claude Code CLI headless (`claude -p`) under your own login with a strict **review contract**, and returns validated findings JSON. The control plane renders and posts the review as `hawkeye[bot]`.
 
 Armable = any PR where the chosen identity can comment; the default list is PRs you authored.
 
@@ -45,7 +45,7 @@ Armable = any PR where the chosen identity can comment; the default list is PRs 
 
 ## Identity
 
-GitHub only lets an account comment on a PR if that account has access to the repo. Copilot is "install-free" only because GitHub owns the platform. So ([ADR-0003](./docs/adr/0003-identity-github-app-first.md)):
+GitHub only lets an account comment on a PR if that account has access to the repo. Copilot is "install-free" only because GitHub owns the platform. So:
 
 | Where the PR lives | Identity Hawkeye posts as | Admin action needed |
 |---|---|---|
@@ -143,9 +143,9 @@ TypeScript, pnpm monorepo: `packages/core` (contract, harness interface, render,
 ## Decisions
 
 - Open source (MIT); official hosted instance run by the author; self-hostable end to end.
-- Split brain: hosted control plane + user-owned runner; the model never runs hosted. ([ADR-0001](./docs/adr/0001-split-brain-control-plane-and-user-runner.md))
-- Control plane posts; runner returns JSON only. ([ADR-0002](./docs/adr/0002-control-plane-posts-reviews.md))
-- Identity: GitHub App first; `hawkeye[bot]` hosted, `hawkeye-<handle>[bot]` self-hosted; others' private repos out of scope; machine user later. ([ADR-0003](./docs/adr/0003-identity-github-app-first.md))
+- Split brain: hosted control plane + user-owned runner; the model never runs hosted.
+- Control plane posts; runner returns JSON only.
+- Identity: GitHub App first; `hawkeye[bot]` hosted, `hawkeye-<handle>[bot]` self-hosted; others' private repos out of scope; machine user later.
 - Contributions: nothing Hawkeye posts counts toward the user's contribution graph. Accepted: bot identity over green squares.
 - Trigger: arm from the dashboard, automatic on every push. Quiet window default 3 min.
 - Hosting: Next.js + Postgres, deployable to Vercel + Neon and as a single Docker Compose. No Workers/D1 (locks self-hosters to one vendor).
