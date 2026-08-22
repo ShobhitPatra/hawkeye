@@ -78,8 +78,16 @@ Each finding has a severity:
 Rules:
 - Give path and line only when the finding is about specific changed lines; line is the line number in the head version (RIGHT side). Otherwise omit path and line.
 - Give suggestion only when an exact textual replacement of that single line fully fixes the finding; suggestion is the replacement text, no fences.
-- claim is one sentence; detail explains why and how to fix.
 - Do not repeat the same finding for every occurrence; state it once and list the other locations in detail.`);
+
+    sections.push(`# Writing
+Be terse. A reader skims the review and acts on it.
+- summary: at most three bullet lines, each starting with "- ", one line each, no paragraphs.
+- lens assessment: one short sentence.
+- lens detail: optional longer reasoning for that lens, shown collapsed.
+- claim: one line.
+- detail: at most two short sentences, only what a reader needs to act.
+- rationale: optional; write it only when a longer explanation or evidence (repro, trace, file references) genuinely helps. It is shown collapsed, so never put anything the reader must see there.`);
   } else {
     sections.push(input.contractOverride);
   }
@@ -89,8 +97,8 @@ When you are done, write the result as JSON to ${resultPath} and stop. Write not
 {
   "verdict": "ship" | "revise" | "hold",
   "summary": string,
-  "lenses": [{ "name": "intent" | "behavior" | "blast_radius" | "verification" | "fit" | "hygiene", "assessment": string }],
-  "findings": [{ "path"?: string, "line"?: number, "side"?: "RIGHT" | "LEFT", "severity": "must_fix" | "should_fix" | "inherited", "claim": string, "detail": string, "suggestion"?: string }]
+  "lenses": [{ "name": "intent" | "behavior" | "blast_radius" | "verification" | "fit" | "hygiene", "assessment": string, "detail"?: string }],
+  "findings": [{ "path"?: string, "line"?: number, "side"?: "RIGHT" | "LEFT", "severity": "must_fix" | "should_fix" | "inherited", "claim": string, "detail": string, "rationale"?: string, "suggestion"?: string }]
 }
 lenses must list each of the six lenses exactly once. verdict is hold if any finding is must_fix, ship if there are no must_fix or should_fix findings, otherwise revise.`);
 

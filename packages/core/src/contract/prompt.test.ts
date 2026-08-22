@@ -46,6 +46,28 @@ describe("buildPrompt", () => {
     expect(p).toMatch(/suggestion.*only.*exact/i);
     expect(p).toMatch(/single line/);
   });
+  it("states the concise writing rules", () => {
+    const p = buildPrompt(input);
+    expect(p).toContain("at most three bullet lines");
+    expect(p).toContain("rationale");
+    expect(p).toContain("one short sentence");
+    expect(p).toContain("at most two short sentences");
+  });
+  it("lists rationale and lens detail in the output schema", () => {
+    const p = buildPrompt(input);
+    expect(p).toContain('"rationale"?: string');
+    expect(p).toContain('"detail"?: string');
+  });
+  it("states the lens assessment and detail rules", () => {
+    const p = buildPrompt(input);
+    expect(p).toContain("one short sentence");
+    expect(p).toContain("lens detail: optional longer reasoning for that lens, shown collapsed");
+  });
+  it("keeps rationale in the schema under a contract override", () => {
+    const p = buildPrompt({ ...input, contractOverride: "CUSTOM RULES" });
+    expect(p).toContain('"rationale"?: string');
+    expect(p).not.toContain("at most three bullet lines");
+  });
   it("replaces the built-in lens and findings guidance with a contract override", () => {
     const p = buildPrompt({ ...input, contractOverride: "CUSTOM RULES" });
     expect(p).toContain("CUSTOM RULES");

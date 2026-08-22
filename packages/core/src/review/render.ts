@@ -24,12 +24,31 @@ const SEVERITY_BADGE: Record<Severity, string> = {
   inherited: "inherited",
 };
 
-function tableCell(text: string): string {
-  return text.replaceAll("|", "\\|").replace(/\r?\n/g, " ");
+function oneLine(text: string): string {
+  return text.replace(/\r?\n/g, " ");
+}
+
+function indentLines(text: string, indent: string): string[] {
+  return text.split("\n").map((line) => (line === "" ? "" : `${indent}${line}`));
+}
+
+function collapsible(summary: string, content: string, indent: string): string[] {
+  return [
+    `${indent}<details><summary>${summary}</summary>`,
+    "",
+    ...indentLines(content, indent),
+    "",
+    `${indent}</details>`,
+  ];
 }
 
 function findingBody(finding: Finding): string {
-  const parts = [`**${SEVERITY_BADGE[finding.severity]}** · ${finding.claim}`, "", finding.detail];
+  const parts = [
+    `**${SEVERITY_BADGE[finding.severity]}** · ${oneLine(finding.claim)}`,
+    "",
+    finding.detail,
+  ];
+  if (finding.rationale !== undefined) parts.push("", ...collapsible("why", finding.rationale, ""));
   if (finding.suggestion !== undefined) parts.push("", "```suggestion", finding.suggestion, "```");
   return parts.join("\n");
 }
@@ -67,7 +86,7 @@ export function renderReview({
   const lines: string[] = [
     encodeMarker(headSha),
     "",
-    `**Verdict:** ${result.verdict}`,
+    `## <sub>Verdict</sub> ${result.verdict}`,
     "",
     result.summary,
   ];
@@ -82,22 +101,19 @@ export function renderReview({
         const location =
           f.path === undefined ? "" : ` — \`${f.path}${f.line === undefined ? "" : `:${f.line}`}\``;
         lines.push(
-          `- \`${findingId(f.path, f.claim)}\` **${f.claim}**${location}`,
-          `  ${f.detail}`,
+          `- \`${findingId(f.path, f.claim)}\` **${oneLine(f.claim)}**${location}`,
+          ...indentLines(f.detail, "  "),
         );
+        if (f.rationale !== undefined) lines.push("", ...collapsible("why", f.rationale, "  "));
       }
     }
   }
 
-  lines.push(
-    "",
-    "<details>",
-    "<summary>Review lenses</summary>",
-    "",
-    "| Lens | Assessment |",
-    "|---|---|",
-  );
-  for (const lens of result.lenses) lines.push(`| ${lens.name} | ${tableCell(lens.assessment)} |`);
+  lines.push("", "<details>", "<summary>Review lenses</summary>", "");
+  for (const lens of result.lenses) {
+    lines.push(`- **${lens.name}** — ${oneLine(lens.assessment)}`);
+    if (lens.detail !== undefined) lines.push(...collapsible("more", lens.detail, "  "));
+  }
   lines.push("", "</details>");
 
   lines.push("", "---", `Reviewed by [Hawkeye](${repositoryUrl}) on the author's own plan.`);

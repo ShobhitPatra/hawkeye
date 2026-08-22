@@ -21,6 +21,7 @@ const FindingSchema = z
     severity: z.enum(SEVERITIES),
     claim: z.string().min(1),
     detail: z.string().min(1),
+    rationale: z.string().min(1).optional(),
     suggestion: z.string().optional(),
   })
   .refine((f) => f.line === undefined || f.path !== undefined, { message: "line requires path" })
@@ -32,7 +33,13 @@ export const ReviewResultSchema = z.object({
   verdict: z.enum(["ship", "revise", "hold"]),
   summary: z.string().min(1),
   lenses: z
-    .array(z.object({ name: z.enum(LENSES), assessment: z.string().min(1) }))
+    .array(
+      z.object({
+        name: z.enum(LENSES),
+        assessment: z.string().min(1),
+        detail: z.string().min(1).optional(),
+      }),
+    )
     .refine(
       (l) => l.length === LENSES.length && new Set(l.map((x) => x.name)).size === LENSES.length,
       { message: "lenses must list each of the six lenses exactly once" },

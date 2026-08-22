@@ -20,6 +20,13 @@ describe("parseReviewResult", () => {
   it("accepts a valid result", () => {
     expect(parseReviewResult(valid()).findings).toHaveLength(1);
   });
+  it("accepts a lens with and without a detail", () => {
+    const r = valid();
+    (r.lenses[0] as { detail?: string }).detail = "Reads the linked issue and the diff together.";
+    const parsed = parseReviewResult(r);
+    expect(parsed.lenses[0]!.detail).toBe("Reads the linked issue and the diff together.");
+    expect(parsed.lenses[1]!.detail).toBeUndefined();
+  });
   it("rejects a missing lens", () => {
     const r = valid();
     r.lenses = r.lenses.slice(1);
@@ -39,6 +46,17 @@ describe("parseReviewResult", () => {
     const r = valid();
     r.verdict = "needs-work";
     expect(() => parseReviewResult(r)).toThrow();
+  });
+  it("accepts a finding with a rationale", () => {
+    const r = valid();
+    (r.findings[0] as { rationale?: string }).rationale =
+      "Trace shows x is null on the retry path.";
+    expect(parseReviewResult(r).findings[0]!.rationale).toBe(
+      "Trace shows x is null on the retry path.",
+    );
+  });
+  it("accepts a finding without a rationale", () => {
+    expect(parseReviewResult(valid()).findings[0]!.rationale).toBeUndefined();
   });
   it("rejects a suggestion without a line", () => {
     const r = valid();

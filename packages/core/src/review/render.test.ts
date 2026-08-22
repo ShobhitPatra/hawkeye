@@ -39,30 +39,44 @@ describe("renderReview", () => {
     expect(r.body.trimEnd().endsWith("on the author's own plan.")).toBe(true);
     expect(r.body).toContain("https://github.com/ShobhitPatra/hawkeye");
   });
-  it("renders the verdict above the summary", () => {
+  it("renders the verdict as a heading above the summary", () => {
     const r = renderReview(input());
-    expect(r.body).toContain("**Verdict:** revise");
-    expect(r.body.indexOf("**Verdict:** revise")).toBeLessThan(r.body.indexOf("Mostly fine."));
+    expect(r.body).toContain("## <sub>Verdict</sub> revise");
+    expect(r.body.indexOf("## <sub>Verdict</sub> revise")).toBeLessThan(
+      r.body.indexOf("Mostly fine."),
+    );
   });
   it("orders marker, verdict, findings, lens details and footer", () => {
     const r = renderReview(input());
     const marker = r.body.indexOf("<!-- hawkeye:");
-    const verdict = r.body.indexOf("**Verdict:**");
+    const verdict = r.body.indexOf("## <sub>Verdict</sub>");
     const findings = r.body.indexOf("## Findings");
-    const details = r.body.indexOf("<details>");
+    const details = r.body.indexOf("<details>\n<summary>Review lenses</summary>");
     const footer = r.body.indexOf("Reviewed by [Hawkeye]");
     expect(marker).toBeLessThan(verdict);
     expect(verdict).toBeLessThan(findings);
     expect(findings).toBeLessThan(details);
     expect(details).toBeLessThan(footer);
   });
-  it("collapses the lens table inside a details block", () => {
+  it("collapses the lens list inside a details block", () => {
     const r = renderReview(input());
-    expect(r.body).toContain(
-      "<details>\n<summary>Review lenses</summary>\n\n| Lens | Assessment |",
-    );
+    expect(r.body).toContain("<details>\n<summary>Review lenses</summary>\n\n- **intent**");
     expect(r.body).toContain("\n\n</details>");
-    for (const lens of LENSES) expect(r.body).toContain(`| ${lens} |`);
+    for (const lens of LENSES) expect(r.body).toContain(`- **${lens}** — ${lens} ok`);
+  });
+  it("collapses a lens detail under a nested more block", () => {
+    const i = input();
+    i.result.lenses = i.result.lenses.map((l) =>
+      l.name === "behavior" ? { ...l, detail: "first\n\nsecond line" } : l,
+    );
+    const r = renderReview(i);
+    expect(r.body).toContain(
+      "- **behavior** — behavior ok\n  <details><summary>more</summary>\n\n  first\n\n  second line\n\n  </details>",
+    );
+    expect(r.body.split("<summary>more</summary>")).toHaveLength(2);
+  });
+  it("omits the more block from a lens without a detail", () => {
+    expect(renderReview(input()).body).not.toContain("<summary>more</summary>");
   });
   it("groups body findings by severity with hyphenated headings", () => {
     const r = renderReview(input());
@@ -90,21 +104,70 @@ describe("renderReview", () => {
     expect(r.body).toContain("Global state");
     expect(r.body).toMatch(/`[0-9a-f]{12}`/);
   });
+  it("collapses a body finding rationale under a why block", () => {
+    const i = input();
+    i.result.findings[1]!.rationale = "The old name is used in three call sites.";
+    const r = renderReview(i);
+    expect(r.body).toContain(
+      "  <details><summary>why</summary>\n\n  The old name is used in three call sites.\n\n  </details>",
+    );
+  });
+  it("keeps a multi-line claim and detail inside the finding bullet", () => {
+    const i = input();
+    i.result.findings[1]!.claim = "a\nb";
+    i.result.findings[1]!.detail = "x\n\ny";
+    const r = renderReview(i);
+    expect(r.body).toContain("**a b**");
+    expect(r.body).toContain("  x");
+    expect(r.body).toContain("  y");
+    expect(r.body).not.toContain("\ny");
+  });
+  it("keeps a multi-line claim on one line in an inline comment", () => {
+    const i = input();
+    i.result.findings[0]!.claim = "a\nb";
+    const r = renderReview(i);
+    expect(r.comments[0]!.body.startsWith("**must-fix** · a b")).toBe(true);
+  });
+  it("keeps a multi-line rationale inside the finding bullet", () => {
+    const i = input();
+    i.result.findings[1]!.rationale = "first\n\nsecond line";
+    const r = renderReview(i);
+    expect(r.body).toContain("  first");
+    expect(r.body).toContain("  second line");
+    expect(r.body).not.toContain("\nsecond line");
+  });
+  it("omits the why block from a body finding without a rationale", () => {
+    const r = renderReview(input());
+    expect(r.body).not.toContain("<summary>why</summary>");
+  });
+  it("collapses an inline comment rationale under a why block before the suggestion", () => {
+    const i = input();
+    i.result.findings[0]!.rationale = "Reproduced by calling f with an empty map.";
+    const r = renderReview(i);
+    const body = r.comments[0]!.body;
+    expect(body).toContain(
+      "<details><summary>why</summary>\n\nReproduced by calling f with an empty map.\n\n</details>",
+    );
+    expect(body.indexOf("<summary>why</summary>")).toBeLessThan(body.indexOf("```suggestion"));
+    expect(body.indexOf("x may be undefined")).toBeLessThan(body.indexOf("<summary>why</summary>"));
+  });
+  it("omits the why block from an inline comment without a rationale", () => {
+    const r = renderReview(input());
+    expect(r.comments[0]!.body).not.toContain("<summary>why</summary>");
+  });
   it("omits the findings section when there are none", () => {
     const i = input();
     i.result.findings = [];
     expect(renderReview(i).body).not.toContain("## Findings");
   });
-  it("keeps the lens table on one row per lens", () => {
+  it("keeps each lens item on one line", () => {
     const i = input();
     i.result.lenses = i.result.lenses.map((l) =>
       l.name === "intent" ? { ...l, assessment: "line one\nline two | pipe" } : l,
     );
     const r = renderReview(i);
-    expect(r.body).toContain("| intent | line one line two \\| pipe |");
-    const lensRows = r.body
-      .split("\n")
-      .filter((line) => line.startsWith("| ") && line !== "| Lens | Assessment |");
-    expect(lensRows).toHaveLength(LENSES.length);
+    expect(r.body).toContain("- **intent** — line one line two | pipe");
+    const lensItems = r.body.split("\n").filter((line) => line.startsWith("- **"));
+    expect(lensItems).toHaveLength(LENSES.length);
   });
 });
