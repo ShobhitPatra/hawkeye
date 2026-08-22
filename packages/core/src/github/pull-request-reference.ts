@@ -1,7 +1,8 @@
 export type PullRequestReference = { owner: string; repo: string; number: number };
 
-const URL_PATTERN = /^https:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/(\d+)(?:[/?#].*)?$/;
-const SHORT_PATTERN = /^([^/\s#]+)\/([^/\s#]+)#(\d+)$/;
+const URL_PATTERN =
+  /^https:\/\/github\.com\/([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+)\/pull\/(\d+)(?:[/?#].*)?$/;
+const SHORT_PATTERN = /^([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+)#(\d+)$/;
 
 export function parsePullRequestReference(input: string): PullRequestReference {
   const match = URL_PATTERN.exec(input.trim()) ?? SHORT_PATTERN.exec(input.trim());
