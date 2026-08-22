@@ -9,9 +9,9 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { user } from "./auth-schema.js";
+import { user } from "./auth-schema";
 
-export * from "./auth-schema.js";
+export * from "./auth-schema";
 
 export const jobState = pgEnum("job_state", ["queued", "claimed", "done", "failed"]);
 export const runStatus = pgEnum("run_status", [
