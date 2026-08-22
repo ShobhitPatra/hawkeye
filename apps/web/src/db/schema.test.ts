@@ -3,13 +3,21 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it, beforeAll } from "vitest";
+import * as schema from "./schema";
+
+async function expectUniqueViolation(promise: Promise<unknown>, indexName: string) {
+  await expect(promise).rejects.toMatchObject({
+    cause: expect.objectContaining({ message: expect.stringContaining(indexName) }),
+  });
+}
 
 const migrationsFolder = join(import.meta.dirname, "..", "..", "drizzle");
 let client: PGlite;
+let db: ReturnType<typeof drizzle<typeof schema>>;
 
 beforeAll(async () => {
   client = new PGlite();
-  const db = drizzle(client);
+  db = drizzle(client, { schema });
   await migrate(db, { migrationsFolder });
 });
 
@@ -31,41 +39,46 @@ describe("schema migrations", () => {
     ]);
   });
   it("allows one active armed pr per user and pull request", async () => {
-    await client.exec(
-      "insert into installation (id, account_login, account_type) values ('1', 'o', 'User')",
+    await db
+      .insert(schema.installation)
+      .values({ id: "1", accountLogin: "o", accountType: "User" });
+    await db
+      .insert(schema.armedPr)
+      .values({ userId: "u", installationId: "1", owner: "o", repo: "r", number: 1 });
+    await expectUniqueViolation(
+      db
+        .insert(schema.armedPr)
+        .values({ userId: "u", installationId: "1", owner: "o", repo: "r", number: 1 }),
+      "armed_pr_active_unique",
     );
-    await client.exec(
-      "insert into armed_pr (user_id, installation_id, owner, repo, number) values ('u', '1', 'o', 'r', 1)",
-    );
-    await expect(
-      client.exec(
-        "insert into armed_pr (user_id, installation_id, owner, repo, number) values ('u', '1', 'o', 'r', 1)",
-      ),
-    ).rejects.toThrow(/armed_pr_active_unique/);
-    await client.exec("update armed_pr set disarmed_at = now()");
-    await client.exec(
-      "insert into armed_pr (user_id, installation_id, owner, repo, number) values ('u', '1', 'o', 'r', 1)",
-    );
+    await db.update(schema.armedPr).set({ disarmedAt: new Date() });
+    await db
+      .insert(schema.armedPr)
+      .values({ userId: "u", installationId: "1", owner: "o", repo: "r", number: 1 });
   });
   it("allows one queued job per armed pr but permits a queued job alongside a claimed one", async () => {
-    await client.exec(
-      "insert into installation (id, account_login, account_type) values ('2', 'o2', 'User')",
+    await db
+      .insert(schema.installation)
+      .values({ id: "2", accountLogin: "o2", accountType: "User" });
+    const returned = await db
+      .insert(schema.armedPr)
+      .values({ userId: "u", installationId: "2", owner: "o2", repo: "r2", number: 1 })
+      .returning({ id: schema.armedPr.id });
+    const armedPrId = returned[0]!.id;
+    await db
+      .insert(schema.job)
+      .values({ armedPrId, headSha: "a", baseSha: "b", notBefore: new Date() });
+    await expectUniqueViolation(
+      db
+        .insert(schema.job)
+        .values({ armedPrId, headSha: "c", baseSha: "b", notBefore: new Date() }),
+      "job_open_per_armed_pr",
     );
-    const { rows } = await client.query<{ id: string }>(
-      "insert into armed_pr (user_id, installation_id, owner, repo, number) values ('u', '2', 'o2', 'r2', 1) returning id",
-    );
-    const armedPrId = rows[0]!.id;
-    await client.exec(
-      `insert into job (armed_pr_id, head_sha, base_sha, not_before) values ('${armedPrId}', 'a', 'b', now())`,
-    );
-    await expect(
-      client.exec(
-        `insert into job (armed_pr_id, head_sha, base_sha, not_before) values ('${armedPrId}', 'c', 'b', now())`,
-      ),
-    ).rejects.toThrow(/job_open_per_armed_pr/);
-    await client.exec("update job set state = 'claimed'");
-    await client.exec(
-      `insert into job (armed_pr_id, head_sha, base_sha, not_before) values ('${armedPrId}', 'd', 'b', now())`,
-    );
+    await db.update(schema.job).set({ state: "claimed" });
+    await db
+      .insert(schema.job)
+      .values({ armedPrId, headSha: "d", baseSha: "b", notBefore: new Date() });
+    const jobs = await db.select().from(schema.job);
+    expect(jobs).toHaveLength(2);
   });
 });
