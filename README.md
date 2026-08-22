@@ -2,9 +2,9 @@
 
 **The personal code reviewer. Runs on the Claude or ChatGPT plan you already pay for. Arms onto any PR you choose. Nothing for repo admins to install.**
 
-> The sharp-eyed one. `hawkeye[bot]` looks over every PR you arm.
+> The sharp-eyed one. `hawkeye[bot]` (currently `hawkeye-review[bot]`; the `hawkeye` slug is reserved for the hosted instance) looks over every PR you arm.
 
-Status: design stage, heading for open source. This README is the design document; nothing is built yet. 
+Status: milestone 1 shipped (`hawkeye review <pr-url>`), heading for open source. This README is the design document; see "Run it" below.
 
 ---
 
@@ -74,17 +74,17 @@ GitHub App ─────── webhooks ──▶ Control plane   (Next.js + P
 ## How a review runs
 
 ```
-job: (repo, pr, head sha, base sha, previously reviewed sha?, open finding ids)
+job: (repo, pr, head sha, merge base sha, previously reviewed sha?, open finding ids)
         │   starts after quiet window (default 3 min, 0 = immediate)
         ▼
- git worktree of PR head (shallow, temp) + base diff / interdiff, PR title/body, linked issue
+ git worktree of PR head (shallow, temp; its CLAUDE.md and .claude/ are captured as repository rules, then removed) + diff from the merge base / interdiff (lockfiles and build output excluded), PR title/body, linked issue
         │
         ▼
- claude -p --output-format stream-json --max-turns N --append-system-prompt <contract>
-   · contract: seven dimensions + JSON output schema + prior open findings
+ claude -p --output-format stream-json … (prompt on stdin; contract is the prompt)
+   · contract: six lenses + JSON output schema + prior open findings
    · Stop hook: refuse to stop until the result file is written
-   · tools: Read/Grep/Glob/Bash on the checkout; WebFetch/WebSearch denied
-   · budget: max-turns 40, wall clock 15 min (per-user tunable)
+   · tools: bypassPermissions; Edit/Write/NotebookEdit/WebFetch/WebSearch removed with --disallowedTools; Bash runs with the user's environment and filesystem, not only the checkout
+   · budget: turns (harness-enforced, default 40), wall clock 15 min (per-user tunable)
         │
         ▼
  runner: parse + validate JSON (zod) → report to control plane
@@ -94,7 +94,7 @@ job: (repo, pr, head sha, base sha, previously reviewed sha?, open finding ids)
    · dedupe against findings already posted on this PR
    · resolved_ids from the model → reply "✓ addressed in <sha>" and resolve the thread
    · POST pulls/{n}/reviews as the bot identity, event COMMENT
-       body: verdict + dimension table + non-line findings + credit footer
+       body: verdict + all findings (anchored ones as one-liners) + collapsed lens table + credit footer
        comments[]: line-anchored findings, ```suggestion``` when an exact fix exists
 ```
 
@@ -102,7 +102,9 @@ Failures (CLI error, max-turns, invalid JSON, timeout) never touch the PR; they 
 
 ## Review contract
 
-Seven **dimensions**: necessity, correctness, tests, conventions, side effects, parity, governance. Finding classes: blocking / polish / pre-existing. Line-anchor only when the finding is about specific changed lines; `suggestion` only when an exact textual replacement fully fixes it. The prompt is repo-agnostic ("discover the repo's layout and conventions, don't assume them"); the target repo's own `AGENTS.md` / `CLAUDE.md` / `CONTRIBUTING.md` are inlined at run time as repository rules for the conventions and governance dimensions to judge against. Any prompt that quotes PR bodies or issue text is injection-guarded.
+Six **lenses**, each assessed once: **intent** (does the change do what the PR and linked issue say, and only that), **behavior** (logic, edge cases, failure modes, races, broken invariants), **blast radius** (public surface, configuration, migrations, performance, security, dependencies), **verification** (are the changed behaviours proven by meaningful tests at the right seam), **fit** (this repository's own rules and patterns), **hygiene** (commit quality, docs in lockstep, licensing, secrets, anything a maintainer must gate on). Finding severities: must-fix / should-fix / inherited (a problem in code the PR touches but did not introduce). Verdict: ship / revise / hold. Line-anchor only when the finding is about specific changed lines; `suggestion` only when an exact single-line replacement fully fixes it. Lenses render as a table with paragraph-length assessments inside a collapsed drop-down, and the body lists every finding grouped by severity — anchored ones as a single line marked `(inline)`. Findings stay short — a one-line claim plus at most two sentences of detail — and any longer reasoning or evidence goes in an optional `rationale`, collapsed under "why". The prompt is repo-agnostic ("discover the repo's layout and conventions, don't assume them"); the target repo's own `AGENTS.md` / `CLAUDE.md` / `CONTRIBUTING.md` are inlined at run time as repository rules for the fit and hygiene lenses to judge against. Any prompt that quotes PR bodies or issue text is injection-guarded.
+
+Contract override: a private contract file replaces the built-in lens and finding rules while the untrusted-data fences, repository rules, diff and JSON output schema stay. The runner reads `--contract <path>`, else `HAWKEYE_CONTRACT_PATH`, else `~/.config/hawkeye/contract.md` when it exists.
 
 Prompt overrides: a per-user override in the dashboard (taste), plus an optional `.hawkeye/REVIEW.md` in the repo (repo norms), appended when present.
 
@@ -133,9 +135,18 @@ Everything is scoped by `user_id` from day one; no orgs, teams, or roles.
 
 TypeScript, pnpm monorepo: `packages/core` (contract, harness interface, render, dedupe, posting), `packages/runner` (CLI + daemon), `apps/web` (Next.js control plane).
 
+## Run it (milestone 1)
+
+1. Register a GitHub App (permissions: pull requests read/write, contents read, issues read, metadata read; no webhook), generate a private key, install it on your repos.
+2. `~/.config/hawkeye/config.json`: `{ "appId": <id>, "appSlug": "<app-slug>", "privateKeyPath": "~/.config/hawkeye/app.pem" }` (`~` is expanded; env overrides: `HAWKEYE_APP_ID`, `HAWKEYE_APP_SLUG`, `HAWKEYE_APP_PRIVATE_KEY_PATH`).
+3. `pnpm install && pnpm build`, then `node packages/runner/dist/bin.js review <pr-url> [--dry-run] [--force] [--contract <path>]`.
+4. Optional: put your own review contract at `~/.config/hawkeye/contract.md` (or point `HAWKEYE_CONTRACT_PATH` at it, or pass `--contract <path>`) to replace the built-in lens and finding rules.
+
+Reviews post as `<app-slug>[bot]` (the author's instance: `hawkeye-review[bot]`). Run artifacts land in `~/.cache/hawkeye/runs/`.
+
 ## Milestones
 
-1. **Runner alone, manual.** `hawkeye review <pr-url>` from a laptop: worktree → `claude -p` → findings → posted as `hawkeye[bot]` via the same `core` posting module, using a locally held App key. Proves contract and identity. Dogfood.
+1. **Runner alone, manual.** `hawkeye review <pr-url>` from a laptop: worktree → `claude -p` → findings → posted as `hawkeye[bot]` via the same `core` posting module, using a locally held App key. Proves contract and identity. Dogfood. (shipped: `hawkeye review <pr-url>`)
 2. **Control plane + arm.** Next.js app with GitHub sign-in, App webhooks, PR list, Arm, jobs; runner becomes a daemon that long-polls with a copied runner token; reviews on every push with quiet window and interdiff; control plane posts.
 3. **Multi-user + OSS release.** Official hosted instance, Codex harness, self-host docs (`docker compose`, App Manifest flow at `/setup`), public repo under MIT.
 4. **Always-on + polish.** Runner Docker image for a VPS, device-code runner login, run history and budget view, re-review-now, machine-user identity for OSS PRs.
@@ -150,7 +161,7 @@ TypeScript, pnpm monorepo: `packages/core` (contract, harness interface, render,
 - Trigger: arm from the dashboard, automatic on every push. Quiet window default 3 min.
 - Hosting: Next.js + Postgres, deployable to Vercel + Neon and as a single Docker Compose. No Workers/D1 (locks self-hosters to one vendor).
 - Runner ↔ control plane: long-poll with a runner token; results via POST. Clone with a 1h App installation token shipped in the job.
-- Review contract: all seven dimensions by default; overrides per user and per repo.
+- Review contract: all six lenses by default; overrides per user and per repo.
 - Subscription terms: the user is responsible for staying within their plan's terms; Hawkeye only drives the CLI they already run. Stated in this README and on the runner-setup page.
 
 ## Open questions
