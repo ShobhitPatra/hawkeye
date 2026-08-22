@@ -2,9 +2,9 @@
 
 **The personal code reviewer. Runs on the Claude or ChatGPT plan you already pay for. Arms onto any PR you choose. Nothing for repo admins to install.**
 
-> The sharp-eyed one. `hawkeye[bot]` looks over every PR you arm.
+> The sharp-eyed one. `hawkeye[bot]` (currently `hawkeye-review[bot]`; the `hawkeye` slug is reserved for the hosted instance) looks over every PR you arm.
 
-Status: design stage, heading for open source. This README is the design document; nothing is built yet. 
+Status: milestone 1 shipped (`hawkeye review <pr-url>`), heading for open source. This README is the design document; see "Run it" below.
 
 ---
 
@@ -133,9 +133,17 @@ Everything is scoped by `user_id` from day one; no orgs, teams, or roles.
 
 TypeScript, pnpm monorepo: `packages/core` (contract, harness interface, render, dedupe, posting), `packages/runner` (CLI + daemon), `apps/web` (Next.js control plane).
 
+## Run it (milestone 1)
+
+1. Register a GitHub App (permissions: pull requests read/write, contents read, issues read, metadata read; no webhook), generate a private key, install it on your repos.
+2. `~/.config/hawkeye/config.json`: `{ "appId": <id>, "appSlug": "<app-slug>", "privateKeyPath": "~/.config/hawkeye/app.pem" }` (env overrides: `HAWKEYE_APP_ID`, `HAWKEYE_APP_SLUG`, `HAWKEYE_APP_PRIVATE_KEY_PATH`).
+3. `pnpm install && pnpm build`, then `node packages/runner/dist/bin.js review <pr-url> [--dry-run] [--force]`.
+
+Reviews post as `<app-slug>[bot]` (the author's instance: `hawkeye-review[bot]`). Run artifacts land in `~/.cache/hawkeye/runs/`.
+
 ## Milestones
 
-1. **Runner alone, manual.** `hawkeye review <pr-url>` from a laptop: worktree → `claude -p` → findings → posted as `hawkeye[bot]` via the same `core` posting module, using a locally held App key. Proves contract and identity. Dogfood.
+1. **Runner alone, manual.** `hawkeye review <pr-url>` from a laptop: worktree → `claude -p` → findings → posted as `hawkeye[bot]` via the same `core` posting module, using a locally held App key. Proves contract and identity. Dogfood. (shipped: `hawkeye review <pr-url>`)
 2. **Control plane + arm.** Next.js app with GitHub sign-in, App webhooks, PR list, Arm, jobs; runner becomes a daemon that long-polls with a copied runner token; reviews on every push with quiet window and interdiff; control plane posts.
 3. **Multi-user + OSS release.** Official hosted instance, Codex harness, self-host docs (`docker compose`, App Manifest flow at `/setup`), public repo under MIT.
 4. **Always-on + polish.** Runner Docker image for a VPS, device-code runner login, run history and budget view, re-review-now, machine-user identity for OSS PRs.
