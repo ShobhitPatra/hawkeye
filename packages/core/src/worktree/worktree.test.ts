@@ -31,11 +31,13 @@ beforeAll(async () => {
   await git(work, "init", "-q", "-b", "main");
   await writeFile(join(work, "a.txt"), "one\n");
   await writeFile(join(work, "AGENTS.md"), "Rules.\n");
+  await writeFile(join(work, "pnpm-lock.yaml"), "lockfileVersion: 9\n");
   await git(work, "add", ".");
   await git(work, "commit", "-q", "-m", "base");
   baseSha = (await git(work, "rev-parse", "HEAD")).stdout.trim();
   await git(work, "switch", "-q", "-c", "feat");
   await writeFile(join(work, "a.txt"), "one\ntwo\n");
+  await writeFile(join(work, "pnpm-lock.yaml"), "lockfileVersion: 9\nregenerated: true\n");
   await git(work, "commit", "-q", "-am", "head");
   headSha = (await git(work, "rev-parse", "HEAD")).stdout.trim();
   await git(root, "clone", "-q", "--bare", work, origin);
@@ -56,6 +58,19 @@ describe("createWorktree", () => {
     expect(wt.diff).toContain("+two");
     await wt.remove();
     await expect(readFile(join(wt.path, "a.txt"))).rejects.toThrow();
+  });
+  it("excludes generated files from the diff", async () => {
+    const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
+    const wt = await createWorktree({
+      cloneUrl: origin,
+      pullRequestNumber: 1,
+      headSha,
+      baseSha,
+      directory,
+    });
+    expect(wt.diff).toContain("+two");
+    expect(wt.diff).not.toContain("pnpm-lock.yaml");
+    await wt.remove();
   });
   it("leaves no origin remote or token behind", async () => {
     const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");

@@ -5,6 +5,16 @@ import { promisify } from "node:util";
 
 const run = promisify(execFile);
 const RULE_FILES = ["AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md"];
+const GENERATED_PATHSPECS = [
+  ".",
+  ":(exclude,glob)**/pnpm-lock.yaml",
+  ":(exclude,glob)**/package-lock.json",
+  ":(exclude,glob)**/yarn.lock",
+  ":(exclude,glob)**/bun.lockb",
+  ":(exclude,glob)**/dist/**",
+  ":(exclude,glob)**/*.min.js",
+  ":(exclude,glob)**/*.min.css",
+];
 
 export type Worktree = { path: string; diff: string; remove(): Promise<void> };
 export type CreateWorktreeInput = {
@@ -66,7 +76,13 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
     await git(input.directory, "checkout", "--quiet", "--detach", fetchedHead);
     if (fetchedHead !== input.headSha)
       throw new Error(`Head moved: expected ${input.headSha}, checkout is at ${fetchedHead}`);
-    const diff = await git(input.directory, "diff", `${input.baseSha}..HEAD`);
+    const diff = await git(
+      input.directory,
+      "diff",
+      `${input.baseSha}..HEAD`,
+      "--",
+      ...GENERATED_PATHSPECS,
+    );
 
     return {
       path: input.directory,
