@@ -235,5 +235,52 @@ describe("schema migrations", () => {
       .from(schema.installationUser)
       .where(eq(schema.installationUser.installationId, "3"));
     expect(selectedInstallationUser).toMatchObject({ installationId: "3", userId: "u3" });
+
+    await db.insert(schema.session).values({
+      id: "session-3",
+      expiresAt: new Date(),
+      token: "token-3",
+      userId: "u3",
+    });
+    const [selectedSession] = await db
+      .select()
+      .from(schema.session)
+      .where(eq(schema.session.id, "session-3"));
+    expect(selectedSession).toMatchObject({ id: "session-3", token: "token-3", userId: "u3" });
+
+    await db.insert(schema.account).values({
+      id: "account-3",
+      issuer: "https://github.com",
+      accountId: "gh-3",
+      providerId: "github",
+      userId: "u3",
+    });
+    const [selectedAccount] = await db
+      .select()
+      .from(schema.account)
+      .where(eq(schema.account.id, "account-3"));
+    expect(selectedAccount).toMatchObject({
+      id: "account-3",
+      issuer: "https://github.com",
+      accountId: "gh-3",
+      providerId: "github",
+      userId: "u3",
+    });
+
+    await db.insert(schema.verification).values({
+      id: "verification-3",
+      identifier: "u3",
+      value: "code-3",
+      expiresAt: new Date(),
+    });
+    const [selectedVerification] = await db
+      .select()
+      .from(schema.verification)
+      .where(eq(schema.verification.id, "verification-3"));
+    expect(selectedVerification).toMatchObject({
+      id: "verification-3",
+      identifier: "u3",
+      value: "code-3",
+    });
   });
 });
