@@ -7,13 +7,15 @@ Personal AI code reviewer: a hosted control plane plus a per-user runner that re
 ```
 README.md          design document
 workspace/         local-only scratch, ADRs, agent-skill config (gitignored)
+packages/core      review contract, harness interface, render, dedupe, posting
+packages/runner    CLI + daemon
 ```
 
-Planned (not yet created): pnpm monorepo with `packages/core` (review contract, harness interface, render, dedupe, posting), `packages/runner` (CLI + daemon), `apps/web` (Next.js control plane).
+Planned (not yet created): `apps/web` (Next.js control plane).
 
 ## Commands
 
-No toolchain yet; this section is filled in when the monorepo lands.
+pnpm install · pnpm lint (oxlint) · pnpm format (oxfmt; run before every commit) · pnpm typecheck · pnpm test (vitest) · pnpm build (tsup). Scope to one package with pnpm --filter <name>.
 
 ## Rules
 

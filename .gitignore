@@ -2,3 +2,6 @@
 workspace/
 CLAUDE.local.md
 CONTEXT.md
+
+node_modules/
+dist/
