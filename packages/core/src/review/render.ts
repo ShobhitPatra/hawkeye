@@ -28,6 +28,10 @@ function oneLine(text: string): string {
   return text.replace(/\r?\n/g, " ");
 }
 
+function tableCell(text: string): string {
+  return oneLine(text).replaceAll("|", "\\|");
+}
+
 function indentLines(text: string, indent: string): string[] {
   return text.split("\n").map((line) => (line === "" ? "" : `${indent}${line}`));
 }
@@ -71,49 +75,56 @@ export function renderReview({
   repositoryUrl,
 }: RenderInput): RenderedReview {
   const comments: ReviewComment[] = [];
-  const inBody: Finding[] = [];
+  const anchored = new Set<Finding>();
   for (const finding of result.findings) {
-    if (isAnchored(finding, commentable))
-      comments.push({
-        path: finding.path,
-        line: finding.line,
-        side: "RIGHT",
-        body: findingBody(finding),
-      });
-    else inBody.push(finding);
+    if (!isAnchored(finding, commentable)) continue;
+    anchored.add(finding);
+    comments.push({
+      path: finding.path,
+      line: finding.line,
+      side: "RIGHT",
+      body: findingBody(finding),
+    });
   }
 
   const lines: string[] = [
     encodeMarker(headSha),
     "",
-    `## <sub>Verdict</sub> ${result.verdict}`,
+    `## <small>Verdict:</small> ${result.verdict}`,
     "",
     result.summary,
   ];
 
-  if (inBody.length > 0) {
+  if (result.findings.length > 0) {
     lines.push("", "## Findings");
     for (const severity of SEVERITY_ORDER) {
-      const group = inBody.filter((f) => f.severity === severity);
+      const group = result.findings.filter((f) => f.severity === severity);
       if (group.length === 0) continue;
       lines.push("", `### ${SEVERITY_BADGE[severity]}`);
       for (const f of group) {
         const location =
           f.path === undefined ? "" : ` — \`${f.path}${f.line === undefined ? "" : `:${f.line}`}\``;
-        lines.push(
-          `- \`${findingId(f.path, f.claim)}\` **${oneLine(f.claim)}**${location}`,
-          ...indentLines(f.detail, "  "),
-        );
+        const headline = `- \`${findingId(f.path, f.claim)}\` **${oneLine(f.claim)}**${location}`;
+        if (anchored.has(f)) {
+          lines.push(`${headline} (inline)`);
+          continue;
+        }
+        lines.push(headline, ...indentLines(f.detail, "  "));
         if (f.rationale !== undefined) lines.push("", ...collapsible("why", f.rationale, "  "));
       }
     }
   }
 
-  lines.push("", "<details>", "<summary>Review lenses</summary>", "");
-  for (const lens of result.lenses) {
-    lines.push(`- **${lens.name}** — ${oneLine(lens.assessment)}`);
-    if (lens.detail !== undefined) lines.push(...collapsible("more", lens.detail, "  "));
-  }
+  lines.push(
+    "",
+    "<details>",
+    "<summary>Review lenses</summary>",
+    "",
+    "| Lens | Assessment |",
+    "|---|---|",
+  );
+  for (const lens of result.lenses)
+    lines.push(`| \`${lens.name}\` | ${tableCell(lens.assessment)} |`);
   lines.push("", "</details>");
 
   lines.push("", "---", `Reviewed by [Hawkeye](${repositoryUrl}) on the author's own plan.`);

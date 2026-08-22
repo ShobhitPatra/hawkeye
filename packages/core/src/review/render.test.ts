@@ -41,15 +41,15 @@ describe("renderReview", () => {
   });
   it("renders the verdict as a heading above the summary", () => {
     const r = renderReview(input());
-    expect(r.body).toContain("## <sub>Verdict</sub> revise");
-    expect(r.body.indexOf("## <sub>Verdict</sub> revise")).toBeLessThan(
+    expect(r.body).toContain("## <small>Verdict:</small> revise");
+    expect(r.body.indexOf("## <small>Verdict:</small> revise")).toBeLessThan(
       r.body.indexOf("Mostly fine."),
     );
   });
   it("orders marker, verdict, findings, lens details and footer", () => {
     const r = renderReview(input());
     const marker = r.body.indexOf("<!-- hawkeye:");
-    const verdict = r.body.indexOf("## <sub>Verdict</sub>");
+    const verdict = r.body.indexOf("## <small>Verdict:</small>");
     const findings = r.body.indexOf("## Findings");
     const details = r.body.indexOf("<details>\n<summary>Review lenses</summary>");
     const footer = r.body.indexOf("Reviewed by [Hawkeye]");
@@ -58,25 +58,13 @@ describe("renderReview", () => {
     expect(findings).toBeLessThan(details);
     expect(details).toBeLessThan(footer);
   });
-  it("collapses the lens list inside a details block", () => {
+  it("collapses the lens table inside a details block", () => {
     const r = renderReview(input());
-    expect(r.body).toContain("<details>\n<summary>Review lenses</summary>\n\n- **intent**");
-    expect(r.body).toContain("\n\n</details>");
-    for (const lens of LENSES) expect(r.body).toContain(`- **${lens}** — ${lens} ok`);
-  });
-  it("collapses a lens detail under a nested more block", () => {
-    const i = input();
-    i.result.lenses = i.result.lenses.map((l) =>
-      l.name === "behavior" ? { ...l, detail: "first\n\nsecond line" } : l,
-    );
-    const r = renderReview(i);
     expect(r.body).toContain(
-      "- **behavior** — behavior ok\n  <details><summary>more</summary>\n\n  first\n\n  second line\n\n  </details>",
+      "<details>\n<summary>Review lenses</summary>\n\n| Lens | Assessment |\n|---|---|",
     );
-    expect(r.body.split("<summary>more</summary>")).toHaveLength(2);
-  });
-  it("omits the more block from a lens without a detail", () => {
-    expect(renderReview(input()).body).not.toContain("<summary>more</summary>");
+    expect(r.body).toContain("\n\n</details>");
+    for (const lens of LENSES) expect(r.body).toContain(`| \`${lens}\` | ${lens} ok |`);
   });
   it("groups body findings by severity with hyphenated headings", () => {
     const r = renderReview(input());
@@ -97,12 +85,27 @@ describe("renderReview", () => {
     const r = renderReview({ ...input(), result });
     expect(r.comments[0]).toMatchObject({ path: "src/a.ts", line: 3, side: "RIGHT" });
   });
-  it("demotes out-of-diff and unanchored findings into the body with their ids", () => {
+  it("lists out-of-diff and unanchored findings in the body with their ids", () => {
     const r = renderReview(input());
     expect(r.body).toContain("Rename");
     expect(r.body).toContain("src/a.ts:99");
     expect(r.body).toContain("Global state");
     expect(r.body).toMatch(/`[0-9a-f]{12}`/);
+  });
+  it("lists an anchored finding in the body as a one-liner marked inline", () => {
+    const r = renderReview(input());
+    expect(r.body).toContain("### must-fix");
+    expect(r.body).toMatch(/- `[0-9a-f]{12}` \*\*Null deref\*\* — `src\/a\.ts:3` \(inline\)\n/);
+    expect(r.body).not.toContain("x may be undefined");
+    expect(r.comments).toHaveLength(1);
+  });
+  it("keeps the findings section when every finding is anchored", () => {
+    const i = input();
+    i.result.findings = [i.result.findings[0]!];
+    const r = renderReview(i);
+    expect(r.body).toContain("## Findings");
+    expect(r.body).toContain("(inline)");
+    expect(r.body).not.toContain("### should-fix");
   });
   it("collapses a body finding rationale under a why block", () => {
     const i = input();
@@ -160,14 +163,16 @@ describe("renderReview", () => {
     i.result.findings = [];
     expect(renderReview(i).body).not.toContain("## Findings");
   });
-  it("keeps each lens item on one line", () => {
+  it("keeps the lens table on one row per lens", () => {
     const i = input();
     i.result.lenses = i.result.lenses.map((l) =>
       l.name === "intent" ? { ...l, assessment: "line one\nline two | pipe" } : l,
     );
     const r = renderReview(i);
-    expect(r.body).toContain("- **intent** — line one line two | pipe");
-    const lensItems = r.body.split("\n").filter((line) => line.startsWith("- **"));
-    expect(lensItems).toHaveLength(LENSES.length);
+    expect(r.body).toContain("| `intent` | line one line two \\| pipe |");
+    const lensRows = r.body
+      .split("\n")
+      .filter((line) => line.startsWith("| ") && line !== "| Lens | Assessment |");
+    expect(lensRows).toHaveLength(LENSES.length);
   });
 });

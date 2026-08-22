@@ -20,13 +20,6 @@ describe("parseReviewResult", () => {
   it("accepts a valid result", () => {
     expect(parseReviewResult(valid()).findings).toHaveLength(1);
   });
-  it("accepts a lens with and without a detail", () => {
-    const r = valid();
-    (r.lenses[0] as { detail?: string }).detail = "Reads the linked issue and the diff together.";
-    const parsed = parseReviewResult(r);
-    expect(parsed.lenses[0]!.detail).toBe("Reads the linked issue and the diff together.");
-    expect(parsed.lenses[1]!.detail).toBeUndefined();
-  });
   it("rejects a missing lens", () => {
     const r = valid();
     r.lenses = r.lenses.slice(1);

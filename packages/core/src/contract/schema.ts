@@ -33,13 +33,7 @@ export const ReviewResultSchema = z.object({
   verdict: z.enum(["ship", "revise", "hold"]),
   summary: z.string().min(1),
   lenses: z
-    .array(
-      z.object({
-        name: z.enum(LENSES),
-        assessment: z.string().min(1),
-        detail: z.string().min(1).optional(),
-      }),
-    )
+    .array(z.object({ name: z.enum(LENSES), assessment: z.string().min(1) }))
     .refine(
       (l) => l.length === LENSES.length && new Set(l.map((x) => x.name)).size === LENSES.length,
       { message: "lenses must list each of the six lenses exactly once" },
