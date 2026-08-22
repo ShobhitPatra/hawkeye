@@ -15,6 +15,7 @@ import { loadConfig } from "./config.js";
 import { createRunDirectory } from "./run-directory.js";
 
 const CONFIG_PATH = join(homedir(), ".config", "hawkeye", "config.json");
+const DEFAULT_CONTRACT_PATH = join(homedir(), ".config", "hawkeye", "contract.md");
 const RUNS_ROOT = join(homedir(), ".cache", "hawkeye", "runs");
 const REPOSITORY_URL = "https://github.com/ShobhitPatra/hawkeye";
 
@@ -23,6 +24,23 @@ function positiveInteger(flag: string, value: string): number {
     throw new Error(`${flag} must be a positive integer, got "${value}"`);
   }
   return Number(value);
+}
+
+export async function loadContractOverride(input: {
+  explicitPath?: string;
+  env: Record<string, string | undefined>;
+  defaultPath: string;
+  readFile(path: string): Promise<string>;
+}): Promise<{ path: string; content: string } | undefined> {
+  const requested = input.explicitPath ?? input.env.HAWKEYE_CONTRACT_PATH;
+  const path = requested ?? input.defaultPath;
+  try {
+    return { path, content: await input.readFile(path) };
+  } catch (error) {
+    if (requested === undefined && (error as NodeJS.ErrnoException).code === "ENOENT")
+      return undefined;
+    throw new Error(`cannot read contract at ${path}`, { cause: error });
+  }
 }
 
 export function createProgram(io: {
@@ -40,10 +58,20 @@ export function createProgram(io: {
     .option("--force", "review even if this head sha was already reviewed", false)
     .option("--max-turns <n>", "assistant turn limit", "40")
     .option("--wall-clock-minutes <n>", "wall clock limit in minutes", "15")
+    .option(
+      "--contract <path>",
+      "review contract that replaces the built-in lens and finding rules",
+    )
     .action(
       async (
         pullRequest: string,
-        options: { dryRun: boolean; force: boolean; maxTurns: string; wallClockMinutes: string },
+        options: {
+          dryRun: boolean;
+          force: boolean;
+          maxTurns: string;
+          wallClockMinutes: string;
+          contract?: string;
+        },
       ) => {
         let runDirectory: string | undefined;
         let log = io.stderr;
@@ -73,6 +101,14 @@ export function createProgram(io: {
           };
           log(`run directory: ${directory}`);
 
+          const contract = await loadContractOverride({
+            ...(options.contract === undefined ? {} : { explicitPath: options.contract }),
+            env: process.env,
+            defaultPath: DEFAULT_CONTRACT_PATH,
+            readFile: (p) => readFile(p, "utf8"),
+          });
+          if (contract) log(`using contract override: ${contract.path}`);
+
           const outcome = await runReview(
             {
               reference,
@@ -83,6 +119,7 @@ export function createProgram(io: {
               wallClockMs: wallClockMinutes * 60_000,
               dryRun: options.dryRun,
               force: options.force,
+              ...(contract ? { contractOverride: contract.content } : {}),
             },
             {
               github: createGitHubClient({ appId: config.appId, privateKeyPem, fetch }),
