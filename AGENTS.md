@@ -13,13 +13,13 @@ Planned (not yet created): pnpm monorepo with `packages/core` (review contract, 
 
 ## Commands
 
-No toolchain yet. Once the monorepo exists: `pnpm lint`, `pnpm test`, `pnpm build` at the root, with `pnpm --filter <package>` for one package. Run the formatter (`pnpm format`) before every commit.
+No toolchain yet; this section is filled in when the monorepo lands.
 
 ## Rules
 
 - One concern per PR. Adjacent work goes to a follow-ups list, not into the diff.
 - Commits: conventional style — `feat(scope): subject`, `fix(scope): subject`, `docs(scope): …`, `test(scope): …`; repo-level chores use bare `chore: subject`. Pick scopes from the repo's top-level areas and list them. Single short subject line, no body, no trailers of any kind.
-  - Scopes: `docs`, `adr`, `agents`, `core`, `runner`, `web`, `ci`.
+  - Scopes: `docs`, `core`, `runner`, `web`, `ci`.
 - Branch names: clean, public, descriptive (`feat/thread-scroll`, `fix/reconnect-backoff`) — never ticket numbers or internal IDs.
 - Repro tests are temporary; contract tests at public seams stay.
 - Comments: only constraints the code cannot express; no history, no restating the code.
@@ -33,21 +33,7 @@ No toolchain yet. Once the monorepo exists: `pnpm lint`, `pnpm test`, `pnpm buil
 - Don't add defensive checks the toolchain already enforces (type system, strict null checks, linter). Don't hand-format — the formatter owns formatting; run it before every commit.
 - Build on what the framework/repo already provides; never introduce a parallel mechanism for something that exists. Follow how the repo already solves a problem; a different approach needs a written reason, not preference.
 - No new dependencies casually — a dep needs justification; never for a minor feature; never commercially-licensed.
-- Published/public surface is append-only once shipped: re-point a moved export, never remove one.
-- Tests: colocated beside the module, import by relative path, cover the public seam and each branch of a reducer/converter; no snapshot tests; mocks spread the original and override only what the test needs.
-- Names: follow the language's idiom guide (effective-dart / Go style / PEP8 etc.); no abbreviations, no internal IDs in identifiers.
+- Shipped surfaces are append-only: the `core` package exports and the runner ↔ control plane HTTP contract. Re-point a moved export, never remove one; add fields, never rename or drop them.
+- Tests: colocated beside the module, import by relative path, cover the public seam and each branch of a parser, renderer, or dedupe step; no snapshot tests; mocks spread the original and override only what the test needs.
+- Names: TypeScript idiom (camelCase values, PascalCase types, UPPER_SNAKE constants); no abbreviations, no internal IDs in identifiers.
 - Keep docs in lockstep with code in the same PR: anything a change invalidates gets updated in that PR, not the next.
-
-## Agent skills
-
-### Issue tracker
-
-Issues live as local markdown files under `workspace/<feature-slug>/` (gitignored). See `workspace/docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Default triage labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), recorded as a `Status:` line in each issue file. See `workspace/docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context: `CONTEXT.md` at the repo root, ADRs in `workspace/docs/adr/` (both gitignored). See `workspace/docs/agents/domain.md`.
