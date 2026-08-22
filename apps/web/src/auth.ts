@@ -23,5 +23,3 @@ export function getAuth() {
   instance ??= createAuth();
   return instance;
 }
-
-export type Session = ReturnType<typeof getAuth>["$Infer"]["Session"];

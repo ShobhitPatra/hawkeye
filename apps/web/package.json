@@ -9,7 +9,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "auth:generate": "npx auth@latest generate --config src/auth.ts --output src/db/auth-schema.ts -y",
+    "auth:generate": "npx auth@1.7.1 generate --config src/auth.cli.ts --output src/db/auth-schema.ts -y",
     "db:migrate": "tsx --env-file-if-exists=.env src/db/migrate.ts"
   },
   "dependencies": {
