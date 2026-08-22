@@ -56,6 +56,9 @@ export function linkedIssueNumber(body: string): number | undefined {
   return match ? Number(match[1]) : undefined;
 }
 
+const bearer = (token: string) => `Bearer ${token}`;
+const pulls = (r: PullRequestReference) => `/repos/${r.owner}/${r.repo}/pulls/${r.number}`;
+
 export function createGitHubClient(input: {
   appId: string;
   privateKeyPem: string;
@@ -89,9 +92,6 @@ export function createGitHubClient(input: {
       );
     return json as T;
   }
-
-  const bearer = (token: string) => `Bearer ${token}`;
-  const pulls = (r: PullRequestReference) => `/repos/${r.owner}/${r.repo}/pulls/${r.number}`;
 
   return {
     async installationToken(reference) {
