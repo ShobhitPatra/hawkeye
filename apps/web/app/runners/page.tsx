@@ -1,16 +1,18 @@
 import { getDb } from "@/db";
+import { formatUpdated } from "@/format-updated";
 import { listRunners } from "@/runner-tokens";
 import { requireSession } from "@/session";
 import { CreateRunnerForm } from "./create-runner-form";
 import { revokeRunnerAction } from "./actions";
 
-function formatTimestamp(value: Date | null) {
-  return value ? value.toISOString() : "never";
+function formatTimestamp(value: Date | null, now: number) {
+  return value ? formatUpdated(value.toISOString(), now) : "never";
 }
 
 export default async function RunnersPage() {
   const session = await requireSession();
   const runners = await listRunners(getDb(), session.user.id);
+  const now = Date.now();
 
   return (
     <main>
@@ -34,8 +36,8 @@ export default async function RunnersPage() {
             {runners.map((runner) => (
               <tr key={runner.id}>
                 <td>{runner.name}</td>
-                <td>{formatTimestamp(runner.createdAt)}</td>
-                <td>{formatTimestamp(runner.lastSeenAt)}</td>
+                <td>{formatTimestamp(runner.createdAt, now)}</td>
+                <td>{formatTimestamp(runner.lastSeenAt, now)}</td>
                 <td>{runner.revokedAt ? "revoked" : "active"}</td>
                 <td>
                   {runner.revokedAt ? null : (

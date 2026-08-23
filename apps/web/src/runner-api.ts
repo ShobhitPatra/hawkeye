@@ -3,7 +3,6 @@ import {
   type GitHubClient,
   RUN_RESULT_STATUSES,
   parseReviewResult,
-  type ReviewResult,
   type RunResultReport,
   type RunResultStatus,
 } from "@hawkeye/core";
@@ -197,12 +196,10 @@ function parseRunResultReport(payload: unknown): RunResultReport {
     throw new Error("result must be an object");
   if (status === "ok" && !result) throw new Error("an ok result needs a review result");
   if (error !== undefined && typeof error !== "string") throw new Error("error must be a string");
-  const reviewResult =
-    status === "ok" ? parseReviewResult(result) : (result as ReviewResult | undefined);
   return {
     status,
     turns: turns as number,
-    ...(reviewResult ? { result: reviewResult } : {}),
+    ...(status === "ok" ? { result: parseReviewResult(result) } : {}),
     ...(error ? { error: error as string } : {}),
   };
 }

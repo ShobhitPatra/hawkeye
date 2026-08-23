@@ -1,3 +1,4 @@
+import { RUN_RESULT_STATUSES } from "@hawkeye/core";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
@@ -296,5 +297,11 @@ describe("schema migrations", () => {
       identifier: "u3",
       value: "code-3",
     });
+  });
+});
+
+describe("run status enum", () => {
+  it("matches core's run result statuses plus running", () => {
+    expect(schema.runStatus.enumValues).toEqual(["running", ...RUN_RESULT_STATUSES]);
   });
 });
