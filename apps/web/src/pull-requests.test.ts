@@ -1,0 +1,124 @@
+import { join } from "node:path";
+import { PGlite } from "@electric-sql/pglite";
+import type { GitHubClient, InstallationRepository, OpenPullRequest } from "@hawkeye/core";
+import { drizzle } from "drizzle-orm/pglite";
+import { migrate } from "drizzle-orm/pglite/migrator";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import type { Db } from "./db/client";
+import * as schema from "./db/schema";
+import { listUserOpenPullRequests } from "./pull-requests";
+
+const migrationsFolder = join(import.meta.dirname, "..", "drizzle");
+let db: Db;
+
+function repository(owner: string, name: string): InstallationRepository {
+  return { owner, name, fullName: `${owner}/${name}`, private: false };
+}
+
+function pullRequest(owner: string, number: number, updatedAt: string): OpenPullRequest {
+  return {
+    owner,
+    repo: "repo",
+    number,
+    title: `pr ${number}`,
+    headRef: `head-${number}`,
+    headSha: `sha-${number}`,
+    updatedAt,
+    htmlUrl: `https://github.com/${owner}/repo/pull/${number}`,
+  };
+}
+
+function fakeGitHub(
+  repositories: Record<string, InstallationRepository[]>,
+  pullRequests: Record<string, OpenPullRequest[]>,
+) {
+  const installationTokenById = vi.fn(async (installationId: string) => `token-${installationId}`);
+  const listInstallationRepositories = vi.fn(async (token: string) => repositories[token] ?? []);
+  const listOpenPullRequestsByAuthor = vi.fn(async (token: string) => pullRequests[token] ?? []);
+  const github = {
+    installationTokenById,
+    listInstallationRepositories,
+    listOpenPullRequestsByAuthor,
+  } as unknown as GitHubClient;
+  return {
+    github,
+    installationTokenById,
+    listInstallationRepositories,
+    listOpenPullRequestsByAuthor,
+  };
+}
+
+beforeAll(async () => {
+  const pglite = drizzle(new PGlite(), { schema });
+  await migrate(pglite, { migrationsFolder });
+  db = pglite;
+
+  await db.insert(schema.user).values([
+    { id: "user-1", name: "octocat", email: "octocat@example.com", githubLogin: "octocat" },
+    { id: "user-2", name: "hubot", email: "hubot@example.com", githubLogin: "hubot" },
+  ]);
+  await db.insert(schema.installation).values([
+    { id: "10", accountLogin: "octo", accountType: "Organization" },
+    { id: "11", accountLogin: "acme", accountType: "Organization" },
+    { id: "12", accountLogin: "gone", accountType: "Organization", deletedAt: new Date() },
+    { id: "13", accountLogin: "other", accountType: "User" },
+  ]);
+  await db.insert(schema.installationUser).values([
+    { installationId: "10", userId: "user-1" },
+    { installationId: "11", userId: "user-1" },
+    { installationId: "12", userId: "user-1" },
+    { installationId: "13", userId: "user-2" },
+  ]);
+});
+
+describe("listUserOpenPullRequests", () => {
+  it("merges the pull requests of every live installation, newest first", async () => {
+    const octoRepositories = [repository("octo", "repo")];
+    const acmeRepositories = [repository("acme", "repo")];
+    const {
+      github,
+      installationTokenById,
+      listInstallationRepositories,
+      listOpenPullRequestsByAuthor,
+    } = fakeGitHub(
+      { "token-10": octoRepositories, "token-11": acmeRepositories },
+      {
+        "token-10": [pullRequest("octo", 1, "2026-08-01T00:00:00Z")],
+        "token-11": [
+          pullRequest("acme", 2, "2026-08-03T00:00:00Z"),
+          pullRequest("acme", 3, "2026-08-02T00:00:00Z"),
+        ],
+      },
+    );
+
+    const found = await listUserOpenPullRequests(
+      { db, github },
+      { userId: "user-1", login: "octocat" },
+    );
+
+    expect(found.map((pr) => pr.number)).toEqual([2, 3, 1]);
+    expect(installationTokenById.mock.calls).toEqual([["10"], ["11"]]);
+    expect(listInstallationRepositories.mock.calls).toEqual([["token-10"], ["token-11"]]);
+    expect(listOpenPullRequestsByAuthor.mock.calls).toEqual([
+      ["token-10", octoRepositories, "octocat"],
+      ["token-11", acmeRepositories, "octocat"],
+    ]);
+  });
+
+  it("returns nothing for a user without live installations", async () => {
+    const { github, installationTokenById } = fakeGitHub({}, {});
+
+    await expect(
+      listUserOpenPullRequests({ db, github }, { userId: "ghost", login: "ghost" }),
+    ).resolves.toEqual([]);
+    expect(installationTokenById).not.toHaveBeenCalled();
+  });
+
+  it("only reads the installations linked to the user", async () => {
+    const { github, installationTokenById } = fakeGitHub({}, {});
+
+    await listUserOpenPullRequests({ db, github }, { userId: "user-2", login: "hubot" });
+
+    expect(installationTokenById.mock.calls).toEqual([["13"]]);
+  });
+});
