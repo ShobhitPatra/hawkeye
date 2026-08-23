@@ -62,9 +62,9 @@ export async function handlePullRequestEvent(
     repo: event.repository.name,
     number: event.number,
   };
-  let target: Promise<ReviewTarget> | undefined;
+  let pendingTarget: Promise<ReviewTarget> | undefined;
   const reviewTarget = () =>
-    (target ??= github.installationTokenById(event.installationId).then((token) =>
+    (pendingTarget ??= github.installationTokenById(event.installationId).then((token) =>
       resolveReviewTarget(github, {
         reference,
         headSha: event.headSha,

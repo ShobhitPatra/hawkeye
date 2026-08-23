@@ -202,6 +202,14 @@ describe("handlePullRequestEvent", () => {
     expect(await jobs()).toHaveLength(0);
   });
 
+  it("does nothing when an unarmed pull request closes", async () => {
+    const result = await handlePullRequestEvent(
+      { db, github: fakeGitHub() },
+      event({ number: 98, action: "closed", merged: true }),
+    );
+    expect(result).toEqual({ enqueued: 0, disarmed: 0, cancelled: 0 });
+  });
+
   it("reports an action it does not act on", async () => {
     await seedArmedPullRequest(db);
     const result = await handlePullRequestEvent(
