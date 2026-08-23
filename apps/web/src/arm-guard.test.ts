@@ -25,13 +25,14 @@ function fakeGitHub(pullRequest: GitHubClient["pullRequest"]): GitHubClient {
 const reference = { owner: "octo", repo: "repo", number: 7 };
 
 describe("assertPullRequestInInstallation", () => {
-  it("resolves when the pull request is reachable through the installation", async () => {
-    const pullRequest: GitHubClient["pullRequest"] = vi.fn(
-      async () => ({}) as Awaited<ReturnType<GitHubClient["pullRequest"]>>,
-    );
+  it("returns the pull request when it is reachable through the installation", async () => {
+    const details = { headSha: "a".repeat(40), baseSha: "b".repeat(40) } as Awaited<
+      ReturnType<GitHubClient["pullRequest"]>
+    >;
+    const pullRequest: GitHubClient["pullRequest"] = vi.fn(async () => details);
     const github = fakeGitHub(pullRequest);
 
-    await expect(assertPullRequestInInstallation(github, "10", reference)).resolves.toBeUndefined();
+    await expect(assertPullRequestInInstallation(github, "10", reference)).resolves.toBe(details);
     expect(pullRequest).toHaveBeenCalledWith(reference, "token-10");
   });
 

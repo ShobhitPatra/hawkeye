@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { parseArmInput, parsePullRequestInput } from "@/arm-input";
 import { assertPullRequestInInstallation } from "@/arm-guard";
 import { armPullRequest, disarmPullRequest } from "@/arming";
+import { enqueueReviewForArmedPullRequest } from "@/enqueue";
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
 import { installationBelongsToUser } from "@/installations";
@@ -19,9 +20,18 @@ export async function armAction(formData: FormData) {
   }
 
   const github = createGitHubAppClient({ fetch });
-  await assertPullRequestInInstallation(github, input.installationId, input);
+  const details = await assertPullRequestInInstallation(github, input.installationId, input);
 
-  await armPullRequest(db, { ...input, userId: session.user.id });
+  const armed = await armPullRequest(db, { ...input, userId: session.user.id });
+  await enqueueReviewForArmedPullRequest(
+    { db, github },
+    {
+      armedPr: armed,
+      headSha: details.headSha,
+      baseSha: details.baseSha,
+      delaySeconds: 0,
+    },
+  );
   revalidatePath("/prs");
 }
 
