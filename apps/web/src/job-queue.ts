@@ -27,6 +27,7 @@ export async function claimNextJob(
              from ${job} next
              join ${armedPr} owner on owner.id = next.armed_pr_id
              where owner.user_id = ${input.userId}
+               and owner.disarmed_at is null
                and next.state = 'queued'
                and next.not_before <= ${input.now}
              order by next.not_before
@@ -141,7 +142,7 @@ export async function completeRun(
     .set({
       status: input.status,
       turns: input.turns,
-      result: input.result ?? null,
+      result: input.status === "ok" ? (input.result ?? null) : null,
       error: input.error ?? null,
       endedAt: new Date(),
     })

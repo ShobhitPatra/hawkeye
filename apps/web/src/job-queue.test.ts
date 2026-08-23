@@ -66,6 +66,16 @@ describe("claimNextJob", () => {
     expect(claimed?.heartbeatAt?.toISOString()).toBe(now.toISOString());
   });
 
+  it("skips jobs whose pull request has been disarmed", async () => {
+    await enqueue("armed-1", minutesBefore(10));
+    await db
+      .update(schema.armedPr)
+      .set({ disarmedAt: new Date() })
+      .where(eq(schema.armedPr.id, "armed-1"));
+
+    expect(await claim()).toBeUndefined();
+  });
+
   it("hands two runners two different jobs", async () => {
     const first = await enqueue("armed-1", minutesBefore(10));
     const second = await enqueue("armed-2", minutesBefore(5));
