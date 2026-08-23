@@ -190,6 +190,8 @@ export function createGitHubClient(input: {
   }
 
   async function installationAccessToken(installationId: string): Promise<string> {
+    if (!/^\d+$/.test(installationId))
+      throw new Error(`Invalid installation id: "${installationId}"`);
     const jwt = bearer(createAppJwt({ appId: input.appId, privateKeyPem: input.privateKeyPem }));
     const token = await request<{ token?: string }>(
       "POST",

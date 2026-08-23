@@ -319,6 +319,27 @@ describe("createGitHubClient", () => {
     expect(String(error)).toContain("GitHub GET /installation/repositories failed: 403 Forbidden");
     expect(String(error)).not.toContain("ghs_secret");
   });
+  it("rejects an installation id that is not numeric", async () => {
+    const { fetchImpl, calls } = fakeFetch({});
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(client.installationTokenById("../app")).rejects.toThrow(/installation id/);
+    expect(calls).toHaveLength(0);
+  });
+  it("fetches pull requests for more repositories than the concurrency limit", async () => {
+    const names = ["a", "b", "c", "d", "e", "f", "g"];
+    const routes = Object.fromEntries(
+      names.map((n) => [`GET /repos/o/${n}/pulls`, () => ({ json: [pull(1, "alice")] })]),
+    );
+    const { fetchImpl, calls } = fakeFetch(routes);
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    const open = await client.listOpenPullRequestsByAuthor(
+      "ghs_x",
+      names.map((name) => ({ owner: "o", name })),
+      "alice",
+    );
+    expect(open.map((p) => p.repo)).toEqual(names);
+    expect(calls).toHaveLength(names.length);
+  });
   it("collects the author's open pull requests across repositories", async () => {
     const { fetchImpl, calls } = fakeFetch({
       "GET /repos/o/a/pulls": () => ({ json: [pull(1, "alice"), pull(2, "bob"), pull(4, null)] }),
