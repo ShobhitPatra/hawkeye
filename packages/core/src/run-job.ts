@@ -1,4 +1,4 @@
-import { fetchPullRequestDetails } from "./github/client.js";
+import { fetchLinkedIssue, fetchPullRequestDetails } from "./github/client.js";
 import type { PullRequestReference } from "./github/pull-request-reference.js";
 import type { HarnessSpec } from "./harness/harness.js";
 import { runReviewPipeline } from "./review-pipeline.js";
@@ -34,6 +34,12 @@ export async function runReviewJob(
 ): Promise<RunReviewJobOutcome> {
   const { reference } = input;
   const pullRequest = await fetchPullRequestDetails({ fetch: deps.fetch }, reference, input.token);
+  const linkedIssue = await fetchLinkedIssue(
+    { fetch: deps.fetch },
+    reference,
+    pullRequest.body,
+    input.token,
+  );
   const outcome = await runReviewPipeline(
     {
       cloneUrl: pullRequest.cloneUrl,
@@ -51,6 +57,7 @@ export async function runReviewJob(
           baseSha: input.baseSha,
           headSha: input.headSha,
         },
+        ...(linkedIssue ? { linkedIssue } : {}),
         ...(input.contractOverride === undefined
           ? {}
           : { contractOverride: input.contractOverride }),

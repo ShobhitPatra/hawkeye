@@ -159,6 +159,28 @@ export async function fetchPullRequestDetails(
   };
 }
 
+export async function fetchLinkedIssue(
+  deps: { fetch: typeof fetch; apiBase?: string },
+  reference: PullRequestReference,
+  body: string,
+  token: string,
+): Promise<LinkedIssue | undefined> {
+  const number = linkedIssueNumber(body);
+  if (number === undefined) return undefined;
+  const issue = await sendGitHubRequest(
+    deps.fetch,
+    "GET",
+    `${deps.apiBase ?? DEFAULT_API_BASE}/repos/${reference.owner}/${reference.repo}/issues/${number}`,
+    bearer(token),
+  ).catch((error: unknown) => {
+    if (error instanceof GitHubRequestError && error.status === 404) return undefined;
+    throw error;
+  });
+  if (issue === undefined) return undefined;
+  const payload = issue.payload as { number: number; title: string; body: string | null };
+  return { number: payload.number, title: payload.title, body: payload.body ?? "" };
+}
+
 export function createGitHubClient(input: {
   appId: string;
   privateKeyPem: string;
@@ -271,19 +293,8 @@ export function createGitHubClient(input: {
       if (typeof sha !== "string") throw new Error(`GitHub GET ${path} returned no merge base sha`);
       return sha;
     },
-    async linkedIssue(reference, body, token) {
-      const number = linkedIssueNumber(body);
-      if (number === undefined) return undefined;
-      const issue = await request<{ number: number; title: string; body: string | null }>(
-        "GET",
-        `/repos/${reference.owner}/${reference.repo}/issues/${number}`,
-        bearer(token),
-      ).catch((error: unknown) => {
-        if (error instanceof GitHubRequestError && error.status === 404) return undefined;
-        throw error;
-      });
-      if (issue === undefined) return undefined;
-      return { number: issue.number, title: issue.title, body: issue.body ?? "" };
+    linkedIssue(reference, body, token) {
+      return fetchLinkedIssue({ fetch: input.fetch, apiBase }, reference, body, token);
     },
     async reviews(reference, token) {
       return paginate(`${pulls(reference)}/reviews`, token, (payload) =>

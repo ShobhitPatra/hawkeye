@@ -16,8 +16,10 @@ export async function loadRunnerConfig(input: {
     },
   );
   const pick = (envName: string, fileName: keyof RunnerConfig): string => {
-    const value =
-      input.env[envName] ?? (file[fileName] === undefined ? undefined : String(file[fileName]));
+    const fromFile = file[fileName];
+    if (fromFile !== undefined && typeof fromFile !== "string")
+      throw new Error(`Invalid ${fileName} in ${input.configPath}: expected a string`);
+    const value = input.env[envName] || fromFile;
     if (value === undefined || value === "")
       throw new Error(
         `Missing ${fileName}: run "hawkeye runner login --url <url> --token <token>" or set ${envName}`,

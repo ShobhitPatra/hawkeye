@@ -43,6 +43,31 @@ describe("loadRunnerConfig", () => {
       }),
     ).rejects.toThrow(/Missing token/);
   });
+  it("rejects non-string values in the config file", async () => {
+    await expect(
+      loadRunnerConfig({
+        env: {},
+        configPath: "/c.json",
+        readFile: async () => JSON.stringify({ controlPlaneUrl: 3000, token: "hk_1" }),
+      }),
+    ).rejects.toThrow("Invalid controlPlaneUrl in /c.json: expected a string");
+    await expect(
+      loadRunnerConfig({
+        env: {},
+        configPath: "/c.json",
+        readFile: async () => JSON.stringify({ controlPlaneUrl: "https://x", token: { a: 1 } }),
+      }),
+    ).rejects.toThrow("Invalid token in /c.json: expected a string");
+  });
+  it("ignores empty env vars instead of shadowing the file", async () => {
+    await expect(
+      loadRunnerConfig({
+        env: { HAWKEYE_CONTROL_PLANE_URL: "", HAWKEYE_RUNNER_TOKEN: "" },
+        configPath: "/c.json",
+        readFile: async () => file,
+      }),
+    ).resolves.toEqual({ controlPlaneUrl: "https://hawkeye.example", token: "hk_1" });
+  });
   it("surfaces unreadable config files", async () => {
     await expect(
       loadRunnerConfig({

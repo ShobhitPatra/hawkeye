@@ -3,9 +3,10 @@ export {
   type PullRequestReference,
 } from "./github/pull-request-reference.js";
 export { createGitHubClient, type GitHubClient } from "./github/client.js";
-export { GitHubRequestError, fetchPullRequestDetails } from "./github/client.js";
+export { GitHubRequestError, fetchPullRequestDetails, fetchLinkedIssue } from "./github/client.js";
 export type {
   InstallationRepository,
+  LinkedIssue,
   OpenPullRequest,
   PullRequestDetails,
 } from "./github/client.js";

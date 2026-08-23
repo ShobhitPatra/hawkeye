@@ -21,15 +21,22 @@ function deps(
     resultText: string;
     harnessResult: HarnessResult;
     pullRequestResponse: Response;
+    pullRequestBody: string;
+    issueResponse: Response;
   }> = {},
 ) {
-  const fetch = vi.fn(
-    async (_url: string, _init?: RequestInit) =>
+  const fetch = vi.fn(async (url: string, _init?: RequestInit) => {
+    if (url.includes("/issues/"))
+      return (
+        overrides.issueResponse ??
+        Response.json({ number: 2, title: "Issue title", body: "ISSUE-FIXTURE-TEXT" })
+      );
+    return (
       overrides.pullRequestResponse ??
       Response.json({
         number: 1,
         title: "T",
-        body: "Closes #2",
+        body: overrides.pullRequestBody ?? "Closes #2",
         draft: false,
         user: { login: "alice" },
         head: { sha: "c".repeat(40), ref: "feature" },
@@ -38,8 +45,9 @@ function deps(
           ref: "main",
           repo: { clone_url: "https://github.com/o/r.git" },
         },
-      }),
-  );
+      })
+    );
+  });
   const harness: HarnessSpec = {
     name: "fake",
     run: vi.fn(async (i): Promise<HarnessResult> => {
@@ -108,7 +116,7 @@ describe("runReviewJob", () => {
     expect((init!.headers as Record<string, string>).Authorization).toBe("Bearer ghs_t");
     expect(await readFile(join(i.runDirectory, "stream.jsonl"), "utf8")).toBe("{}");
   });
-  it("writes a prompt with the pull request text, rules and diff but no linked issue", async () => {
+  it("writes a prompt with the pull request text, linked issue, rules and diff", async () => {
     const d = deps();
     const i = await input({ contractOverride: "CUSTOM RULES" });
     await runReviewJob(i, d);
@@ -116,12 +124,33 @@ describe("runReviewJob", () => {
     expect(prompt).toContain("Author: alice");
     expect(prompt).toContain("Title: T");
     expect(prompt).toContain("Closes #2");
-    expect(prompt).not.toContain("# Linked issue");
+    expect(prompt).toContain("# Linked issue #2");
+    expect(prompt).toContain('source="linked_issue"');
+    expect(prompt).toContain("ISSUE-FIXTURE-TEXT");
     expect(prompt).toContain("RULES-FIXTURE-TEXT");
     expect(prompt).toContain("+two");
     expect(prompt).toContain("CUSTOM RULES");
     expect(prompt).toContain(headSha);
     expect(prompt).toContain(baseSha);
+    const [issueUrl, issueInit] = d.fetch.mock.calls[1]!;
+    expect(issueUrl).toBe("https://api.github.com/repos/o/r/issues/2");
+    expect((issueInit!.headers as Record<string, string>).Authorization).toBe("Bearer ghs_t");
+  });
+  it("omits the linked issue section when the body links none and when the issue is gone", async () => {
+    const unlinked = deps({ pullRequestBody: "no link here" });
+    const i = await input();
+    await runReviewJob(i, unlinked);
+    expect(await readFile(join(i.runDirectory, "prompt.md"), "utf8")).not.toContain(
+      "# Linked issue",
+    );
+    expect(unlinked.fetch).toHaveBeenCalledTimes(1);
+
+    const gone = deps({ issueResponse: Response.json({ message: "Not Found" }, { status: 404 }) });
+    const j = await input();
+    await runReviewJob(j, gone);
+    expect(await readFile(join(j.runDirectory, "prompt.md"), "utf8")).not.toContain(
+      "# Linked issue",
+    );
   });
   it("removes Claude config from the checkout after reading the repository rules", async () => {
     const d = deps();
