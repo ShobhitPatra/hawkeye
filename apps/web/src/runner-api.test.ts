@@ -179,7 +179,7 @@ describe("claimJob", () => {
     expect(response.status).toBe(204);
   });
 
-  it("requeues a stale job and claims it on the next poll", async () => {
+  it("requeues a stale job and claims it on the first attempt", async () => {
     const queued = await enqueue();
     await db
       .update(schema.job)
@@ -198,7 +198,7 @@ describe("claimJob", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(sleep).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
     expect((await response.json()).job.id).toBe(queued.id);
   });
 });
