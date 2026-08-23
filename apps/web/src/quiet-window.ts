@@ -1,4 +1,4 @@
-export const DEFAULT_QUIET_WINDOW_SECONDS = 180;
+import { DEFAULT_QUIET_WINDOW_SECONDS } from "./db/schema";
 
 export function quietWindowSeconds(
   settings: { quietWindowSeconds: number } | undefined,

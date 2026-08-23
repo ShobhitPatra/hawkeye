@@ -11,6 +11,8 @@ import {
 } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
 
+export const DEFAULT_QUIET_WINDOW_SECONDS = 180;
+
 export * from "./auth-schema";
 
 export const jobState = pgEnum("job_state", ["queued", "claimed", "done", "failed"]);
@@ -183,6 +185,6 @@ export const userSettings = pgTable("user_settings", {
   promptOverride: text("prompt_override"),
   maxTurns: integer("max_turns").notNull().default(40),
   wallClockMinutes: integer("wall_clock_min").notNull().default(15),
-  quietWindowSeconds: integer("quiet_window_s").notNull().default(180),
+  quietWindowSeconds: integer("quiet_window_s").notNull().default(DEFAULT_QUIET_WINDOW_SECONDS),
   reviewDrafts: boolean("review_drafts").notNull().default(false),
 });

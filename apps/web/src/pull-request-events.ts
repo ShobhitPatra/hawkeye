@@ -5,7 +5,7 @@ import { armedPr, job, userSettings } from "./db/schema";
 import type { PullRequestEvent } from "./github/webhook-events";
 import { enqueueJob } from "./jobs";
 import { quietWindowSeconds } from "./quiet-window";
-import { resolveReviewTarget } from "./review-target";
+import { resolveReviewTarget, type ReviewTarget } from "./review-target";
 
 export type PullRequestEventResult = {
   enqueued: number;
@@ -62,7 +62,16 @@ export async function handlePullRequestEvent(
     repo: event.repository.name,
     number: event.number,
   };
-  const tokens = new Map<string, Promise<string>>();
+  let target: Promise<ReviewTarget> | undefined;
+  const reviewTarget = () =>
+    (target ??= github.installationTokenById(event.installationId).then((token) =>
+      resolveReviewTarget(github, {
+        reference,
+        headSha: event.headSha,
+        baseSha: event.baseSha,
+        token,
+      }),
+    ));
   let enqueued = 0;
 
   for (const row of armed) {
@@ -72,18 +81,7 @@ export async function handlePullRequestEvent(
       .where(eq(userSettings.userId, row.userId));
     if (event.draft && !settings?.reviewDrafts) continue;
 
-    let token = tokens.get(row.installationId);
-    if (!token) {
-      token = github.installationTokenById(row.installationId);
-      tokens.set(row.installationId, token);
-    }
-
-    const target = await resolveReviewTarget(github, {
-      reference,
-      headSha: event.headSha,
-      baseSha: event.baseSha,
-      token: await token,
-    });
+    const target = await reviewTarget();
     const delaySeconds = quietWindowSeconds(settings, row);
     await enqueueJob(db, {
       armedPrId: row.id,

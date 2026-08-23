@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_QUIET_WINDOW_SECONDS, quietWindowSeconds } from "./quiet-window";
+import { DEFAULT_QUIET_WINDOW_SECONDS } from "./db/schema";
+import { quietWindowSeconds } from "./quiet-window";
 
 describe("quietWindowSeconds", () => {
   it("falls back to the default without settings or an override", () => {
