@@ -9,10 +9,11 @@ export async function assertPullRequestInInstallation(
   github: GitHubClient,
   installationId: string,
   reference: PullRequestReference,
-): Promise<PullRequestDetails> {
+): Promise<{ token: string; pullRequest: PullRequestDetails }> {
   const token = await github.installationTokenById(installationId);
   try {
-    return await github.pullRequest(reference, token);
+    const pullRequest = await github.pullRequest(reference, token);
+    return { token, pullRequest };
   } catch (error) {
     if (error instanceof GitHubRequestError && error.status === 404) {
       throw new Error(

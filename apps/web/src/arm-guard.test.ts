@@ -32,7 +32,10 @@ describe("assertPullRequestInInstallation", () => {
     const pullRequest: GitHubClient["pullRequest"] = vi.fn(async () => details);
     const github = fakeGitHub(pullRequest);
 
-    await expect(assertPullRequestInInstallation(github, "10", reference)).resolves.toBe(details);
+    await expect(assertPullRequestInInstallation(github, "10", reference)).resolves.toEqual({
+      token: "token-10",
+      pullRequest: details,
+    });
     expect(pullRequest).toHaveBeenCalledWith(reference, "token-10");
   });
 

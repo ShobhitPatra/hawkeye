@@ -20,16 +20,21 @@ export async function armAction(formData: FormData) {
   }
 
   const github = createGitHubAppClient({ fetch });
-  const details = await assertPullRequestInInstallation(github, input.installationId, input);
+  const { token, pullRequest } = await assertPullRequestInInstallation(
+    github,
+    input.installationId,
+    input,
+  );
 
   const armed = await armPullRequest(db, { ...input, userId: session.user.id });
   await enqueueReviewForArmedPullRequest(
     { db, github },
     {
       armedPr: armed,
-      headSha: details.headSha,
-      baseSha: details.baseSha,
+      headSha: pullRequest.headSha,
+      baseSha: pullRequest.baseSha,
       delaySeconds: 0,
+      token,
     },
   );
   revalidatePath("/prs");
