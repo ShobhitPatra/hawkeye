@@ -189,6 +189,19 @@ export function createGitHubClient(input: {
       }));
   }
 
+  async function installationAccessToken(installationId: string): Promise<string> {
+    const jwt = bearer(createAppJwt({ appId: input.appId, privateKeyPem: input.privateKeyPem }));
+    const token = await request<{ token?: string }>(
+      "POST",
+      `/app/installations/${installationId}/access_tokens`,
+      jwt,
+      {},
+    );
+    if (typeof token.token !== "string")
+      throw new Error("GitHub installation token response has no token");
+    return token.token;
+  }
+
   return {
     async installationToken(reference) {
       const jwt = bearer(createAppJwt({ appId: input.appId, privateKeyPem: input.privateKeyPem }));
@@ -197,25 +210,10 @@ export function createGitHubClient(input: {
         `/repos/${reference.owner}/${reference.repo}/installation`,
         jwt,
       );
-      const token = await request<{ token: string }>(
-        "POST",
-        `/app/installations/${installation.id}/access_tokens`,
-        jwt,
-        {},
-      );
-      return token.token;
+      return installationAccessToken(String(installation.id));
     },
     async installationTokenById(installationId) {
-      const jwt = bearer(createAppJwt({ appId: input.appId, privateKeyPem: input.privateKeyPem }));
-      const token = await request<{ token?: string }>(
-        "POST",
-        `/app/installations/${installationId}/access_tokens`,
-        jwt,
-        {},
-      );
-      if (typeof token.token !== "string")
-        throw new Error("GitHub installation token response has no token");
-      return token.token;
+      return installationAccessToken(installationId);
     },
     async pullRequest(reference, token) {
       const pr = await request<{
@@ -283,9 +281,16 @@ export function createGitHubClient(input: {
     async listInstallationRepositories(token) {
       return paginate("/installation/repositories", token, (payload) =>
         (
-          payload as { repositories: { name: string; full_name: string; private: boolean }[] }
+          payload as {
+            repositories: {
+              name: string;
+              full_name: string;
+              private: boolean;
+              owner: { login: string };
+            }[];
+          }
         ).repositories.map((repository) => ({
-          owner: repository.full_name.split("/")[0]!,
+          owner: repository.owner.login,
           name: repository.name,
           fullName: repository.full_name,
           private: repository.private,

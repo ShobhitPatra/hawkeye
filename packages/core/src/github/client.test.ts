@@ -236,13 +236,14 @@ describe("createGitHubClient", () => {
       name: `r${index}`,
       full_name: `o/r${index}`,
       private: false,
+      owner: { login: "o" },
     }));
     const { fetchImpl, calls } = fakeFetch({
       "GET /installation/repositories": (_init, url) => ({
         json: {
           repositories:
             url.searchParams.get("page") === "2"
-              ? [{ name: "b", full_name: "o/b", private: true }]
+              ? [{ name: "b", full_name: "o/b", private: true, owner: { login: "o" } }]
               : full,
         },
         link:
@@ -258,11 +259,49 @@ describe("createGitHubClient", () => {
     expect(calls).toHaveLength(2);
     expect(calls[0]!.url).toContain("per_page=100");
   });
+  it("follows the next rel out of a link header listing multiple rels", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      "GET /installation/repositories": (_init, url) => ({
+        json: {
+          repositories:
+            url.searchParams.get("page") === "2"
+              ? [{ name: "z", full_name: "o/z", private: false, owner: { login: "o" } }]
+              : [{ name: "a", full_name: "o/a", private: false, owner: { login: "o" } }],
+        },
+        link:
+          url.searchParams.get("page") === "2"
+            ? undefined
+            : '<https://api.github.com/installation/repositories?per_page=100&page=2>; rel="next", <https://api.github.com/installation/repositories?per_page=100&page=5>; rel="last"',
+      }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    const repositories = await client.listInstallationRepositories("ghs_x");
+    expect(repositories).toHaveLength(2);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.url).toContain("page=2");
+  });
+  it("takes the repository owner from the owner field, not the full name", async () => {
+    const { fetchImpl } = fakeFetch({
+      "GET /installation/repositories": () => ({
+        json: {
+          repositories: [
+            { name: "r", full_name: "renamed-owner/r", private: false, owner: { login: "o" } },
+          ],
+        },
+      }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    const repositories = await client.listInstallationRepositories("ghs_x");
+    expect(repositories).toEqual([
+      { owner: "o", name: "r", fullName: "renamed-owner/r", private: false },
+    ]);
+  });
   it("stops after a last link page holding exactly one hundred repositories", async () => {
     const full = Array.from({ length: 100 }, (_value, index) => ({
       name: `r${index}`,
       full_name: `o/r${index}`,
       private: false,
+      owner: { login: "o" },
     }));
     const { fetchImpl, calls } = fakeFetch({
       "GET /installation/repositories": () => ({ json: { repositories: full } }),

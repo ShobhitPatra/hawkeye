@@ -1,4 +1,3 @@
-export { createAppJwt } from "./github/app-auth.js";
 export {
   parsePullRequestReference,
   type PullRequestReference,
