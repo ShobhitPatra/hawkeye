@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { account, installation, installationUser } from "./db/schema";
 import type { WebhookEvent } from "./github/webhook-events";
@@ -20,6 +20,25 @@ export async function linkInstallationToUser(
     .insert(installationUser)
     .values({ installationId, userId: linkedAccount.userId })
     .onConflictDoNothing();
+}
+
+export async function installationBelongsToUser(
+  db: Db,
+  installationId: string,
+  userId: string,
+): Promise<boolean> {
+  const [link] = await db
+    .select({ userId: installationUser.userId })
+    .from(installationUser)
+    .innerJoin(installation, eq(installation.id, installationUser.installationId))
+    .where(
+      and(
+        eq(installationUser.installationId, installationId),
+        eq(installationUser.userId, userId),
+        isNull(installation.deletedAt),
+      ),
+    );
+  return link !== undefined;
 }
 
 export async function recordInstallation(db: Db, event: InstallationEvent) {

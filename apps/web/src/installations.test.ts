@@ -7,7 +7,11 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
 import type { WebhookEvent } from "./github/webhook-events";
-import { linkInstallationToUser, recordInstallation } from "./installations";
+import {
+  installationBelongsToUser,
+  linkInstallationToUser,
+  recordInstallation,
+} from "./installations";
 
 type InstallationEvent = Extract<WebhookEvent, { type: "installation" }>;
 
@@ -107,5 +111,31 @@ describe("linkInstallationToUser", () => {
     await linkInstallationToUser(db, "99", 999);
 
     expect(await readLinks("99")).toHaveLength(0);
+  });
+});
+
+describe("installationBelongsToUser", () => {
+  it("is true only for an installation linked to the user", async () => {
+    await db
+      .insert(schema.user)
+      .values({ id: "user-3", name: "hubot", email: "hubot@example.com" });
+    await db.insert(schema.account).values({
+      id: "account-3",
+      issuer: "https://github.com",
+      accountId: "800",
+      providerId: "github",
+      userId: "user-3",
+    });
+    await recordInstallation(db, installationEvent("created", 80, 800));
+
+    expect(await installationBelongsToUser(db, "80", "user-3")).toBe(true);
+    expect(await installationBelongsToUser(db, "80", "user-1")).toBe(false);
+    expect(await installationBelongsToUser(db, "81", "user-3")).toBe(false);
+  });
+  it("is false once the installation is deleted or suspended", async () => {
+    await recordInstallation(db, installationEvent("suspend", 80, 800));
+    expect(await installationBelongsToUser(db, "80", "user-3")).toBe(false);
+    await recordInstallation(db, installationEvent("unsuspend", 80, 800));
+    expect(await installationBelongsToUser(db, "80", "user-3")).toBe(true);
   });
 });
