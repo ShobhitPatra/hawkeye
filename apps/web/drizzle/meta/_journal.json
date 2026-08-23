@@ -15,6 +15,13 @@
       "when": 1787408208085,
       "tag": "0001_lazy_vance_astro",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787452158688,
+      "tag": "0002_freezing_devos",
+      "breakpoints": true
     }
   ]
 }
