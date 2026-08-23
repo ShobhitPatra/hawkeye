@@ -13,12 +13,27 @@ function unsupported() {
   });
 }
 
+function pullRequestWithHead(headSha: string) {
+  return {
+    number: 7,
+    title: "title",
+    body: "",
+    author: "octocat",
+    draft: false,
+    headSha,
+    headRef: "feature",
+    baseSha: "b".repeat(40),
+    baseRef: "main",
+    cloneUrl: "https://github.com/octo/repo.git",
+  };
+}
+
 function fakeGitHub(overrides: Partial<GitHubClient> = {}): GitHubClient {
   return {
     mergeBase: vi.fn(async () => "m".repeat(40)),
     installationTokenById: vi.fn(async () => "ghs_t"),
     installationToken: unsupported(),
-    pullRequest: unsupported(),
+    pullRequest: vi.fn(async () => pullRequestWithHead("h".repeat(40))),
     linkedIssue: unsupported(),
     reviews: unsupported(),
     postReview: unsupported(),
@@ -71,7 +86,10 @@ describe("handlePullRequestEvent", () => {
 
   it("collapses a second push onto the waiting job", async () => {
     await seedArmedPullRequest(db);
-    const github = fakeGitHub();
+    const pullRequest = vi.fn();
+    pullRequest.mockResolvedValueOnce(pullRequestWithHead("h".repeat(40)));
+    pullRequest.mockResolvedValueOnce(pullRequestWithHead("c".repeat(40)));
+    const github = fakeGitHub({ pullRequest });
     await handlePullRequestEvent({ db, github }, event());
     await handlePullRequestEvent({ db, github }, event({ headSha: "c".repeat(40) }));
 
@@ -208,6 +226,16 @@ describe("handlePullRequestEvent", () => {
       event({ number: 98, action: "closed", merged: true }),
     );
     expect(result).toEqual({ enqueued: 0, disarmed: 0, cancelled: 0 });
+  });
+
+  it("ignores a delivery whose head is no longer current", async () => {
+    await seedArmedPullRequest(db);
+    const github = fakeGitHub({
+      pullRequest: vi.fn(async () => pullRequestWithHead("d".repeat(40))),
+    });
+    const result = await handlePullRequestEvent({ db, github }, event());
+    expect(result).toEqual({ enqueued: 0, disarmed: 0, cancelled: 0, ignored: "stale head" });
+    expect(await jobs()).toHaveLength(0);
   });
 
   it("reports an action it does not act on", async () => {

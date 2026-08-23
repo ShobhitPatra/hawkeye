@@ -59,21 +59,27 @@ export async function handlePullRequestEvent(
   }
 
   const armed = await db.select().from(armedPr).where(activeRows(event));
+  if (armed.length === 0) return { enqueued: 0, disarmed: 0, cancelled: 0 };
+
   const reference = {
     owner: event.repository.owner,
     repo: event.repository.name,
     number: event.number,
   };
+  const token = await github.installationTokenById(event.installationId);
+  const current = await github.pullRequest(reference, token);
+  if (current.headSha !== event.headSha) {
+    return { enqueued: 0, disarmed: 0, cancelled: 0, ignored: "stale head" };
+  }
+
   let pendingTarget: Promise<ReviewTarget> | undefined;
   const reviewTarget = () =>
-    (pendingTarget ??= github.installationTokenById(event.installationId).then((token) =>
-      resolveReviewTarget(github, {
-        reference,
-        headSha: event.headSha,
-        baseSha: event.baseSha,
-        token,
-      }),
-    ));
+    (pendingTarget ??= resolveReviewTarget(github, {
+      reference,
+      headSha: event.headSha,
+      baseSha: event.baseSha,
+      token,
+    }));
   let enqueued = 0;
 
   for (const row of armed) {
