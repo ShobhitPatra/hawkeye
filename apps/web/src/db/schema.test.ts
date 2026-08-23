@@ -47,6 +47,20 @@ describe("schema migrations", () => {
       "verification",
     ]);
   });
+  it("stores the github login on the user", async () => {
+    await db
+      .insert(schema.user)
+      .values({ id: "u-login", name: "octocat", email: "octocat@example.com" });
+    const [withoutLogin] = await db.select().from(schema.user).where(eq(schema.user.id, "u-login"));
+    expect(withoutLogin?.githubLogin).toBeNull();
+
+    await db
+      .update(schema.user)
+      .set({ githubLogin: "octocat" })
+      .where(eq(schema.user.id, "u-login"));
+    const [withLogin] = await db.select().from(schema.user).where(eq(schema.user.id, "u-login"));
+    expect(withLogin?.githubLogin).toBe("octocat");
+  });
   it("rejects an armed pr for an unknown user and accepts it once the user exists", async () => {
     await db
       .insert(schema.installation)

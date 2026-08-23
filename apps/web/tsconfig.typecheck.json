@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": { "@/*": ["./src/*"], "@hawkeye/core": ["../../packages/core/src/index.ts"] }
+  }
+}
