@@ -5,6 +5,18 @@ type InstallationAction =
   | "unsuspend"
   | "new_permissions_accepted";
 
+export type PullRequestEvent = {
+  type: "pull_request";
+  action: string;
+  repository: { owner: string; name: string };
+  number: number;
+  headSha: string;
+  baseSha: string;
+  draft: boolean;
+  merged: boolean;
+  installationId: string;
+};
+
 export type WebhookEvent =
   | {
       type: "installation";
@@ -12,6 +24,7 @@ export type WebhookEvent =
       installation: { id: number; account: { login: string; type: string } };
       sender: { id: number; login: string };
     }
+  | PullRequestEvent
   | { type: "ignored"; eventName: string };
 
 const INSTALLATION_ACTIONS: ReadonlySet<InstallationAction> = new Set([
@@ -63,7 +76,63 @@ function parseInstallationEvent(eventName: string, payload: unknown): WebhookEve
   };
 }
 
+function parsePullRequestEvent(payload: unknown): WebhookEvent {
+  const body = payload as {
+    action?: unknown;
+    installation?: { id?: unknown };
+    repository?: { name?: unknown; owner?: { login?: unknown } };
+    pull_request?: {
+      number?: unknown;
+      draft?: unknown;
+      merged?: unknown;
+      head?: { sha?: unknown };
+      base?: { sha?: unknown };
+    };
+  };
+
+  if (typeof body.action !== "string") {
+    throw new Error("pull_request webhook payload is missing its action");
+  }
+  if (!body.installation || typeof body.installation.id !== "number") {
+    throw new Error("pull_request webhook payload is missing required installation fields");
+  }
+  const repository = body.repository;
+  if (
+    !repository ||
+    typeof repository.name !== "string" ||
+    !repository.owner ||
+    typeof repository.owner.login !== "string"
+  ) {
+    throw new Error("pull_request webhook payload is missing required repository fields");
+  }
+  const pullRequest = body.pull_request;
+  if (
+    !pullRequest ||
+    typeof pullRequest.number !== "number" ||
+    typeof pullRequest.draft !== "boolean" ||
+    !pullRequest.head ||
+    typeof pullRequest.head.sha !== "string" ||
+    !pullRequest.base ||
+    typeof pullRequest.base.sha !== "string"
+  ) {
+    throw new Error("pull_request webhook payload is missing required pull request fields");
+  }
+
+  return {
+    type: "pull_request",
+    action: body.action,
+    repository: { owner: repository.owner.login, name: repository.name },
+    number: pullRequest.number,
+    headSha: pullRequest.head.sha,
+    baseSha: pullRequest.base.sha,
+    draft: pullRequest.draft,
+    merged: pullRequest.merged === true,
+    installationId: String(body.installation.id),
+  };
+}
+
 export function parseWebhookEvent(eventName: string, payload: unknown): WebhookEvent {
   if (eventName === "installation") return parseInstallationEvent(eventName, payload);
+  if (eventName === "pull_request") return parsePullRequestEvent(payload);
   return { type: "ignored", eventName };
 }
