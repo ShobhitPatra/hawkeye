@@ -1,6 +1,6 @@
 import type { GitHubClient } from "@hawkeye/core";
 import { describe, expect, it, vi } from "vitest";
-import { resolveReviewTarget } from "./enqueue";
+import { resolveReviewTarget } from "./review-target";
 
 function unsupported() {
   return vi.fn(() => {
