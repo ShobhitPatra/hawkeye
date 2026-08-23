@@ -14,7 +14,7 @@ export type WebhookEvent =
     }
   | { type: "ignored"; eventName: string };
 
-const installationActions: ReadonlySet<InstallationAction> = new Set([
+const INSTALLATION_ACTIONS: ReadonlySet<InstallationAction> = new Set([
   "created",
   "deleted",
   "suspend",
@@ -23,7 +23,7 @@ const installationActions: ReadonlySet<InstallationAction> = new Set([
 ]);
 
 function isInstallationAction(action: string): action is InstallationAction {
-  return installationActions.has(action as InstallationAction);
+  return INSTALLATION_ACTIONS.has(action as InstallationAction);
 }
 
 function parseInstallationEvent(eventName: string, payload: unknown): WebhookEvent {

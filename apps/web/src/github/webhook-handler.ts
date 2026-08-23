@@ -22,7 +22,11 @@ export async function handleWebhook(
     return json({ error: "invalid signature" }, 401);
   }
 
-  const eventName = request.headers.get("x-github-event") ?? "";
+  const eventName = request.headers.get("x-github-event");
+  if (!eventName) {
+    return json({ error: "missing event header" }, 400);
+  }
+
   let event;
   try {
     event = parseWebhookEvent(eventName, JSON.parse(body));

@@ -72,4 +72,12 @@ describe("handleWebhook", () => {
     });
     expect(response.status).toBe(400);
   });
+
+  it("rejects a request missing the event header", async () => {
+    const request = signedRequest("installation", createdPayload);
+    request.headers.delete("x-github-event");
+    const response = await handleWebhook(request, { secret, db });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "missing event header" });
+  });
 });
