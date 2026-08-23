@@ -1,13 +1,13 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
-import { createDb } from "./db/client";
+import { getDb } from "./db";
 import * as schema from "./db/schema";
 import { env } from "./env";
 
 function createAuth() {
   return betterAuth({
-    database: drizzleAdapter(createDb(env.databaseUrl()), { provider: "pg", schema }),
+    database: drizzleAdapter(getDb(), { provider: "pg", schema }),
     secret: env.betterAuthSecret(),
     baseURL: env.betterAuthUrl(),
     socialProviders: {
