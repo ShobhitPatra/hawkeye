@@ -26,6 +26,9 @@ function deps(
 ) {
   const github: GitHubClient = {
     installationToken: vi.fn(async () => "ghs_t"),
+    installationTokenById: vi.fn(async () => "ghs_t"),
+    listInstallationRepositories: vi.fn(async () => []),
+    listOpenPullRequestsByAuthor: vi.fn(async () => []),
     pullRequest: vi.fn(async () => ({
       number: 1,
       title: "T",
