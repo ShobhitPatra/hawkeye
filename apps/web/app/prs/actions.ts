@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { parseArmInput, parsePullRequestInput } from "@/arm-input";
+import { assertPullRequestInInstallation } from "@/arm-guard";
 import { armPullRequest, disarmPullRequest } from "@/arming";
 import { getDb } from "@/db";
+import { createGitHubAppClient } from "@/github/app";
 import { installationBelongsToUser } from "@/installations";
 import { requireSession } from "@/session";
 
@@ -15,6 +17,9 @@ export async function armAction(formData: FormData) {
   if (!(await installationBelongsToUser(db, input.installationId, session.user.id))) {
     throw new Error(`installation ${input.installationId} is not linked to the signed-in user`);
   }
+
+  const github = createGitHubAppClient({ fetch });
+  await assertPullRequestInInstallation(github, input.installationId, input);
 
   await armPullRequest(db, { ...input, userId: session.user.id });
   revalidatePath("/prs");
