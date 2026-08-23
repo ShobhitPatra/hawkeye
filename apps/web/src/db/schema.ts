@@ -1,7 +1,9 @@
+import type { ReviewResult } from "@hawkeye/core";
 import { sql } from "drizzle-orm";
 import {
   boolean,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -136,6 +138,7 @@ export const run = pgTable("run", {
   turns: integer("turns").notNull().default(0),
   error: text("error"),
   streamPath: text("stream_path"),
+  result: jsonb("result").$type<ReviewResult>(),
 });
 
 export const finding = pgTable(

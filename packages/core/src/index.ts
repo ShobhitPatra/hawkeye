@@ -19,3 +19,10 @@ export {
   type RunReviewOutcome,
 } from "./run.js";
 export type { RenderedReview } from "./review/render.js";
+export type { ReviewResult, Finding, Severity, Lens } from "./contract/schema.js";
+export {
+  RUN_RESULT_STATUSES,
+  type ClaimedJob,
+  type RunResultStatus,
+  type RunResultReport,
+} from "./runner/protocol.js";
