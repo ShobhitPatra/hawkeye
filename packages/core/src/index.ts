@@ -27,3 +27,9 @@ export {
   type RunResultStatus,
   type RunResultReport,
 } from "./runner/protocol.js";
+export {
+  runReviewJob,
+  type RunReviewJobInput,
+  type RunReviewJobDependencies,
+  type RunReviewJobOutcome,
+} from "./run-job.js";
