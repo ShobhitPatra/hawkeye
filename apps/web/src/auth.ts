@@ -10,7 +10,20 @@ function createAuth() {
     database: drizzleAdapter(getDb(), { provider: "pg", schema }),
     secret: env.betterAuthSecret(),
     baseURL: env.betterAuthUrl(),
-    user: { additionalFields: { githubLogin: { type: "string", required: false, input: false } } },
+    user: { additionalFields: { githubLogin: { type: "string", required: false } } },
+    databaseHooks: {
+      user: {
+        update: {
+          before: async (user, context) => {
+            if (context?.path === "/update-user" && "githubLogin" in user) {
+              const { githubLogin: _ignored, ...rest } = user;
+              return { data: rest };
+            }
+            return { data: user };
+          },
+        },
+      },
+    },
     socialProviders: {
       github: {
         clientId: env.githubClientId(),
