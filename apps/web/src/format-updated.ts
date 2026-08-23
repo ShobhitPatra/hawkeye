@@ -11,7 +11,7 @@ const relativeTime = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 export function formatUpdated(updatedAt: string, now: number): string {
   const elapsed = new Date(updatedAt).getTime() - now;
   for (const { unit, ms } of UNITS) {
-    if (Math.abs(elapsed) >= ms) return relativeTime.format(Math.round(elapsed / ms), unit);
+    if (Math.abs(elapsed) >= ms) return relativeTime.format(Math.trunc(elapsed / ms), unit);
   }
-  return relativeTime.format(Math.round(elapsed / 1000), "second");
+  return relativeTime.format(Math.trunc(elapsed / 1000), "second");
 }
