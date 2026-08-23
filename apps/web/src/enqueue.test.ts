@@ -1,15 +1,6 @@
 import type { GitHubClient } from "@hawkeye/core";
-import { beforeAll, describe, expect, it, vi } from "vitest";
-import type { Db } from "./db/client";
-import { enqueueReviewForArmedPullRequest } from "./enqueue";
-import { createTestDb, seedArmedPullRequest } from "./test/pglite";
-
-let db: Db;
-
-beforeAll(async () => {
-  db = await createTestDb();
-  await seedArmedPullRequest(db);
-});
+import { describe, expect, it, vi } from "vitest";
+import { resolveReviewTarget } from "./enqueue";
 
 function unsupported() {
   return vi.fn(() => {
@@ -17,10 +8,10 @@ function unsupported() {
   });
 }
 
-function fakeGitHub(): GitHubClient {
+function fakeGitHub(mergeBase = vi.fn(async () => "m".repeat(40))): GitHubClient {
   return {
-    installationTokenById: vi.fn(async (installationId: string) => `token-${installationId}`),
-    mergeBase: vi.fn(async () => "m".repeat(40)),
+    mergeBase,
+    installationTokenById: unsupported(),
     installationToken: unsupported(),
     pullRequest: unsupported(),
     linkedIssue: unsupported(),
@@ -31,62 +22,31 @@ function fakeGitHub(): GitHubClient {
   };
 }
 
-const armedPr = {
-  id: "armed-1",
-  installationId: "10",
-  owner: "octo",
-  repo: "repo",
-  number: 7,
-};
+const reference = { owner: "octo", repo: "repo", number: 7 };
 
-describe("enqueueReviewForArmedPullRequest", () => {
-  it("resolves the merge base with the given token and queues the job", async () => {
-    const github = fakeGitHub();
-    const before = Date.now();
-
-    const enqueued = await enqueueReviewForArmedPullRequest(
-      { db, github },
-      {
-        armedPr,
-        headSha: "a".repeat(40),
-        baseSha: "b".repeat(40),
-        delaySeconds: 0,
-        token: "token-10",
-      },
-    );
-
-    expect(github.installationTokenById).not.toHaveBeenCalled();
-    expect(github.mergeBase).toHaveBeenCalledWith(
-      { owner: "octo", repo: "repo", number: 7 },
-      "b".repeat(40),
-      "a".repeat(40),
-      "token-10",
-    );
-    expect(enqueued).toMatchObject({
-      armedPrId: "armed-1",
-      headSha: "a".repeat(40),
-      baseSha: "m".repeat(40),
-      state: "queued",
+describe("resolveReviewTarget", () => {
+  it("keeps the head and replaces the base with the merge base", async () => {
+    const mergeBase = vi.fn(async () => "m".repeat(40));
+    const target = await resolveReviewTarget(fakeGitHub(mergeBase), {
+      reference,
+      headSha: "h".repeat(40),
+      baseSha: "b".repeat(40),
+      token: "ghs_t",
     });
-    expect(enqueued.notBefore.getTime()).toBeGreaterThanOrEqual(before);
-    expect(enqueued.notBefore.getTime()).toBeLessThanOrEqual(Date.now());
+    expect(target).toEqual({ headSha: "h".repeat(40), baseSha: "m".repeat(40) });
+    expect(mergeBase).toHaveBeenCalledWith(reference, "b".repeat(40), "h".repeat(40), "ghs_t");
   });
-
-  it("delays the job by the requested quiet window", async () => {
-    const before = Date.now();
-
-    const enqueued = await enqueueReviewForArmedPullRequest(
-      { db, github: fakeGitHub() },
-      {
-        armedPr,
-        headSha: "c".repeat(40),
-        baseSha: "d".repeat(40),
-        delaySeconds: 180,
-        token: "token-10",
-      },
-    );
-
-    expect(enqueued.notBefore.getTime()).toBeGreaterThanOrEqual(before + 180_000);
-    expect(enqueued.notBefore.getTime()).toBeLessThanOrEqual(Date.now() + 180_000);
+  it("propagates a failure from the compare call", async () => {
+    const failing = vi.fn(async () => {
+      throw new Error("GitHub GET /repos/octo/repo/compare failed: 500");
+    });
+    await expect(
+      resolveReviewTarget(fakeGitHub(failing), {
+        reference,
+        headSha: "h",
+        baseSha: "b",
+        token: "t",
+      }),
+    ).rejects.toThrow(/500/);
   });
 });

@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { parseArmInput, parsePullRequestInput } from "@/arm-input";
 import { assertPullRequestInInstallation } from "@/arm-guard";
 import { armPullRequest, disarmPullRequest } from "@/arming";
-import { enqueueReviewForArmedPullRequest } from "@/enqueue";
+import { resolveReviewTarget } from "@/enqueue";
+import { enqueueJob } from "@/jobs";
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
 import { installationBelongsToUser } from "@/installations";
@@ -26,17 +27,15 @@ export async function armAction(formData: FormData) {
     input,
   );
 
+  const target = await resolveReviewTarget(github, {
+    reference: input,
+    headSha: pullRequest.headSha,
+    baseSha: pullRequest.baseSha,
+    token,
+  });
+
   const armed = await armPullRequest(db, { ...input, userId: session.user.id });
-  await enqueueReviewForArmedPullRequest(
-    { db, github },
-    {
-      armedPr: armed,
-      headSha: pullRequest.headSha,
-      baseSha: pullRequest.baseSha,
-      delaySeconds: 0,
-      token,
-    },
-  );
+  await enqueueJob(db, { armedPrId: armed.id, ...target, notBefore: new Date() });
   revalidatePath("/prs");
 }
 
