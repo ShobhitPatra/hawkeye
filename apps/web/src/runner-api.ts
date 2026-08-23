@@ -2,14 +2,22 @@ import {
   type ClaimedJob,
   type GitHubClient,
   RUN_RESULT_STATUSES,
+  parseReviewResult,
   type ReviewResult,
   type RunResultReport,
   type RunResultStatus,
 } from "@hawkeye/core";
 import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
-import { armedPr, run, userSettings } from "./db/schema";
-import { claimNextJob, completeRun, createRun, heartbeatJob, requeueStaleJobs } from "./job-queue";
+import { armedPr, job, run, userSettings } from "./db/schema";
+import {
+  claimNextJob,
+  completeRun,
+  createRun,
+  heartbeatJob,
+  holdsJobClaim,
+  requeueStaleJobs,
+} from "./job-queue";
 import { requireRunner } from "./runner-auth";
 
 export const DEFAULT_MAX_TURNS = 40;
@@ -26,6 +34,10 @@ export type ClaimDeps = {
 };
 
 export type RunnerApiDeps = { db: Db };
+
+function claimLost(): Response {
+  return Response.json({ error: "job is no longer claimed by this runner" }, { status: 409 });
+}
 
 function sleepFor(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -93,7 +105,11 @@ export async function heartbeat(
   if (runner instanceof Response) return runner;
 
   const beat = await heartbeatJob(deps.db, { jobId, runnerId: runner.id, now: new Date() });
-  if (!beat) return Response.json({ error: "job is not claimed by this runner" }, { status: 404 });
+  if (!beat) {
+    const [existing] = await deps.db.select().from(job).where(eq(job.id, jobId));
+    if (!existing) return Response.json({ error: "job not found" }, { status: 404 });
+    return claimLost();
+  }
   return Response.json({ ok: true }, { status: 200 });
 }
 
@@ -128,6 +144,15 @@ export async function recordEvents(
     );
   }
 
+  if (!(await holdsJobClaim(deps.db, { runId, runnerId: runner.id }))) {
+    const [owned] = await deps.db
+      .select({ id: run.id })
+      .from(run)
+      .where(and(eq(run.id, runId), eq(run.runnerId, runner.id)));
+    if (!owned) return Response.json({ error: "run not found" }, { status: 404 });
+    return claimLost();
+  }
+
   const turns = events.filter((event) => event.type === "turn").length;
   const [updated] = await deps.db
     .update(run)
@@ -154,10 +179,12 @@ function parseRunResultReport(payload: unknown): RunResultReport {
     throw new Error("result must be an object");
   if (status === "ok" && !result) throw new Error("an ok result needs a review result");
   if (error !== undefined && typeof error !== "string") throw new Error("error must be a string");
+  const reviewResult =
+    status === "ok" ? parseReviewResult(result) : (result as ReviewResult | undefined);
   return {
     status,
     turns: turns as number,
-    ...(result ? { result: result as ReviewResult } : {}),
+    ...(reviewResult ? { result: reviewResult } : {}),
     ...(error ? { error: error as string } : {}),
   };
 }
@@ -188,6 +215,7 @@ export async function recordResult(
   if (existing.status !== "running")
     return Response.json({ error: "run is already complete" }, { status: 409 });
 
-  await completeRun(deps.db, { runId, ...report });
+  const completed = await completeRun(deps.db, { runId, runnerId: runner.id, ...report });
+  if (!completed) return claimLost();
   return Response.json({ ok: true }, { status: 200 });
 }

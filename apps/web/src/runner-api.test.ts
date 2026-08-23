@@ -33,7 +33,14 @@ function createGitHub(): GitHubClient {
 const reviewResult: ReviewResult = {
   verdict: "ship",
   summary: "looks good",
-  lenses: [],
+  lenses: [
+    { name: "intent", assessment: "clear" },
+    { name: "behavior", assessment: "clear" },
+    { name: "blast_radius", assessment: "clear" },
+    { name: "verification", assessment: "clear" },
+    { name: "fit", assessment: "clear" },
+    { name: "hygiene", assessment: "clear" },
+  ],
   findings: [],
 };
 
@@ -191,13 +198,44 @@ describe("heartbeat", () => {
     expect(row?.heartbeatAt?.getTime()).toBeGreaterThan(now.getTime());
   });
 
-  it("404s for a job the runner does not hold", async () => {
+  it("409s for a job the runner does not hold", async () => {
     const queued = await enqueue();
 
     const response = await heartbeat(
       request(`/api/runner/jobs/${queued.id}/heartbeat`, { method: "POST" }),
       { db },
       queued.id,
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: "job is no longer claimed by this runner",
+    });
+  });
+
+  it("409s once another runner has taken the claim over", async () => {
+    const queued = await enqueue();
+    await claimJob(request("/api/runner/jobs"), claimDeps());
+    const other = await createRunnerToken(db, { userId: "user-1", name: "desktop" });
+    await db
+      .update(schema.job)
+      .set({ claimedByRunnerId: other.runner.id })
+      .where(eq(schema.job.id, queued.id));
+
+    const response = await heartbeat(
+      request(`/api/runner/jobs/${queued.id}/heartbeat`, { method: "POST" }),
+      { db },
+      queued.id,
+    );
+
+    expect(response.status).toBe(409);
+  });
+
+  it("404s for a job that does not exist", async () => {
+    const response = await heartbeat(
+      request("/api/runner/jobs/missing/heartbeat", { method: "POST" }),
+      { db },
+      "missing",
     );
 
     expect(response.status).toBe(404);
@@ -280,6 +318,25 @@ describe("recordEvents", () => {
     );
 
     expect(response.status).toBe(404);
+  });
+
+  it("409s once the job is no longer claimed by this runner", async () => {
+    const runId = await claimedRunId();
+    const [row] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
+    await db
+      .update(schema.job)
+      .set({ state: "queued", claimedByRunnerId: null })
+      .where(eq(schema.job.id, row!.jobId));
+
+    const response = await recordEvents(
+      jsonRequest(`/api/runner/runs/${runId}/events`, [{ type: "turn", at: now.toISOString() }]),
+      { db },
+      runId,
+    );
+
+    expect(response.status).toBe(409);
+    const [after] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
+    expect(after?.turns).toBe(0);
   });
 });
 
@@ -383,5 +440,65 @@ describe("recordResult", () => {
     );
 
     expect(response.status).toBe(404);
+  });
+
+  it("rejects a malformed review result and stores nothing", async () => {
+    const runId = await claimedRunId();
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, {
+        status: "ok",
+        turns: 2,
+        result: { verdict: "maybe", summary: "", lenses: [], findings: [] },
+      }),
+      { db },
+      runId,
+    );
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toContain("Invalid review result");
+    const [row] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
+    expect(row).toMatchObject({ status: "running", result: null, turns: 0, endedAt: null });
+    const [jobRow] = await db.select().from(schema.job).where(eq(schema.job.id, row!.jobId));
+    expect(jobRow?.state).toBe("claimed");
+  });
+
+  it("409s on a late result once the job was requeued and reclaimed", async () => {
+    const queued = await enqueue();
+    const first = await claimJob(request("/api/runner/jobs"), claimDeps());
+    const staleRunId = (await first.json()).job.runId as string;
+    await db
+      .update(schema.job)
+      .set({ heartbeatAt: new Date(now.getTime() - 3_600_000) })
+      .where(eq(schema.job.id, queued.id));
+
+    const other = await createRunnerToken(db, { userId: "user-1", name: "desktop" });
+    const second = await claimJob(
+      request("/api/runner/jobs", { bearer: other.token }),
+      claimDeps({ poll: { intervalMs: 1, totalMs: 10 }, sleep: vi.fn(async () => {}) }),
+    );
+    expect(second.status).toBe(200);
+    const freshRunId = (await second.json()).job.runId as string;
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${staleRunId}/result`, {
+        status: "ok",
+        turns: 5,
+        result: reviewResult,
+      }),
+      { db },
+      staleRunId,
+    );
+
+    expect(response.status).toBe(409);
+    const [fresh] = await db.select().from(schema.run).where(eq(schema.run.id, freshRunId));
+    expect(fresh).toMatchObject({
+      status: "running",
+      runnerId: other.runner.id,
+      result: null,
+      endedAt: null,
+    });
+    const [jobRow] = await db.select().from(schema.job).where(eq(schema.job.id, queued.id));
+    expect(jobRow).toMatchObject({ state: "claimed", claimedByRunnerId: other.runner.id });
   });
 });

@@ -1,5 +1,5 @@
 import type { ReviewResult, RunResultStatus } from "@hawkeye/core";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { armedPr, job, run } from "./db/schema";
 import type { Job } from "./jobs";
@@ -80,6 +80,20 @@ export async function requeueStaleJobs(
     })
     .where(and(eq(job.state, "claimed"), sql`${job.heartbeatAt} < ${cutoff}`))
     .returning({ id: job.id });
+  if (swept.length === 0) return 0;
+
+  await db
+    .update(run)
+    .set({ status: "error", error: "heartbeat lost", endedAt: input.now })
+    .where(
+      and(
+        inArray(
+          run.jobId,
+          swept.map((row) => row.id),
+        ),
+        eq(run.status, "running"),
+      ),
+    );
   return swept.length;
 }
 
@@ -92,16 +106,36 @@ export async function createRun(db: Db, input: { jobId: string; runnerId: string
   return created;
 }
 
+export async function holdsJobClaim(
+  db: Db,
+  input: { runId: string; runnerId: string },
+): Promise<boolean> {
+  const [held] = await db
+    .select({ id: run.id })
+    .from(run)
+    .innerJoin(job, eq(job.id, run.jobId))
+    .where(
+      and(
+        eq(run.id, input.runId),
+        eq(run.runnerId, input.runnerId),
+        eq(job.state, "claimed"),
+        eq(job.claimedByRunnerId, input.runnerId),
+      ),
+    );
+  return held !== undefined;
+}
+
 export async function completeRun(
   db: Db,
   input: {
     runId: string;
+    runnerId: string;
     status: RunResultStatus;
     turns: number;
     result?: ReviewResult;
     error?: string;
   },
-): Promise<Run> {
+): Promise<Run | undefined> {
   const [completed] = await db
     .update(run)
     .set({
@@ -111,9 +145,20 @@ export async function completeRun(
       error: input.error ?? null,
       endedAt: new Date(),
     })
-    .where(and(eq(run.id, input.runId), eq(run.status, "running")))
+    .where(
+      and(
+        eq(run.id, input.runId),
+        eq(run.runnerId, input.runnerId),
+        eq(run.status, "running"),
+        sql`exists (select 1
+                    from ${job} claim
+                    where claim.id = ${run.jobId}
+                      and claim.state = 'claimed'
+                      and claim.claimed_by_runner_id = ${input.runnerId})`,
+      ),
+    )
     .returning();
-  if (!completed) throw new Error(`run ${input.runId} is not running`);
+  if (!completed) return undefined;
 
   await db
     .update(job)

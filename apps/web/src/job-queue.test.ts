@@ -3,7 +3,14 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
-import { claimNextJob, completeRun, createRun, heartbeatJob, requeueStaleJobs } from "./job-queue";
+import {
+  claimNextJob,
+  completeRun,
+  createRun,
+  heartbeatJob,
+  holdsJobClaim,
+  requeueStaleJobs,
+} from "./job-queue";
 import { enqueueJob } from "./jobs";
 import { createTestDb, seedArmedPullRequest } from "./test/pglite";
 
@@ -135,6 +142,41 @@ describe("requeueStaleJobs", () => {
     });
   });
 
+  it("marks the abandoned run of a requeued job as an error", async () => {
+    const stale = await enqueue("armed-1", minutesBefore(10));
+    await claim();
+    const abandoned = await createRun(db, { jobId: stale.id, runnerId: "runner-1" });
+    await heartbeatJob(db, { jobId: stale.id, runnerId: "runner-1", now: minutesBefore(6) });
+
+    expect(await requeueStaleJobs(db, { now })).toBe(1);
+
+    const [row] = await db.select().from(schema.run).where(eq(schema.run.id, abandoned.id));
+    expect(row).toMatchObject({ status: "error", error: "heartbeat lost" });
+    expect(row?.endedAt?.toISOString()).toBe(now.toISOString());
+  });
+
+  it("leaves an already finished run of a requeued job alone", async () => {
+    const stale = await enqueue("armed-1", minutesBefore(10));
+    await claim();
+    const finished = await createRun(db, { jobId: stale.id, runnerId: "runner-1" });
+    await completeRun(db, {
+      runId: finished.id,
+      runnerId: "runner-1",
+      status: "ok",
+      turns: 2,
+      result: reviewResult,
+    });
+    await db
+      .update(schema.job)
+      .set({ state: "claimed", claimedByRunnerId: "runner-1", heartbeatAt: minutesBefore(6) })
+      .where(eq(schema.job.id, stale.id));
+
+    expect(await requeueStaleJobs(db, { now })).toBe(1);
+
+    const [row] = await db.select().from(schema.run).where(eq(schema.run.id, finished.id));
+    expect(row).toMatchObject({ status: "ok", error: null });
+  });
+
   it("leaves a live claim alone", async () => {
     const live = await enqueue("armed-1", minutesBefore(10));
     await claim();
@@ -206,14 +248,15 @@ describe("createRun and completeRun", () => {
 
     const completed = await completeRun(db, {
       runId: created.id,
+      runnerId: "runner-1",
       status: "ok",
       turns: 7,
       result: reviewResult,
     });
 
     expect(completed).toMatchObject({ status: "ok", turns: 7, error: null });
-    expect(completed.result).toEqual(reviewResult);
-    expect(completed.endedAt).toBeInstanceOf(Date);
+    expect(completed?.result).toEqual(reviewResult);
+    expect(completed?.endedAt).toBeInstanceOf(Date);
 
     const [row] = await db.select().from(schema.job).where(eq(schema.job.id, claimed.id));
     expect(row?.state).toBe("done");
@@ -226,6 +269,7 @@ describe("createRun and completeRun", () => {
 
     const completed = await completeRun(db, {
       runId: created.id,
+      runnerId: "runner-1",
       status: "timeout",
       turns: 40,
       error: "wall clock exceeded",
@@ -241,10 +285,58 @@ describe("createRun and completeRun", () => {
     const claimed = await enqueue("armed-1", minutesBefore(10));
     await claim();
     const created = await createRun(db, { jobId: claimed.id, runnerId: "runner-1" });
-    await completeRun(db, { runId: created.id, status: "ok", turns: 1, result: reviewResult });
+    const ok = {
+      runId: created.id,
+      runnerId: "runner-1",
+      status: "ok" as const,
+      turns: 1,
+      result: reviewResult,
+    };
+    await completeRun(db, ok);
 
-    await expect(
-      completeRun(db, { runId: created.id, status: "ok", turns: 1, result: reviewResult }),
-    ).rejects.toThrow("is not running");
+    expect(await completeRun(db, ok)).toBeUndefined();
+  });
+
+  it("ignores a completion from a runner that no longer holds the claim", async () => {
+    const claimed = await enqueue("armed-1", minutesBefore(10));
+    await claim();
+    const created = await createRun(db, { jobId: claimed.id, runnerId: "runner-1" });
+    await db
+      .update(schema.job)
+      .set({ claimedByRunnerId: "runner-2" })
+      .where(eq(schema.job.id, claimed.id));
+
+    expect(
+      await completeRun(db, {
+        runId: created.id,
+        runnerId: "runner-1",
+        status: "ok",
+        turns: 1,
+        result: reviewResult,
+      }),
+    ).toBeUndefined();
+
+    const [row] = await db.select().from(schema.run).where(eq(schema.run.id, created.id));
+    expect(row).toMatchObject({ status: "running", result: null, endedAt: null });
+    const [jobRow] = await db.select().from(schema.job).where(eq(schema.job.id, claimed.id));
+    expect(jobRow?.state).toBe("claimed");
+  });
+});
+
+describe("holdsJobClaim", () => {
+  it("holds while the run's job is still claimed by the same runner", async () => {
+    const claimed = await enqueue("armed-1", minutesBefore(10));
+    await claim();
+    const created = await createRun(db, { jobId: claimed.id, runnerId: "runner-1" });
+
+    expect(await holdsJobClaim(db, { runId: created.id, runnerId: "runner-1" })).toBe(true);
+    expect(await holdsJobClaim(db, { runId: created.id, runnerId: "runner-2" })).toBe(false);
+
+    await db
+      .update(schema.job)
+      .set({ state: "queued", claimedByRunnerId: null })
+      .where(eq(schema.job.id, claimed.id));
+
+    expect(await holdsJobClaim(db, { runId: created.id, runnerId: "runner-1" })).toBe(false);
   });
 });
