@@ -11,11 +11,15 @@ import { linkInstallationToUser, recordInstallation } from "./installations";
 
 type InstallationEvent = Extract<WebhookEvent, { type: "installation" }>;
 
-function installationEvent(action: InstallationEvent["action"], senderId = 500): InstallationEvent {
+function installationEvent(
+  action: InstallationEvent["action"],
+  installationId: number,
+  senderId: number,
+): InstallationEvent {
   return {
     type: "installation",
     action,
-    installation: { id: 42, account: { login: "octo", type: "Organization" } },
+    installation: { id: installationId, account: { login: "octo", type: "Organization" } },
     sender: { id: senderId, login: "octocat" },
   };
 }
@@ -29,25 +33,32 @@ beforeAll(async () => {
   db = pglite;
 });
 
-async function readInstallation() {
-  const [row] = await db.select().from(schema.installation).where(eq(schema.installation.id, "42"));
+async function readInstallation(id: string) {
+  const [row] = await db.select().from(schema.installation).where(eq(schema.installation.id, id));
   return row;
+}
+
+function readLinks(installationId: string) {
+  return db
+    .select()
+    .from(schema.installationUser)
+    .where(eq(schema.installationUser.installationId, installationId));
 }
 
 describe("recordInstallation", () => {
   it("inserts an installation on created, soft-deletes it, and revives it", async () => {
-    await recordInstallation(db, installationEvent("created"));
-    expect(await readInstallation()).toMatchObject({
+    await recordInstallation(db, installationEvent("created", 42, 500));
+    expect(await readInstallation("42")).toMatchObject({
       accountLogin: "octo",
       accountType: "Organization",
       deletedAt: null,
     });
 
-    await recordInstallation(db, installationEvent("deleted"));
-    expect((await readInstallation())?.deletedAt).toBeInstanceOf(Date);
+    await recordInstallation(db, installationEvent("deleted", 42, 500));
+    expect((await readInstallation("42"))?.deletedAt).toBeInstanceOf(Date);
 
-    await recordInstallation(db, installationEvent("created"));
-    expect((await readInstallation())?.deletedAt).toBeNull();
+    await recordInstallation(db, installationEvent("created", 42, 500));
+    expect((await readInstallation("42"))?.deletedAt).toBeNull();
   });
 });
 
@@ -63,17 +74,15 @@ describe("linkInstallationToUser", () => {
       providerId: "github",
       userId: "user-1",
     });
-    await recordInstallation(db, installationEvent("created", 700));
+    await recordInstallation(db, installationEvent("created", 70, 700));
 
-    const links = await db.select().from(schema.installationUser);
-    expect(links).toEqual([{ installationId: "42", userId: "user-1" }]);
+    expect(await readLinks("70")).toEqual([{ installationId: "70", userId: "user-1" }]);
   });
 
   it("does nothing when no account matches the sender", async () => {
-    await recordInstallation(db, installationEvent("created", 999));
-    await linkInstallationToUser(db, "42", 999);
+    await recordInstallation(db, installationEvent("created", 99, 999));
+    await linkInstallationToUser(db, "99", 999);
 
-    const links = await db.select().from(schema.installationUser);
-    expect(links).toEqual([{ installationId: "42", userId: "user-1" }]);
+    expect(await readLinks("99")).toHaveLength(0);
   });
 });
