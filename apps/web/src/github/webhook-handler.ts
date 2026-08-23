@@ -39,11 +39,11 @@ export async function handleWebhook(
   if (event.type === "ignored") return json({ ignored: event.eventName }, 200);
 
   if (event.type === "pull_request") {
-    const { enqueued, disarmed } = await handlePullRequestEvent(
+    const { enqueued, disarmed, cancelled } = await handlePullRequestEvent(
       { db: deps.db, github: deps.github },
       event,
     );
-    return json({ ok: true, enqueued, disarmed }, 200);
+    return json({ ok: true, enqueued, disarmed, cancelled }, 200);
   }
 
   await recordInstallation(deps.db, event);

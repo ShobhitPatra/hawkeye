@@ -119,6 +119,11 @@ describe("handleWebhook", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ ok: true, enqueued: 1, disarmed: 0 });
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      enqueued: 1,
+      disarmed: 0,
+      cancelled: 0,
+    });
   });
 });

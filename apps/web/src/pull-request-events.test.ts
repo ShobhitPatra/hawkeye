@@ -59,7 +59,7 @@ describe("handlePullRequestEvent", () => {
     const before = Date.now();
     const result = await handlePullRequestEvent({ db, github: fakeGitHub() }, event());
 
-    expect(result).toEqual({ enqueued: 1, disarmed: 0 });
+    expect(result).toEqual({ enqueued: 1, disarmed: 0, cancelled: 0 });
     const rows = await jobs();
     expect(rows).toMatchObject([
       { armedPrId: armed.armedPrId, headSha: "h".repeat(40), baseSha: "m".repeat(40) },
@@ -110,7 +110,7 @@ describe("handlePullRequestEvent", () => {
       { db, github: fakeGitHub() },
       event({ draft: true }),
     );
-    expect(skipped).toEqual({ enqueued: 0, disarmed: 0 });
+    expect(skipped).toEqual({ enqueued: 0, disarmed: 0, cancelled: 0 });
     expect(await jobs()).toHaveLength(0);
 
     await db.insert(schema.userSettings).values({ userId: armed.userId, reviewDrafts: true });
@@ -118,7 +118,7 @@ describe("handlePullRequestEvent", () => {
       { db, github: fakeGitHub() },
       event({ draft: true }),
     );
-    expect(reviewed).toEqual({ enqueued: 1, disarmed: 0 });
+    expect(reviewed).toEqual({ enqueued: 1, disarmed: 0, cancelled: 0 });
   });
 
   it("queues on ready_for_review", async () => {
@@ -127,7 +127,7 @@ describe("handlePullRequestEvent", () => {
       { db, github: fakeGitHub() },
       event({ action: "ready_for_review" }),
     );
-    expect(result).toEqual({ enqueued: 1, disarmed: 0 });
+    expect(result).toEqual({ enqueued: 1, disarmed: 0, cancelled: 0 });
   });
 
   it("queues one job per armed row when two users armed the pull request", async () => {
@@ -137,7 +137,7 @@ describe("handlePullRequestEvent", () => {
 
     const github = fakeGitHub();
     const result = await handlePullRequestEvent({ db, github }, event());
-    expect(result).toEqual({ enqueued: 2, disarmed: 0 });
+    expect(result).toEqual({ enqueued: 2, disarmed: 0, cancelled: 0 });
     expect(await jobs()).toHaveLength(2);
     expect(github.installationTokenById).toHaveBeenCalledTimes(1);
   });
@@ -149,10 +149,48 @@ describe("handlePullRequestEvent", () => {
       event({ action: "closed", merged: true }),
     );
 
-    expect(result).toEqual({ enqueued: 0, disarmed: 1 });
+    expect(result).toEqual({ enqueued: 0, disarmed: 1, cancelled: 0 });
     expect(await jobs()).toHaveLength(0);
     const [row] = await db.select().from(schema.armedPr);
     expect(row!.disarmedAt).not.toBeNull();
+  });
+
+  it("cancels a queued job when the pull request closes", async () => {
+    const armed = await seedArmedPullRequest(db);
+    await db.insert(schema.job).values({
+      armedPrId: armed.armedPrId,
+      headSha: "h".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: new Date(),
+      state: "queued",
+    });
+
+    const result = await handlePullRequestEvent(
+      { db, github: fakeGitHub() },
+      event({ action: "closed", merged: true }),
+    );
+
+    expect(result).toEqual({ enqueued: 0, disarmed: 1, cancelled: 1 });
+    expect(await jobs()).toHaveLength(0);
+  });
+
+  it("leaves a claimed job in place when the pull request closes", async () => {
+    const armed = await seedArmedPullRequest(db);
+    await db.insert(schema.job).values({
+      armedPrId: armed.armedPrId,
+      headSha: "h".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: new Date(),
+      state: "claimed",
+    });
+
+    const result = await handlePullRequestEvent(
+      { db, github: fakeGitHub() },
+      event({ action: "closed", merged: true }),
+    );
+
+    expect(result).toEqual({ enqueued: 0, disarmed: 1, cancelled: 0 });
+    expect(await jobs()).toHaveLength(1);
   });
 
   it("does nothing for an unarmed pull request", async () => {
@@ -160,7 +198,7 @@ describe("handlePullRequestEvent", () => {
       { db, github: fakeGitHub() },
       event({ number: 99 }),
     );
-    expect(result).toEqual({ enqueued: 0, disarmed: 0 });
+    expect(result).toEqual({ enqueued: 0, disarmed: 0, cancelled: 0 });
     expect(await jobs()).toHaveLength(0);
   });
 
@@ -170,6 +208,6 @@ describe("handlePullRequestEvent", () => {
       { db, github: fakeGitHub() },
       event({ action: "labeled" }),
     );
-    expect(result).toEqual({ enqueued: 0, disarmed: 0, ignored: "labeled" });
+    expect(result).toEqual({ enqueued: 0, disarmed: 0, cancelled: 0, ignored: "labeled" });
   });
 });
