@@ -17,7 +17,7 @@ export default async function PullRequestsPage() {
     );
   }
 
-  const pullRequests = await listUserOpenPullRequests(
+  const { pullRequests, failures } = await listUserOpenPullRequests(
     { db: getDb(), github: createGitHubAppClient({ fetch }) },
     { userId: session.user.id, login },
   );
@@ -29,6 +29,15 @@ export default async function PullRequestsPage() {
         <p>No open pull requests</p>
       ) : (
         <PullRequestTable pullRequests={pullRequests} />
+      )}
+      {failures.length > 0 && (
+        <ul>
+          {failures.map((failure) => (
+            <li key={failure.installationId}>
+              Could not load installation {failure.installationId}: {failure.message}
+            </li>
+          ))}
+        </ul>
       )}
     </main>
   );

@@ -28,18 +28,35 @@ function pullRequest(owner: string, number: number, updatedAt: string): OpenPull
   };
 }
 
+function unsupported() {
+  return vi.fn(() => {
+    throw new Error("unexpected call");
+  });
+}
+
 function fakeGitHub(
   repositories: Record<string, InstallationRepository[]>,
   pullRequests: Record<string, OpenPullRequest[]>,
+  broken: Record<string, string> = {},
 ) {
-  const installationTokenById = vi.fn(async (installationId: string) => `token-${installationId}`);
+  const installationTokenById = vi.fn(async (installationId: string) => {
+    const failure = broken[installationId];
+    if (failure) throw new Error(failure);
+    return `token-${installationId}`;
+  });
   const listInstallationRepositories = vi.fn(async (token: string) => repositories[token] ?? []);
   const listOpenPullRequestsByAuthor = vi.fn(async (token: string) => pullRequests[token] ?? []);
-  const github = {
+  const github: GitHubClient = {
     installationTokenById,
     listInstallationRepositories,
     listOpenPullRequestsByAuthor,
-  } as unknown as GitHubClient;
+    installationToken: unsupported(),
+    pullRequest: unsupported(),
+    mergeBase: unsupported(),
+    linkedIssue: unsupported(),
+    reviews: unsupported(),
+    postReview: unsupported(),
+  };
   return {
     github,
     installationTokenById,
@@ -96,7 +113,8 @@ describe("listUserOpenPullRequests", () => {
       { userId: "user-1", login: "octocat" },
     );
 
-    expect(found.map((pr) => pr.number)).toEqual([2, 3, 1]);
+    expect(found.pullRequests.map((pr) => pr.number)).toEqual([2, 3, 1]);
+    expect(found.failures).toEqual([]);
     expect(installationTokenById.mock.calls).toEqual([["10"], ["11"]]);
     expect(listInstallationRepositories.mock.calls).toEqual([["token-10"], ["token-11"]]);
     expect(listOpenPullRequestsByAuthor.mock.calls).toEqual([
@@ -110,7 +128,7 @@ describe("listUserOpenPullRequests", () => {
 
     await expect(
       listUserOpenPullRequests({ db, github }, { userId: "ghost", login: "ghost" }),
-    ).resolves.toEqual([]);
+    ).resolves.toEqual({ pullRequests: [], failures: [] });
     expect(installationTokenById).not.toHaveBeenCalled();
   });
 
@@ -120,5 +138,24 @@ describe("listUserOpenPullRequests", () => {
     await listUserOpenPullRequests({ db, github }, { userId: "user-2", login: "hubot" });
 
     expect(installationTokenById.mock.calls).toEqual([["13"]]);
+  });
+
+  it("reports a failing installation and still returns the others' pull requests", async () => {
+    const acmeRepositories = [repository("acme", "repo")];
+    const { github } = fakeGitHub(
+      { "token-11": acmeRepositories },
+      { "token-11": [pullRequest("acme", 2, "2026-08-03T00:00:00Z")] },
+      { "10": "installation token minting failed" },
+    );
+
+    const found = await listUserOpenPullRequests(
+      { db, github },
+      { userId: "user-1", login: "octocat" },
+    );
+
+    expect(found.pullRequests.map((pr) => pr.number)).toEqual([2]);
+    expect(found.failures).toEqual([
+      { installationId: "10", message: "installation token minting failed" },
+    ]);
   });
 });
