@@ -11,4 +11,6 @@ export const env = {
   githubClientId: () => required("GITHUB_CLIENT_ID"),
   githubClientSecret: () => required("GITHUB_CLIENT_SECRET"),
   githubWebhookSecret: () => required("GITHUB_WEBHOOK_SECRET"),
+  githubAppId: () => required("GITHUB_APP_ID"),
+  githubAppPrivateKey: () => required("GITHUB_APP_PRIVATE_KEY"),
 };
