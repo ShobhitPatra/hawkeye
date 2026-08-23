@@ -10,6 +10,9 @@ import { ControlPlaneRequestError, type ControlPlaneClient } from "./client.js";
 
 export const DEFAULT_HEARTBEAT_INTERVAL_MS = 30_000;
 export const DEFAULT_RETRY_DELAY_MS = 5_000;
+export const DEFAULT_EMPTY_POLL_DELAY_MS = 1_000;
+export const DEFAULT_RESULT_RETRY_DELAYS_MS = [2_000, 4_000, 8_000];
+export const ONCE_CLAIM_ATTEMPTS = 3;
 
 export type RunnerLoopDependencies = {
   client: ControlPlaneClient;
@@ -23,6 +26,8 @@ export type RunnerLoopDependencies = {
   signal?: AbortSignal;
   heartbeatIntervalMs?: number;
   retryDelayMs?: number;
+  emptyPollDelayMs?: number;
+  resultRetryDelaysMs?: number[];
   sleep?(milliseconds: number, signal?: AbortSignal): Promise<void>;
 };
 
@@ -79,7 +84,43 @@ async function reportFor(
     : { status: outcome.status, turns: outcome.turns, error: outcome.error };
 }
 
-export async function runJob(claimed: ClaimedJob, deps: RunnerLoopDependencies): Promise<void> {
+function isRetryable(error: unknown): boolean {
+  return !(error instanceof ControlPlaneRequestError) || error.status >= 500;
+}
+
+async function deliverResult(
+  runId: string,
+  report: RunResultReport,
+  deps: RunnerLoopDependencies,
+): Promise<"delivered" | "dropped" | "undelivered"> {
+  const sleep = deps.sleep ?? sleepFor;
+  const delays = deps.resultRetryDelaysMs ?? DEFAULT_RESULT_RETRY_DELAYS_MS;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await deps.client.sendResult(runId, report);
+      deps.log(`result ${report.status} after ${report.turns} turn(s)`);
+      return "delivered";
+    } catch (error) {
+      if (error instanceof ControlPlaneRequestError && error.status === 409) {
+        deps.log(`result ${report.status} dropped: the claim was lost`);
+        return "dropped";
+      }
+      const message = (error as Error).message;
+      const delay = delays[attempt];
+      if (!isRetryable(error) || delay === undefined) {
+        deps.log(`result ${report.status} not delivered: ${message}`);
+        return "undelivered";
+      }
+      deps.log(`result not sent (${message}); retrying in ${delay}ms`);
+      await sleep(delay);
+    }
+  }
+}
+
+export async function runJob(
+  claimed: ClaimedJob,
+  deps: RunnerLoopDependencies,
+): Promise<"delivered" | "dropped" | "undelivered"> {
   const { job, pullRequest } = claimed;
   deps.log(
     `job claimed: ${pullRequest.owner}/${pullRequest.repo}#${pullRequest.number} head ${job.headSha.slice(0, 7)}`,
@@ -97,16 +138,7 @@ export async function runJob(claimed: ClaimedJob, deps: RunnerLoopDependencies):
   } finally {
     clearInterval(heartbeat);
   }
-  try {
-    await deps.client.sendResult(job.runId, report);
-    deps.log(`result ${report.status} after ${report.turns} turn(s)`);
-  } catch (error) {
-    if (error instanceof ControlPlaneRequestError && error.status === 409) {
-      deps.log(`result ${report.status} dropped: the claim was lost`);
-      return;
-    }
-    throw error;
-  }
+  return deliverResult(job.runId, report, deps);
 }
 
 export async function runRunnerLoop(
@@ -114,6 +146,7 @@ export async function runRunnerLoop(
   options: { once?: boolean } = {},
 ): Promise<void> {
   const sleep = deps.sleep ?? sleepFor;
+  let failedClaims = 0;
   while (!deps.signal?.aborted) {
     let claimed: ClaimedJob | undefined;
     try {
@@ -121,16 +154,28 @@ export async function runRunnerLoop(
     } catch (error) {
       if (isAbort(error) && deps.signal?.aborted) return;
       if (error instanceof ControlPlaneRequestError && error.status === 401) throw error;
+      failedClaims += 1;
+      if (options.once && failedClaims >= ONCE_CLAIM_ATTEMPTS)
+        throw new Error(`claim failed ${failedClaims} times: ${(error as Error).message}`, {
+          cause: error,
+        });
       deps.log(`claim failed: ${(error as Error).message}`);
       await sleep(deps.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS, deps.signal);
       continue;
     }
+    failedClaims = 0;
     if (claimed === undefined) {
-      if (!options.once) continue;
-      deps.log("no job queued");
+      if (options.once) {
+        deps.log("no job queued");
+        return;
+      }
+      await sleep(deps.emptyPollDelayMs ?? DEFAULT_EMPTY_POLL_DELAY_MS, deps.signal);
+      continue;
+    }
+    const delivery = await runJob(claimed, deps);
+    if (options.once) {
+      if (delivery === "undelivered") throw new Error("the result was not delivered");
       return;
     }
-    await runJob(claimed, deps);
-    if (options.once) return;
   }
 }

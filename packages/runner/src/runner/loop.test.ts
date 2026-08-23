@@ -63,14 +63,18 @@ function json(response: ServerResponse, status: number, body?: unknown) {
   response.end(body === undefined ? undefined : JSON.stringify(body));
 }
 
-function scripted(claims: (ClaimedJob | undefined)[], resultStatus = 200) {
+function scripted(claims: (ClaimedJob | undefined)[], resultStatuses: number[] = [200]) {
   let claimIndex = 0;
+  let resultIndex = 0;
   return (received: Received, response: ServerResponse) => {
     if (received.url === "/api/runner/jobs") {
       const claim = claims[claimIndex++];
       return claim === undefined ? json(response, 204) : json(response, 200, claim);
     }
-    if (received.url.endsWith("/result")) return json(response, resultStatus, { ok: true });
+    if (received.url.endsWith("/result")) {
+      const status = resultStatuses[Math.min(resultIndex++, resultStatuses.length - 1)]!;
+      return json(response, status, { ok: true });
+    }
     return json(response, 200, { ok: true });
   };
 }
@@ -110,10 +114,24 @@ async function deps(
       return directory;
     },
     fetch: (async () =>
-      Response.json({ title: "T", body: "", user: { login: "alice" } })) as typeof fetch,
+      Response.json({
+        number: 7,
+        title: "T",
+        body: "",
+        draft: false,
+        user: { login: "alice" },
+        head: { sha: "a".repeat(40), ref: "feature" },
+        base: {
+          sha: "b".repeat(40),
+          ref: "main",
+          repo: { clone_url: "https://github.com/o/r.git" },
+        },
+      })) as typeof fetch,
     log: (line) => logged.push(line),
     heartbeatIntervalMs: 10,
     retryDelayMs: 1,
+    emptyPollDelayMs: 1,
+    resultRetryDelaysMs: [1, 1, 1],
     logged,
     ...rest,
   };
@@ -203,7 +221,7 @@ describe("runRunnerLoop", () => {
     );
   });
   it("keeps going when the claim is lost before the result lands", async () => {
-    const plane = await fakeControlPlane(scripted([claimedJob], 409));
+    const plane = await fakeControlPlane(scripted([claimedJob], [409]));
     servers.push(plane.server);
     const d = await deps(plane.baseUrl);
     await runRunnerLoop(d, { once: true });
@@ -284,5 +302,94 @@ describe("runRunnerLoop", () => {
     const d = await deps(plane.baseUrl);
     await runRunnerLoop(d, { once: true });
     expect(d.logged).toContain("no job queued");
+  });
+  it("retries the result after a 5xx and delivers it", async () => {
+    const plane = await fakeControlPlane(scripted([claimedJob], [503, 502, 200]));
+    servers.push(plane.server);
+    const sleeps: number[] = [];
+    const d = await deps(plane.baseUrl, {
+      resultRetryDelaysMs: [2, 4, 8],
+      sleep: async (milliseconds) => {
+        sleeps.push(milliseconds);
+      },
+    });
+    await runRunnerLoop(d, { once: true });
+    expect(plane.received.filter((r) => r.url.endsWith("/result")).length).toBe(3);
+    expect(sleeps).toEqual([2, 4]);
+    expect(d.logged).toContain("result ok after 1 turn(s)");
+  });
+  it("keeps the daemon running when the result cannot be delivered", async () => {
+    let claims = 0;
+    const plane = await fakeControlPlane((received, response) => {
+      if (received.url === "/api/runner/jobs") {
+        claims += 1;
+        return claims === 1 ? json(response, 200, claimedJob) : json(response, 204);
+      }
+      if (received.url.endsWith("/result")) return json(response, 500, { error: "db down" });
+      return json(response, 200, { ok: true });
+    });
+    servers.push(plane.server);
+    const controller = new AbortController();
+    const d = await deps(plane.baseUrl, {
+      signal: controller.signal,
+      sleep: async (milliseconds) => {
+        if (milliseconds === 1 && claims >= 2) controller.abort();
+      },
+    });
+    await runRunnerLoop(d);
+    expect(plane.received.filter((r) => r.url.endsWith("/result")).length).toBe(4);
+    expect(claims).toBe(2);
+    expect(d.logged).toContain(
+      "result ok not delivered: control plane POST /api/runner/runs/run-1/result failed: 500 db down",
+    );
+  });
+  it("exits non-zero with once when the result cannot be delivered", async () => {
+    const plane = await fakeControlPlane(scripted([claimedJob], [500]));
+    servers.push(plane.server);
+    await expect(runRunnerLoop(await deps(plane.baseUrl), { once: true })).rejects.toThrow(
+      "the result was not delivered",
+    );
+  });
+  it("does not retry a result the control plane rejects as invalid", async () => {
+    const plane = await fakeControlPlane(scripted([claimedJob], [400]));
+    servers.push(plane.server);
+    const d = await deps(plane.baseUrl);
+    await expect(runRunnerLoop(d, { once: true })).rejects.toThrow("the result was not delivered");
+    expect(plane.received.filter((r) => r.url.endsWith("/result")).length).toBe(1);
+  });
+  it("gives up with once after three failed claims", async () => {
+    let calls = 0;
+    const plane = await fakeControlPlane((_received, response) => {
+      calls += 1;
+      json(response, 500, { error: "db down" });
+    });
+    servers.push(plane.server);
+    const d = await deps(plane.baseUrl);
+    await expect(runRunnerLoop(d, { once: true })).rejects.toThrow(
+      "claim failed 3 times: control plane GET /api/runner/jobs failed: 500 db down",
+    );
+    expect(calls).toBe(3);
+    expect(d.logged.filter((line) => line.startsWith("claim failed:")).length).toBe(2);
+  });
+  it("waits before polling again after an empty claim", async () => {
+    let calls = 0;
+    const plane = await fakeControlPlane((_received, response) => {
+      calls += 1;
+      json(response, 204);
+    });
+    servers.push(plane.server);
+    const controller = new AbortController();
+    const sleeps: number[] = [];
+    const d = await deps(plane.baseUrl, {
+      signal: controller.signal,
+      emptyPollDelayMs: 250,
+      sleep: async (milliseconds) => {
+        sleeps.push(milliseconds);
+        if (sleeps.length === 3) controller.abort();
+      },
+    });
+    await runRunnerLoop(d);
+    expect(calls).toBe(3);
+    expect(sleeps).toEqual([250, 250, 250]);
   });
 });

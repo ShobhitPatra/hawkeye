@@ -1,6 +1,4 @@
-import type { ClaimedJob, RunResultReport } from "@hawkeye/core";
-
-export type RunEvent = { type: string; at: string; data?: unknown };
+import type { ClaimedJob, RunEvent, RunResultReport } from "@hawkeye/core";
 
 export class ControlPlaneRequestError extends Error {
   constructor(
