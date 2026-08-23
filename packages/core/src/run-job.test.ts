@@ -26,7 +26,19 @@ function deps(
   const fetch = vi.fn(
     async (_url: string, _init?: RequestInit) =>
       overrides.pullRequestResponse ??
-      Response.json({ title: "T", body: "Closes #2", user: { login: "alice" } }),
+      Response.json({
+        number: 1,
+        title: "T",
+        body: "Closes #2",
+        draft: false,
+        user: { login: "alice" },
+        head: { sha: "c".repeat(40), ref: "feature" },
+        base: {
+          sha: "d".repeat(40),
+          ref: "main",
+          repo: { clone_url: "https://github.com/o/r.git" },
+        },
+      }),
   );
   const harness: HarnessSpec = {
     name: "fake",

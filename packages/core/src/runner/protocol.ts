@@ -36,3 +36,5 @@ export type RunResultReport = {
   result?: ReviewResult;
   error?: string;
 };
+
+export type RunEvent = { type: string; at: string; data?: unknown };

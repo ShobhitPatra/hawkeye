@@ -96,39 +96,79 @@ function nextLink(header: string | null): string | undefined {
   return undefined;
 }
 
+const DEFAULT_API_BASE = "https://api.github.com";
+
+async function sendGitHubRequest(
+  fetchImpl: typeof fetch,
+  method: string,
+  url: string,
+  auth: string,
+  body?: unknown,
+): Promise<{ payload: unknown; response: Response }> {
+  const response = await fetchImpl(url, {
+    method,
+    headers: {
+      Authorization: auth,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "hawkeye",
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  const payload = (await response.json().catch(() => ({}))) as { message?: string };
+  if (!response.ok)
+    throw new GitHubRequestError(
+      response.status,
+      `GitHub ${method} ${new URL(url).pathname} failed: ${response.status} ${payload.message ?? ""}`.trim(),
+    );
+  return { payload, response };
+}
+
+export async function fetchPullRequestDetails(
+  deps: { fetch: typeof fetch; apiBase?: string },
+  reference: PullRequestReference,
+  token: string,
+): Promise<PullRequestDetails> {
+  const { payload } = await sendGitHubRequest(
+    deps.fetch,
+    "GET",
+    `${deps.apiBase ?? DEFAULT_API_BASE}${pulls(reference)}`,
+    bearer(token),
+  );
+  const pr = payload as {
+    number: number;
+    title: string;
+    body: string | null;
+    draft: boolean;
+    user: { login: string };
+    head: { sha: string; ref: string };
+    base: { sha: string; ref: string; repo: { clone_url: string } };
+  };
+  return {
+    number: pr.number,
+    title: pr.title,
+    body: pr.body ?? "",
+    author: pr.user.login,
+    draft: pr.draft,
+    headSha: pr.head.sha,
+    headRef: pr.head.ref,
+    baseSha: pr.base.sha,
+    baseRef: pr.base.ref,
+    cloneUrl: pr.base.repo.clone_url,
+  };
+}
+
 export function createGitHubClient(input: {
   appId: string;
   privateKeyPem: string;
   fetch: typeof fetch;
   apiBase?: string;
 }): GitHubClient {
-  const apiBase = input.apiBase ?? "https://api.github.com";
+  const apiBase = input.apiBase ?? DEFAULT_API_BASE;
 
-  async function send(
-    method: string,
-    url: string,
-    auth: string,
-    body?: unknown,
-  ): Promise<{ payload: unknown; response: Response }> {
-    const response = await input.fetch(url, {
-      method,
-      headers: {
-        Authorization: auth,
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "hawkeye",
-        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
-    const payload = (await response.json().catch(() => ({}))) as { message?: string };
-    if (!response.ok)
-      throw new GitHubRequestError(
-        response.status,
-        `GitHub ${method} ${new URL(url).pathname} failed: ${response.status} ${payload.message ?? ""}`.trim(),
-      );
-    return { payload, response };
-  }
+  const send = (method: string, url: string, auth: string, body?: unknown) =>
+    sendGitHubRequest(input.fetch, method, url, auth, body);
 
   async function request<T>(
     method: string,
@@ -217,28 +257,8 @@ export function createGitHubClient(input: {
     async installationTokenById(installationId) {
       return installationAccessToken(installationId);
     },
-    async pullRequest(reference, token) {
-      const pr = await request<{
-        number: number;
-        title: string;
-        body: string | null;
-        draft: boolean;
-        user: { login: string };
-        head: { sha: string; ref: string };
-        base: { sha: string; ref: string; repo: { clone_url: string } };
-      }>("GET", pulls(reference), bearer(token));
-      return {
-        number: pr.number,
-        title: pr.title,
-        body: pr.body ?? "",
-        author: pr.user.login,
-        draft: pr.draft,
-        headSha: pr.head.sha,
-        headRef: pr.head.ref,
-        baseSha: pr.base.sha,
-        baseRef: pr.base.ref,
-        cloneUrl: pr.base.repo.clone_url,
-      };
+    pullRequest(reference, token) {
+      return fetchPullRequestDetails({ fetch: input.fetch, apiBase }, reference, token);
     },
     async mergeBase(reference, baseSha, headSha, token) {
       const path = `/repos/${reference.owner}/${reference.repo}/compare/${baseSha}...${headSha}`;

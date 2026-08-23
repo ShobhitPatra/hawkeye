@@ -3,7 +3,7 @@ export {
   type PullRequestReference,
 } from "./github/pull-request-reference.js";
 export { createGitHubClient, type GitHubClient } from "./github/client.js";
-export { GitHubRequestError } from "./github/client.js";
+export { GitHubRequestError, fetchPullRequestDetails } from "./github/client.js";
 export type {
   InstallationRepository,
   OpenPullRequest,
@@ -26,6 +26,7 @@ export {
   type ClaimedJob,
   type RunResultStatus,
   type RunResultReport,
+  type RunEvent,
 } from "./runner/protocol.js";
 export {
   runReviewJob,
