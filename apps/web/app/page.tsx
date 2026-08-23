@@ -12,6 +12,7 @@ export default async function HomePage() {
       {session ? (
         <>
           <Link href="/prs">Pull requests</Link>
+          <Link href="/runners">Runners</Link>
           <SignOutButton />
         </>
       ) : (
