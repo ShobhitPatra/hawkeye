@@ -1,8 +1,4 @@
-import { join } from "node:path";
-import { PGlite } from "@electric-sql/pglite";
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/pglite";
-import { migrate } from "drizzle-orm/pglite/migrator";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   armPullRequest,
@@ -12,14 +8,12 @@ import {
 } from "./arming";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
+import { createTestDb } from "./test/pglite";
 
-const migrationsFolder = join(import.meta.dirname, "..", "drizzle");
 let db: Db;
 
 beforeAll(async () => {
-  const pglite = drizzle(new PGlite(), { schema });
-  await migrate(pglite, { migrationsFolder });
-  db = pglite;
+  db = await createTestDb();
 
   await db.insert(schema.user).values([
     { id: "user-1", name: "octocat", email: "octocat@example.com" },

@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { parseArmInput, parsePullRequestInput } from "@/arm-input";
 import { assertPullRequestInInstallation } from "@/arm-guard";
 import { armPullRequest, disarmPullRequest } from "@/arming";
+import { resolveReviewTarget } from "@/review-target";
+import { enqueueJob } from "@/jobs";
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
 import { installationBelongsToUser } from "@/installations";
@@ -19,9 +21,23 @@ export async function armAction(formData: FormData) {
   }
 
   const github = createGitHubAppClient({ fetch });
-  await assertPullRequestInInstallation(github, input.installationId, input);
+  const { token, pullRequest } = await assertPullRequestInInstallation(
+    github,
+    input.installationId,
+    input,
+  );
 
-  await armPullRequest(db, { ...input, userId: session.user.id });
+  const target = await resolveReviewTarget(github, {
+    reference: input,
+    headSha: pullRequest.headSha,
+    baseSha: pullRequest.baseSha,
+    token,
+  });
+
+  await db.transaction(async (tx) => {
+    const armed = await armPullRequest(tx, { ...input, userId: session.user.id });
+    await enqueueJob(tx, { armedPrId: armed.id, ...target, notBefore: new Date() });
+  });
   revalidatePath("/prs");
 }
 
