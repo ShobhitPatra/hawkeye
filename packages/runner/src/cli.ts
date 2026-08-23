@@ -13,8 +13,12 @@ import {
 } from "@hawkeye/core";
 import { expandHome, loadConfig } from "./config.js";
 import { createRunDirectory } from "./run-directory.js";
+import { createControlPlaneClient } from "./runner/client.js";
+import { loadRunnerConfig, writeRunnerConfig } from "./runner/config.js";
+import { runRunnerLoop } from "./runner/loop.js";
 
 const CONFIG_PATH = join(homedir(), ".config", "hawkeye", "config.json");
+const RUNNER_CONFIG_PATH = join(homedir(), ".config", "hawkeye", "runner.json");
 const DEFAULT_CONTRACT_PATH = join(homedir(), ".config", "hawkeye", "contract.md");
 const RUNS_ROOT = join(homedir(), ".cache", "hawkeye", "runs");
 const REPOSITORY_URL = "https://github.com/ShobhitPatra/hawkeye";
@@ -150,6 +154,85 @@ export function createProgram(io: {
         }
       },
     );
+
+  const runner = program
+    .command("runner")
+    .description("review armed pull requests claimed from the control plane")
+    .option("--once", "claim at most one job, then exit", false)
+    .option(
+      "--contract <path>",
+      "review contract that replaces the built-in lens and finding rules",
+    )
+    .action(async (options: { once: boolean; contract?: string }) => {
+      try {
+        const config = await loadRunnerConfig({
+          env: process.env,
+          configPath: RUNNER_CONFIG_PATH,
+          readFile: (p) => readFile(p, "utf8"),
+        });
+        const contract = await loadContractOverride({
+          ...(options.contract === undefined ? {} : { explicitPath: options.contract }),
+          env: process.env,
+          home: homedir(),
+          defaultPath: DEFAULT_CONTRACT_PATH,
+          readFile: (p) => readFile(p, "utf8"),
+        });
+        if (contract) io.stderr(`using contract override: ${contract.path}`);
+        const stop = new AbortController();
+        const onSignal = (signal: NodeJS.Signals) => {
+          io.stderr(`${signal} received; finishing the current job`);
+          stop.abort();
+        };
+        process.once("SIGINT", onSignal);
+        process.once("SIGTERM", onSignal);
+        io.stderr(`polling ${config.controlPlaneUrl}`);
+        try {
+          await runRunnerLoop(
+            {
+              client: createControlPlaneClient({
+                baseUrl: config.controlPlaneUrl,
+                token: config.token,
+                fetch,
+              }),
+              harness: createClaudeCodeHarness(),
+              createWorktree,
+              readRepositoryRules,
+              createRunDirectory: (reference) =>
+                createRunDirectory({ root: RUNS_ROOT, reference, now: new Date() }),
+              fetch,
+              log: io.stderr,
+              ...(contract ? { contractOverride: contract.content } : {}),
+              signal: stop.signal,
+            },
+            { once: options.once },
+          );
+        } finally {
+          process.off("SIGINT", onSignal);
+          process.off("SIGTERM", onSignal);
+        }
+      } catch (error) {
+        io.stderr(`error: ${(error as Error).message}`);
+        process.exitCode = 1;
+      }
+    });
+
+  runner
+    .command("login")
+    .description("store the control plane URL and runner token")
+    .requiredOption("--url <url>", "control plane URL, e.g. https://hawkeye.example")
+    .requiredOption("--token <token>", "runner token created on /runners")
+    .action(async (options: { url: string; token: string }) => {
+      try {
+        await writeRunnerConfig(RUNNER_CONFIG_PATH, {
+          controlPlaneUrl: options.url,
+          token: options.token,
+        });
+        io.stdout(`saved ${RUNNER_CONFIG_PATH}`);
+      } catch (error) {
+        io.stderr(`error: ${(error as Error).message}`);
+        process.exitCode = 1;
+      }
+    });
 
   return program;
 }

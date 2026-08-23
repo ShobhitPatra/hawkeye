@@ -146,6 +146,10 @@ TypeScript, pnpm monorepo: `packages/core` (contract, harness interface, render,
 
 Reviews post as `<app-slug>[bot]` (the author's instance: `hawkeye-review[bot]`). Run artifacts land in `~/.cache/hawkeye/runs/`.
 
+### Runner daemon (milestone 2, in progress)
+
+On the machine that holds your Claude Code login: `node packages/runner/dist/bin.js runner login --url <control plane url> --token <runner token from /runners>` once (stored in `~/.config/hawkeye/runner.json`; env overrides `HAWKEYE_CONTROL_PLANE_URL`, `HAWKEYE_RUNNER_TOKEN`), then `node packages/runner/dist/bin.js runner` to loop: claim a job, clone the PR with the one-hour token the job carries, run Claude Code with the review contract, heartbeat, report the result. `--once` handles a single job and exits non-zero when three claims in a row fail or the result cannot be delivered; the daemon waits a second after an empty poll, retries a failed claim after five seconds, and retries a failed result report three times (2 s, 4 s, 8 s) before logging it and moving on (the control plane requeues a claim that stops heartbeating). `--contract <path>` overrides the built-in contract (else the job's per-user override, else the default). The daemon never posts to GitHub; the control plane does. It needs Node 22+, git and the `claude` CLI signed in; it holds no GitHub credentials of its own.
+
 ### Control plane (milestone 2, in progress)
 
 Local: `docker compose up -d --wait db`, copy `apps/web/.env.example` to `apps/web/.env`, `pnpm --filter web db:migrate`, `pnpm --filter web dev`.

@@ -3,6 +3,7 @@ import {
   type GitHubClient,
   RUN_RESULT_STATUSES,
   parseReviewResult,
+  type RunEvent,
   type RunResultReport,
   type RunResultStatus,
 } from "@hawkeye/core";
@@ -129,8 +130,6 @@ export async function heartbeat(
   }
   return Response.json({ ok: true }, { status: 200 });
 }
-
-export type RunEvent = { type: string; at: string; data?: unknown };
 
 function parseEvents(payload: unknown): RunEvent[] {
   if (!Array.isArray(payload)) throw new Error("events must be an array");

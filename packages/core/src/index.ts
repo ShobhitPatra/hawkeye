@@ -3,9 +3,10 @@ export {
   type PullRequestReference,
 } from "./github/pull-request-reference.js";
 export { createGitHubClient, type GitHubClient } from "./github/client.js";
-export { GitHubRequestError } from "./github/client.js";
+export { GitHubRequestError, fetchPullRequestDetails, fetchLinkedIssue } from "./github/client.js";
 export type {
   InstallationRepository,
+  LinkedIssue,
   OpenPullRequest,
   PullRequestDetails,
 } from "./github/client.js";
@@ -26,4 +27,11 @@ export {
   type ClaimedJob,
   type RunResultStatus,
   type RunResultReport,
+  type RunEvent,
 } from "./runner/protocol.js";
+export {
+  runReviewJob,
+  type RunReviewJobInput,
+  type RunReviewJobDependencies,
+  type RunReviewJobOutcome,
+} from "./run-job.js";
