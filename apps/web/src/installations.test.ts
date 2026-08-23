@@ -1,8 +1,4 @@
-import { join } from "node:path";
-import { PGlite } from "@electric-sql/pglite";
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/pglite";
-import { migrate } from "drizzle-orm/pglite/migrator";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
@@ -12,6 +8,7 @@ import {
   linkInstallationToUser,
   recordInstallation,
 } from "./installations";
+import { createTestDb } from "./test/pglite";
 
 type InstallationEvent = Extract<WebhookEvent, { type: "installation" }>;
 
@@ -28,13 +25,10 @@ function installationEvent(
   };
 }
 
-const migrationsFolder = join(import.meta.dirname, "..", "drizzle");
 let db: Db;
 
 beforeAll(async () => {
-  const pglite = drizzle(new PGlite(), { schema });
-  await migrate(pglite, { migrationsFolder });
-  db = pglite;
+  db = await createTestDb();
 });
 
 async function readInstallation(id: string) {

@@ -1,29 +1,16 @@
-import { join } from "node:path";
-import { PGlite } from "@electric-sql/pglite";
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/pglite";
-import { migrate } from "drizzle-orm/pglite/migrator";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
 import { enqueueJob } from "./jobs";
+import { createTestDb, seedArmedPullRequest } from "./test/pglite";
 
-const migrationsFolder = join(import.meta.dirname, "..", "drizzle");
 let db: Db;
 
 beforeAll(async () => {
-  const pglite = drizzle(new PGlite(), { schema });
-  await migrate(pglite, { migrationsFolder });
-  db = pglite;
-
-  await db.insert(schema.user).values({ id: "user-1", name: "octocat", email: "o@example.com" });
-  await db
-    .insert(schema.installation)
-    .values({ id: "10", accountLogin: "octo", accountType: "Organization" });
-  await db.insert(schema.armedPr).values([
-    { id: "armed-1", userId: "user-1", installationId: "10", owner: "octo", repo: "a", number: 1 },
-    { id: "armed-2", userId: "user-1", installationId: "10", owner: "octo", repo: "b", number: 2 },
-  ]);
+  db = await createTestDb();
+  await seedArmedPullRequest(db, { armedPrId: "armed-1", repo: "a", number: 1 });
+  await seedArmedPullRequest(db, { armedPrId: "armed-2", repo: "b", number: 2 });
   await db
     .insert(schema.runner)
     .values({ id: "runner-1", userId: "user-1", name: "laptop", tokenHash: "hash" });

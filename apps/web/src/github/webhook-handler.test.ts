@@ -1,21 +1,15 @@
 import { createHmac } from "node:crypto";
-import { join } from "node:path";
-import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
-import { migrate } from "drizzle-orm/pglite/migrator";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Db } from "../db/client";
 import * as schema from "../db/schema";
+import { createTestDb } from "../test/pglite";
 import { handleWebhook } from "./webhook-handler";
 
 const secret = "test-secret";
-const migrationsFolder = join(import.meta.dirname, "..", "..", "drizzle");
 let db: Db;
 
 beforeAll(async () => {
-  const pglite = drizzle(new PGlite(), { schema });
-  await migrate(pglite, { migrationsFolder });
-  db = pglite;
+  db = await createTestDb();
 });
 
 function signedRequest(eventName: string, payload: unknown, signature?: string) {
