@@ -40,8 +40,8 @@ describe("parseWebhookEvent", () => {
   });
 
   it("returns ignored for an unknown event name", () => {
-    const event = parseWebhookEvent("pull_request", { action: "opened" });
-    expect(event).toEqual({ type: "ignored", eventName: "pull_request" });
+    const event = parseWebhookEvent("ping", { zen: "hi" });
+    expect(event).toEqual({ type: "ignored", eventName: "ping" });
   });
 
   it("returns ignored for an unknown installation action", () => {
@@ -65,5 +65,103 @@ describe("parseWebhookEvent", () => {
         sender,
       }),
     ).toThrow();
+  });
+});
+
+function pullRequestPayload(
+  overrides: Record<string, unknown> = {},
+  pullRequestOverrides: Record<string, unknown> = {},
+) {
+  return {
+    action: "synchronize",
+    installation: { id: 10 },
+    repository: { name: "repo", owner: { login: "octo" } },
+    ...overrides,
+    pull_request: {
+      number: 7,
+      draft: false,
+      merged: false,
+      head: { sha: "h".repeat(40) },
+      base: { sha: "b".repeat(40) },
+      ...pullRequestOverrides,
+    },
+  };
+}
+
+describe("parseWebhookEvent for pull_request", () => {
+  it("parses a synchronize event", () => {
+    expect(parseWebhookEvent("pull_request", pullRequestPayload())).toEqual({
+      type: "pull_request",
+      action: "synchronize",
+      repository: { owner: "octo", name: "repo" },
+      number: 7,
+      headSha: "h".repeat(40),
+      baseSha: "b".repeat(40),
+      draft: false,
+      merged: false,
+      installationId: "10",
+    });
+  });
+
+  it("parses a ready_for_review event", () => {
+    const event = parseWebhookEvent(
+      "pull_request",
+      pullRequestPayload({ action: "ready_for_review" }),
+    );
+    expect(event).toMatchObject({ action: "ready_for_review", draft: false });
+  });
+
+  it("parses a closed event that was merged", () => {
+    const event = parseWebhookEvent(
+      "pull_request",
+      pullRequestPayload({ action: "closed" }, { merged: true }),
+    );
+    expect(event).toMatchObject({ action: "closed", merged: true });
+  });
+
+  it("parses an opened draft event", () => {
+    const event = parseWebhookEvent(
+      "pull_request",
+      pullRequestPayload({ action: "opened" }, { draft: true }),
+    );
+    expect(event).toMatchObject({ action: "opened", draft: true });
+  });
+
+  it("parses a reopened event", () => {
+    expect(
+      parseWebhookEvent("pull_request", pullRequestPayload({ action: "reopened" })),
+    ).toMatchObject({
+      action: "reopened",
+    });
+  });
+
+  it("keeps an action it does not act on", () => {
+    expect(
+      parseWebhookEvent("pull_request", pullRequestPayload({ action: "labeled" })),
+    ).toMatchObject({ action: "labeled" });
+  });
+
+  it("throws when the installation is missing", () => {
+    const payload = pullRequestPayload();
+    delete (payload as Record<string, unknown>).installation;
+    expect(() => parseWebhookEvent("pull_request", payload)).toThrow(/installation/);
+  });
+
+  it("throws when the repository owner is missing", () => {
+    expect(() =>
+      parseWebhookEvent("pull_request", pullRequestPayload({ repository: { name: "repo" } })),
+    ).toThrow(/repository/);
+  });
+
+  it("throws when the head sha is missing", () => {
+    const payload = pullRequestPayload();
+    delete (payload.pull_request as Record<string, unknown>).head;
+    expect(() => parseWebhookEvent("pull_request", payload)).toThrow(/pull request/);
+  });
+
+  it("throws when the action is missing", () => {
+    const payload = pullRequestPayload();
+    delete (payload as Record<string, unknown>).action;
+    expect(() => parseWebhookEvent("pull_request", payload)).toThrow(/action/);
   });
 });
