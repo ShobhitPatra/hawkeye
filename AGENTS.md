@@ -14,7 +14,7 @@ apps/web           Next.js control plane (Drizzle + Postgres)
 
 ## Commands
 
-pnpm install · pnpm lint (oxlint) · pnpm format (oxfmt; run before every commit) · pnpm typecheck · pnpm test (vitest) · pnpm build (tsup). Scope to one package with pnpm --filter <name>. Control plane: `pnpm --filter web dev|build|db:generate|db:migrate|auth:generate`, `docker compose up -d --wait db` (local Postgres).
+pnpm install · pnpm lint (oxlint) · pnpm format (oxfmt; run before every commit) · pnpm typecheck · pnpm test (vitest) · pnpm build (tsup). CI (`.github/workflows/ci.yml`) runs install, lint, format:check, typecheck, test and build on every PR and push to main. Scope to one package with pnpm --filter <name>. Control plane: `pnpm --filter web dev|build|db:generate|db:migrate|auth:generate`, `docker compose up -d --wait db` (local Postgres).
 
 ## Rules
 
