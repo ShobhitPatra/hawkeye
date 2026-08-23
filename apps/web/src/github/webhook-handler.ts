@@ -1,5 +1,7 @@
+import type { GitHubClient } from "@hawkeye/core";
 import type { Db } from "../db/client";
 import { recordInstallation } from "../installations";
+import { handlePullRequestEvent } from "../pull-request-events";
 import { parseWebhookEvent } from "./webhook-events";
 import { verifyWebhookSignature } from "./webhook-signature";
 
@@ -9,7 +11,7 @@ function json(body: unknown, status: number) {
 
 export async function handleWebhook(
   request: Request,
-  deps: { secret: string; db: Db },
+  deps: { secret: string; db: Db; github: GitHubClient },
 ): Promise<Response> {
   const body = await request.text();
   if (
@@ -35,6 +37,14 @@ export async function handleWebhook(
   }
 
   if (event.type === "ignored") return json({ ignored: event.eventName }, 200);
+
+  if (event.type === "pull_request") {
+    const { enqueued, disarmed } = await handlePullRequestEvent(
+      { db: deps.db, github: deps.github },
+      event,
+    );
+    return json({ ok: true, enqueued, disarmed }, 200);
+  }
 
   await recordInstallation(deps.db, event);
   return json({ ok: true }, 200);
