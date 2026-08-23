@@ -132,4 +132,10 @@ describe("installationBelongsToUser", () => {
     expect(await installationBelongsToUser(db, "80", "user-1")).toBe(false);
     expect(await installationBelongsToUser(db, "81", "user-3")).toBe(false);
   });
+  it("is false once the installation is deleted or suspended", async () => {
+    await recordInstallation(db, installationEvent("suspend", 80, 800));
+    expect(await installationBelongsToUser(db, "80", "user-3")).toBe(false);
+    await recordInstallation(db, installationEvent("unsuspend", 80, 800));
+    expect(await installationBelongsToUser(db, "80", "user-3")).toBe(true);
+  });
 });
