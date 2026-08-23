@@ -82,6 +82,20 @@ describe("createControlPlaneClient", () => {
       },
     ]);
   });
+  it("rejects a malformed claimed job payload", async () => {
+    const cases: [unknown, string][] = [
+      ["not an object", "payload"],
+      [{ ...job, job: { ...job.job, runId: 7 } }, "job.runId"],
+      [{ ...job, pullRequest: { ...job.pullRequest, number: "7" } }, "pullRequest.number"],
+      [{ ...job, installationToken: null }, "installationToken"],
+      [{ ...job, settings: { maxTurns: 10, wallClockMinutes: 1.5 } }, "settings.wallClockMinutes"],
+      [{ ...job, settings: { ...job.settings, promptOverride: 5 } }, "settings.promptOverride"],
+    ];
+    for (const [payload, field] of cases) {
+      const { client: c } = client(() => Response.json(payload));
+      await expect(c.claimJob()).rejects.toThrow(`invalid claimed job payload: ${field}`);
+    }
+  });
   it("surfaces a lost claim on result as a 409 error", async () => {
     const { client: c } = client(() =>
       Response.json({ error: "job is no longer claimed by this runner" }, { status: 409 }),

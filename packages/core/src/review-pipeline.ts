@@ -73,7 +73,7 @@ export async function runReviewPipeline(
       return {
         status: harnessResult.status,
         turns: harnessResult.turns,
-        error: harnessResult.error ?? `harness ${harnessResult.status}`,
+        error: harnessResult.error ?? "stopped without a message",
         diff: worktree.diff,
       };
 

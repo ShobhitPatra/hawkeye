@@ -146,7 +146,7 @@ describe("runReviewJob", () => {
     expect(await runReviewJob(await input(), d)).toEqual({
       status: "timeout",
       turns: 3,
-      error: "harness timeout",
+      error: "stopped without a message",
     });
     const failing = deps({ harnessResult: { status: "error", turns: 0, error: "boom" } });
     expect(await runReviewJob(await input(), failing)).toEqual({

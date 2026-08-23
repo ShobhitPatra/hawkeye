@@ -193,7 +193,7 @@ describe("runRunnerLoop", () => {
     expect(plane.received.find((r) => r.url.endsWith("/result"))?.body).toEqual({
       status: "max-turns",
       turns: 3,
-      error: "harness max-turns",
+      error: "stopped without a message",
     });
   });
   it("reports an error when the review cannot even start", async () => {
@@ -295,6 +295,25 @@ describe("runRunnerLoop", () => {
     const loop = runRunnerLoop(d);
     setTimeout(() => controller.abort(), 20);
     await expect(loop).resolves.toBeUndefined();
+  });
+  it("does not wait when the signal is already aborted", async () => {
+    const controller = new AbortController();
+    const d = await deps("http://127.0.0.1:1", {
+      signal: controller.signal,
+      emptyPollDelayMs: 30_000,
+    });
+    d.client = {
+      claimJob: async () => {
+        controller.abort();
+        return undefined;
+      },
+      heartbeat: async () => {},
+      sendEvents: async () => {},
+      sendResult: async () => {},
+    };
+    const started = Date.now();
+    await runRunnerLoop(d);
+    expect(Date.now() - started).toBeLessThan(1_000);
   });
   it("returns after one empty poll with once", async () => {
     const plane = await fakeControlPlane(scripted([]));
