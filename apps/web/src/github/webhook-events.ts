@@ -110,7 +110,6 @@ function parsePullRequestEvent(payload: unknown): WebhookEvent {
     !pullRequest ||
     typeof pullRequest.number !== "number" ||
     typeof pullRequest.draft !== "boolean" ||
-    typeof pullRequest.merged !== "boolean" ||
     !pullRequest.head ||
     typeof pullRequest.head.sha !== "string" ||
     !pullRequest.base ||
@@ -127,7 +126,7 @@ function parsePullRequestEvent(payload: unknown): WebhookEvent {
     headSha: pullRequest.head.sha,
     baseSha: pullRequest.base.sha,
     draft: pullRequest.draft,
-    merged: pullRequest.merged,
+    merged: pullRequest.merged === true,
     installationId: String(body.installation.id),
   };
 }

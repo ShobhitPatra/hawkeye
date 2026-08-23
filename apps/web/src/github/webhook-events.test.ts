@@ -111,6 +111,14 @@ describe("parseWebhookEvent for pull_request", () => {
     expect(event).toMatchObject({ action: "ready_for_review", draft: false });
   });
 
+  it("treats a null merged flag as not merged", () => {
+    const event = parseWebhookEvent(
+      "pull_request",
+      pullRequestPayload({ action: "closed" }, { merged: null }),
+    );
+    expect(event).toMatchObject({ type: "pull_request", action: "closed", merged: false });
+  });
+
   it("parses a closed event that was merged", () => {
     const event = parseWebhookEvent(
       "pull_request",

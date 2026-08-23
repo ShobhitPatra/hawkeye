@@ -32,24 +32,26 @@ export async function handlePullRequestEvent(
   const { db, github } = deps;
 
   if (event.action === "closed") {
-    const disarmed = await db
-      .update(armedPr)
-      .set({ disarmedAt: sql`now()` })
-      .where(activeRows(event))
-      .returning({ id: armedPr.id });
-    const cancelled = await db
-      .delete(job)
-      .where(
-        and(
-          inArray(
-            job.armedPrId,
-            disarmed.map((row) => row.id),
+    return db.transaction(async (tx) => {
+      const disarmed = await tx
+        .update(armedPr)
+        .set({ disarmedAt: sql`now()` })
+        .where(activeRows(event))
+        .returning({ id: armedPr.id });
+      const cancelled = await tx
+        .delete(job)
+        .where(
+          and(
+            inArray(
+              job.armedPrId,
+              disarmed.map((row) => row.id),
+            ),
+            eq(job.state, "queued"),
           ),
-          eq(job.state, "queued"),
-        ),
-      )
-      .returning({ id: job.id });
-    return { enqueued: 0, disarmed: disarmed.length, cancelled: cancelled.length };
+        )
+        .returning({ id: job.id });
+      return { enqueued: 0, disarmed: disarmed.length, cancelled: cancelled.length };
+    });
   }
 
   if (!REVIEW_ACTIONS.has(event.action)) {
