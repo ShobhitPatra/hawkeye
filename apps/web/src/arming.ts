@@ -1,20 +1,15 @@
+import type { PullRequestReference } from "@hawkeye/core";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { armedPr } from "./db/schema";
 
-export interface PullRequestRef {
-  owner: string;
-  repo: string;
-  number: number;
-}
-
 export type ArmedPullRequest = typeof armedPr.$inferSelect;
 
-export function armedPullRequestKey(pullRequest: PullRequestRef) {
+export function armedPullRequestKey(pullRequest: PullRequestReference) {
   return `${pullRequest.owner}/${pullRequest.repo}#${pullRequest.number}`;
 }
 
-function activeRow(userId: string, pullRequest: PullRequestRef) {
+function activeRow(userId: string, pullRequest: PullRequestReference) {
   return and(
     eq(armedPr.userId, userId),
     eq(armedPr.owner, pullRequest.owner),
@@ -26,7 +21,7 @@ function activeRow(userId: string, pullRequest: PullRequestRef) {
 
 export async function armPullRequest(
   db: Db,
-  input: PullRequestRef & { userId: string; installationId: string },
+  input: PullRequestReference & { userId: string; installationId: string },
 ): Promise<ArmedPullRequest> {
   const [inserted] = await db
     .insert(armedPr)
@@ -43,12 +38,20 @@ export async function armPullRequest(
 
   const [existing] = await db.select().from(armedPr).where(activeRow(input.userId, input));
   if (!existing) throw new Error(`${armedPullRequestKey(input)} was disarmed while arming`);
-  return existing;
+  if (existing.installationId === input.installationId) return existing;
+
+  const [updated] = await db
+    .update(armedPr)
+    .set({ installationId: input.installationId })
+    .where(eq(armedPr.id, existing.id))
+    .returning();
+  if (!updated) throw new Error(`${armedPullRequestKey(input)} was disarmed while arming`);
+  return updated;
 }
 
 export async function disarmPullRequest(
   db: Db,
-  input: PullRequestRef & { userId: string },
+  input: PullRequestReference & { userId: string },
 ): Promise<ArmedPullRequest | undefined> {
   const [disarmed] = await db
     .update(armedPr)

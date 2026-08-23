@@ -35,6 +35,22 @@ describe("parseArmInput", () => {
     expect(() => parseArmInput(formData({ ...valid, number: "0" }))).toThrow("invalid number");
   });
 
+  it("rejects a negative number", () => {
+    expect(() => parseArmInput(formData({ ...valid, number: "-1" }))).toThrow("invalid number");
+  });
+
+  it("rejects a number beyond the postgres integer range", () => {
+    expect(() => parseArmInput(formData({ ...valid, number: "2147483648" }))).toThrow(
+      "invalid number",
+    );
+  });
+
+  it("rejects a huge digit string", () => {
+    expect(() => parseArmInput(formData({ ...valid, number: "1".padEnd(22, "0") }))).toThrow(
+      "invalid number",
+    );
+  });
+
   it("rejects a non-numeric installation", () => {
     expect(() => parseArmInput(formData({ ...valid, installationId: "ten" }))).toThrow(
       "invalid installationId",

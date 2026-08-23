@@ -1,9 +1,9 @@
-import { GitHubRequestError, type GitHubClient } from "@hawkeye/core";
+import { GitHubRequestError, type GitHubClient, type PullRequestReference } from "@hawkeye/core";
 
 export async function assertPullRequestInInstallation(
   github: GitHubClient,
   installationId: string,
-  reference: { owner: string; repo: string; number: number },
+  reference: PullRequestReference,
 ): Promise<void> {
   const token = await github.installationTokenById(installationId);
   try {

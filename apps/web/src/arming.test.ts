@@ -25,9 +25,10 @@ beforeAll(async () => {
     { id: "user-1", name: "octocat", email: "octocat@example.com" },
     { id: "user-2", name: "hubot", email: "hubot@example.com" },
   ]);
-  await db
-    .insert(schema.installation)
-    .values({ id: "10", accountLogin: "octo", accountType: "Organization" });
+  await db.insert(schema.installation).values([
+    { id: "10", accountLogin: "octo", accountType: "Organization" },
+    { id: "20", accountLogin: "octo-two", accountType: "Organization" },
+  ]);
 });
 
 function rowsFor(owner: string) {
@@ -68,6 +69,22 @@ describe("armPullRequest", () => {
 
     expect(second.id).toBe(first.id);
     expect(await rowsFor("twice")).toHaveLength(1);
+  });
+
+  it("updates the installation on an already-armed row when it changes", async () => {
+    const input = {
+      userId: "user-1",
+      installationId: "10",
+      owner: "reinstall",
+      repo: "repo",
+      number: 42,
+    };
+    const first = await armPullRequest(db, input);
+    const second = await armPullRequest(db, { ...input, installationId: "20" });
+
+    expect(second.id).toBe(first.id);
+    expect(second.installationId).toBe("20");
+    expect(await rowsFor("reinstall")).toHaveLength(1);
   });
 
   it("arms again after a disarm, leaving the disarmed row behind", async () => {
