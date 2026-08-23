@@ -10,4 +10,5 @@ export const env = {
   betterAuthUrl: () => required("BETTER_AUTH_URL"),
   githubClientId: () => required("GITHUB_CLIENT_ID"),
   githubClientSecret: () => required("GITHUB_CLIENT_SECRET"),
+  githubWebhookSecret: () => required("GITHUB_WEBHOOK_SECRET"),
 };
