@@ -1,3 +1,4 @@
+import { listArmedPullRequests } from "@/arming";
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
 import { listUserOpenPullRequests } from "@/pull-requests";
@@ -17,10 +18,14 @@ export default async function PullRequestsPage() {
     );
   }
 
-  const { pullRequests, failures } = await listUserOpenPullRequests(
-    { db: getDb(), github: createGitHubAppClient({ fetch }) },
-    { userId: session.user.id, login },
-  );
+  const db = getDb();
+  const [{ pullRequests, failures }, armed] = await Promise.all([
+    listUserOpenPullRequests(
+      { db, github: createGitHubAppClient({ fetch }) },
+      { userId: session.user.id, login },
+    ),
+    listArmedPullRequests(db, session.user.id),
+  ]);
 
   return (
     <main>
@@ -28,7 +33,7 @@ export default async function PullRequestsPage() {
       {pullRequests.length === 0 ? (
         <p>No open pull requests</p>
       ) : (
-        <PullRequestTable pullRequests={pullRequests} />
+        <PullRequestTable pullRequests={pullRequests} armed={armed} />
       )}
       {failures.length > 0 && (
         <ul>

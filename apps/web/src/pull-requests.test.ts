@@ -114,6 +114,7 @@ describe("listUserOpenPullRequests", () => {
     );
 
     expect(found.pullRequests.map((pr) => pr.number)).toEqual([2, 3, 1]);
+    expect(found.pullRequests.map((pr) => pr.installationId)).toEqual(["11", "11", "10"]);
     expect(found.failures).toEqual([]);
     expect(installationTokenById.mock.calls).toEqual([["10"], ["11"]]);
     expect(listInstallationRepositories.mock.calls).toEqual([["token-10"], ["token-11"]]);

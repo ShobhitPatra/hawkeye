@@ -3,6 +3,10 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { installation, installationUser } from "./db/schema";
 
+export interface ListedPullRequest extends OpenPullRequest {
+  installationId: string;
+}
+
 export interface InstallationFailure {
   installationId: string;
   message: string;
@@ -11,7 +15,7 @@ export interface InstallationFailure {
 export async function listUserOpenPullRequests(
   deps: { db: Db; github: GitHubClient },
   input: { userId: string; login: string },
-): Promise<{ pullRequests: OpenPullRequest[]; failures: InstallationFailure[] }> {
+): Promise<{ pullRequests: ListedPullRequest[]; failures: InstallationFailure[] }> {
   const installations = await deps.db
     .select({ id: installation.id })
     .from(installation)
@@ -19,15 +23,18 @@ export async function listUserOpenPullRequests(
     .where(and(eq(installationUser.userId, input.userId), isNull(installation.deletedAt)))
     .orderBy(installation.id);
 
-  const pullRequests: OpenPullRequest[] = [];
+  const pullRequests: ListedPullRequest[] = [];
   const failures: InstallationFailure[] = [];
   for (const { id } of installations) {
     try {
       const token = await deps.github.installationTokenById(id);
       const repositories = await deps.github.listInstallationRepositories(token);
-      pullRequests.push(
-        ...(await deps.github.listOpenPullRequestsByAuthor(token, repositories, input.login)),
+      const found = await deps.github.listOpenPullRequestsByAuthor(
+        token,
+        repositories,
+        input.login,
       );
+      pullRequests.push(...found.map((pullRequest) => ({ ...pullRequest, installationId: id })));
     } catch (error) {
       failures.push({
         installationId: id,

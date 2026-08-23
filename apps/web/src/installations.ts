@@ -22,6 +22,20 @@ export async function linkInstallationToUser(
     .onConflictDoNothing();
 }
 
+export async function installationBelongsToUser(
+  db: Db,
+  installationId: string,
+  userId: string,
+): Promise<boolean> {
+  const [link] = await db
+    .select({ userId: installationUser.userId })
+    .from(installationUser)
+    .where(
+      and(eq(installationUser.installationId, installationId), eq(installationUser.userId, userId)),
+    );
+  return link !== undefined;
+}
+
 export async function recordInstallation(db: Db, event: InstallationEvent) {
   const id = String(event.installation.id);
   const accountLogin = event.installation.account.login;
