@@ -17,6 +17,24 @@ export type PullRequestDetails = {
 };
 export type LinkedIssue = { number: number; title: string; body: string };
 
+export type InstallationRepository = {
+  owner: string;
+  name: string;
+  fullName: string;
+  private: boolean;
+};
+
+export type OpenPullRequest = {
+  owner: string;
+  repo: string;
+  number: number;
+  title: string;
+  headRef: string;
+  headSha: string;
+  updatedAt: string;
+  htmlUrl: string;
+};
+
 export class GitHubRequestError extends Error {
   constructor(
     public readonly status: number,
@@ -29,6 +47,7 @@ export class GitHubRequestError extends Error {
 
 export interface GitHubClient {
   installationToken(reference: PullRequestReference): Promise<string>;
+  installationTokenById(installationId: string): Promise<string>;
   pullRequest(reference: PullRequestReference, token: string): Promise<PullRequestDetails>;
   mergeBase(
     reference: PullRequestReference,
@@ -47,6 +66,12 @@ export interface GitHubClient {
     review: RenderedReview,
     token: string,
   ): Promise<{ url: string }>;
+  listInstallationRepositories(token: string): Promise<InstallationRepository[]>;
+  listOpenPullRequestsByAuthor(
+    token: string,
+    repositories: { owner: string; name: string }[],
+    login: string,
+  ): Promise<OpenPullRequest[]>;
 }
 
 const LINKED_ISSUE = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/i;
@@ -59,6 +84,18 @@ export function linkedIssueNumber(body: string): number | undefined {
 const bearer = (token: string) => `Bearer ${token}`;
 const pulls = (r: PullRequestReference) => `/repos/${r.owner}/${r.repo}/pulls/${r.number}`;
 
+const PER_PAGE = 100;
+const CONCURRENCY = 5;
+
+function nextLink(header: string | null): string | undefined {
+  if (!header) return undefined;
+  for (const part of header.split(",")) {
+    const match = /<([^>]+)>\s*;\s*rel="next"/.exec(part.trim());
+    if (match) return match[1];
+  }
+  return undefined;
+}
+
 export function createGitHubClient(input: {
   appId: string;
   privateKeyPem: string;
@@ -67,13 +104,13 @@ export function createGitHubClient(input: {
 }): GitHubClient {
   const apiBase = input.apiBase ?? "https://api.github.com";
 
-  async function request<T>(
+  async function send(
     method: string,
-    path: string,
+    url: string,
     auth: string,
     body?: unknown,
-  ): Promise<T> {
-    const response = await input.fetch(`${apiBase}${path}`, {
+  ): Promise<{ payload: unknown; response: Response }> {
+    const response = await input.fetch(url, {
       method,
       headers: {
         Authorization: auth,
@@ -84,13 +121,87 @@ export function createGitHubClient(input: {
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-    const json = (await response.json().catch(() => ({}))) as { message?: string };
+    const payload = (await response.json().catch(() => ({}))) as { message?: string };
     if (!response.ok)
       throw new GitHubRequestError(
         response.status,
-        `GitHub ${method} ${path} failed: ${response.status} ${json.message ?? ""}`.trim(),
+        `GitHub ${method} ${new URL(url).pathname} failed: ${response.status} ${payload.message ?? ""}`.trim(),
       );
-    return json as T;
+    return { payload, response };
+  }
+
+  async function request<T>(
+    method: string,
+    path: string,
+    auth: string,
+    body?: unknown,
+  ): Promise<T> {
+    const { payload } = await send(method, `${apiBase}${path}`, auth, body);
+    return payload as T;
+  }
+
+  async function paginate<T>(
+    path: string,
+    token: string,
+    select: (payload: unknown) => T[],
+  ): Promise<T[]> {
+    const first = new URL(`${apiBase}${path}`);
+    first.searchParams.set("per_page", String(PER_PAGE));
+    const items: T[] = [];
+    let url: string | undefined = first.toString();
+    while (url) {
+      const { payload, response } = await send("GET", url, bearer(token));
+      items.push(...select(payload));
+      url = nextLink(response.headers.get("Link"));
+    }
+    return items;
+  }
+
+  async function openPullRequests(
+    token: string,
+    repository: { owner: string; name: string },
+    login: string,
+  ): Promise<OpenPullRequest[]> {
+    const list = await paginate(
+      `/repos/${repository.owner}/${repository.name}/pulls?state=open`,
+      token,
+      (payload) =>
+        payload as {
+          number: number;
+          title: string;
+          updated_at: string;
+          html_url: string;
+          user: { login: string } | null;
+          head: { ref: string; sha: string };
+        }[],
+    );
+    return list
+      .filter((pull) => pull.user?.login === login)
+      .map((pull) => ({
+        owner: repository.owner,
+        repo: repository.name,
+        number: pull.number,
+        title: pull.title,
+        headRef: pull.head.ref,
+        headSha: pull.head.sha,
+        updatedAt: pull.updated_at,
+        htmlUrl: pull.html_url,
+      }));
+  }
+
+  async function installationAccessToken(installationId: string): Promise<string> {
+    if (!/^\d+$/.test(installationId))
+      throw new Error(`Invalid installation id: "${installationId}"`);
+    const jwt = bearer(createAppJwt({ appId: input.appId, privateKeyPem: input.privateKeyPem }));
+    const token = await request<{ token?: string }>(
+      "POST",
+      `/app/installations/${installationId}/access_tokens`,
+      jwt,
+      {},
+    );
+    if (typeof token.token !== "string")
+      throw new Error("GitHub installation token response has no token");
+    return token.token;
   }
 
   return {
@@ -101,13 +212,10 @@ export function createGitHubClient(input: {
         `/repos/${reference.owner}/${reference.repo}/installation`,
         jwt,
       );
-      const token = await request<{ token: string }>(
-        "POST",
-        `/app/installations/${installation.id}/access_tokens`,
-        jwt,
-        {},
-      );
-      return token.token;
+      return installationAccessToken(String(installation.id));
+    },
+    async installationTokenById(installationId) {
+      return installationAccessToken(installationId);
     },
     async pullRequest(reference, token) {
       const pr = await request<{
@@ -158,16 +266,12 @@ export function createGitHubClient(input: {
       return { number: issue.number, title: issue.title, body: issue.body ?? "" };
     },
     async reviews(reference, token) {
-      const all: ExistingReview[] = [];
-      for (let page = 1; ; page += 1) {
-        const list = await request<{ user: { login: string } | null; body: string }[]>(
-          "GET",
-          `${pulls(reference)}/reviews?per_page=100&page=${page}`,
-          bearer(token),
-        );
-        all.push(...list.map((r) => ({ authorLogin: r.user?.login ?? "", body: r.body ?? "" })));
-        if (list.length < 100) return all;
-      }
+      return paginate(`${pulls(reference)}/reviews`, token, (payload) =>
+        (payload as { user: { login: string } | null; body: string }[]).map((review) => ({
+          authorLogin: review.user?.login ?? "",
+          body: review.body ?? "",
+        })),
+      );
     },
     async postReview(reference, review, token) {
       const path = `${pulls(reference)}/reviews`;
@@ -175,6 +279,38 @@ export function createGitHubClient(input: {
       if (typeof posted.html_url !== "string")
         throw new Error(`GitHub POST ${path} returned no review url`);
       return { url: posted.html_url };
+    },
+    async listInstallationRepositories(token) {
+      return paginate("/installation/repositories", token, (payload) =>
+        (
+          payload as {
+            repositories: {
+              name: string;
+              full_name: string;
+              private: boolean;
+              owner: { login: string };
+            }[];
+          }
+        ).repositories.map((repository) => ({
+          owner: repository.owner.login,
+          name: repository.name,
+          fullName: repository.full_name,
+          private: repository.private,
+        })),
+      );
+    },
+    async listOpenPullRequestsByAuthor(token, repositories, login) {
+      const collected: OpenPullRequest[][] = [];
+      for (let start = 0; start < repositories.length; start += CONCURRENCY) {
+        collected.push(
+          ...(await Promise.all(
+            repositories
+              .slice(start, start + CONCURRENCY)
+              .map((repository) => openPullRequests(token, repository, login)),
+          )),
+        );
+      }
+      return collected.flat();
     },
   };
 }

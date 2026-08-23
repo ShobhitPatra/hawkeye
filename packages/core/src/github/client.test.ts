@@ -9,8 +9,20 @@ const ref = { owner: "o", repo: "r", number: 5 };
 const reviewPage = (login: string, count: number) =>
   Array.from({ length: count }, () => ({ user: { login }, body: "b" }));
 
+const pull = (number: number, login: string | null) => ({
+  number,
+  title: `PR ${number}`,
+  updated_at: "2026-01-01T00:00:00Z",
+  html_url: `https://github.com/pull/${number}`,
+  user: login === null ? null : { login },
+  head: { ref: `feat-${number}`, sha: `sha-${number}` },
+});
+
 function fakeFetch(
-  routes: Record<string, (init: RequestInit, url: URL) => { status?: number; json: unknown }>,
+  routes: Record<
+    string,
+    (init: RequestInit, url: URL) => { status?: number; json: unknown; link?: string | undefined }
+  >,
 ) {
   const calls: { url: string; init: RequestInit }[] = [];
   const fetchImpl = vi.fn(async (url: string | URL | Request, init: RequestInit = {}) => {
@@ -19,8 +31,8 @@ function fakeFetch(
     calls.push({ url: String(url), init });
     const route = routes[key];
     if (!route) return new Response(JSON.stringify({ message: "no route" }), { status: 404 });
-    const { status = 200, json } = route(init, parsed);
-    return new Response(JSON.stringify(json), { status });
+    const { status = 200, json, link } = route(init, parsed);
+    return new Response(JSON.stringify(json), { status, headers: link ? { Link: link } : {} });
   });
   return { fetchImpl: fetchImpl as unknown as typeof fetch, calls };
 }
@@ -128,17 +140,21 @@ describe("createGitHubClient", () => {
       { authorLogin: "alice", body: "y" },
     ]);
   });
-  it("pages through reviews until a short page", async () => {
+  it("follows the link header across review pages", async () => {
     const { fetchImpl, calls } = fakeFetch({
       "GET /repos/o/r/pulls/5/reviews": (_init, url) => ({
-        json: url.searchParams.get("page") === "1" ? reviewPage("a", 100) : reviewPage("b", 1),
+        json: url.searchParams.get("page") === "2" ? reviewPage("b", 1) : reviewPage("a", 100),
+        link:
+          url.searchParams.get("page") === "2"
+            ? undefined
+            : '<https://api.github.com/repos/o/r/pulls/5/reviews?per_page=100&page=2>; rel="next"',
       }),
     });
     const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
     const reviews = await client.reviews(ref, "t");
     expect(reviews).toHaveLength(101);
     expect(calls).toHaveLength(2);
-    expect(calls[0]!.url).toContain("page=1");
+    expect(calls[0]!.url).toContain("per_page=100");
     expect(calls[1]!.url).toContain("page=2");
   });
   it("rejects a posted review without a url", async () => {
@@ -195,6 +211,172 @@ describe("createGitHubClient", () => {
         fetch: broken.fetchImpl,
       }).linkedIssue(ref, "Fixes #9", "t"),
     ).rejects.toThrow(/500/);
+  });
+
+  it("exchanges an app jwt for an installation token by installation id", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      "POST /app/installations/155822984/access_tokens": () => ({
+        status: 201,
+        json: { token: "ghs_x" },
+      }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(client.installationTokenById("155822984")).resolves.toBe("ghs_x");
+    expect((calls[0]!.init.headers as Record<string, string>).Authorization).toMatch(/^Bearer ey/);
+  });
+  it("rejects an installation token response without a token", async () => {
+    const { fetchImpl } = fakeFetch({
+      "POST /app/installations/155822984/access_tokens": () => ({ status: 201, json: {} }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(client.installationTokenById("155822984")).rejects.toThrow(/no token/);
+  });
+  it("lists installation repositories across link header pages", async () => {
+    const full = Array.from({ length: 100 }, (_value, index) => ({
+      name: `r${index}`,
+      full_name: `o/r${index}`,
+      private: false,
+      owner: { login: "o" },
+    }));
+    const { fetchImpl, calls } = fakeFetch({
+      "GET /installation/repositories": (_init, url) => ({
+        json: {
+          repositories:
+            url.searchParams.get("page") === "2"
+              ? [{ name: "b", full_name: "o/b", private: true, owner: { login: "o" } }]
+              : full,
+        },
+        link:
+          url.searchParams.get("page") === "2"
+            ? undefined
+            : '<https://api.github.com/installation/repositories?per_page=100&page=2>; rel="next"',
+      }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    const repositories = await client.listInstallationRepositories("ghs_x");
+    expect(repositories).toHaveLength(101);
+    expect(repositories[100]).toEqual({ owner: "o", name: "b", fullName: "o/b", private: true });
+    expect(calls).toHaveLength(2);
+    expect(calls[0]!.url).toContain("per_page=100");
+  });
+  it("follows the next rel out of a link header listing multiple rels", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      "GET /installation/repositories": (_init, url) => ({
+        json: {
+          repositories:
+            url.searchParams.get("page") === "2"
+              ? [{ name: "z", full_name: "o/z", private: false, owner: { login: "o" } }]
+              : [{ name: "a", full_name: "o/a", private: false, owner: { login: "o" } }],
+        },
+        link:
+          url.searchParams.get("page") === "2"
+            ? undefined
+            : '<https://api.github.com/installation/repositories?per_page=100&page=2>; rel="next", <https://api.github.com/installation/repositories?per_page=100&page=5>; rel="last"',
+      }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    const repositories = await client.listInstallationRepositories("ghs_x");
+    expect(repositories).toHaveLength(2);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.url).toContain("page=2");
+  });
+  it("takes the repository owner from the owner field, not the full name", async () => {
+    const { fetchImpl } = fakeFetch({
+      "GET /installation/repositories": () => ({
+        json: {
+          repositories: [
+            { name: "r", full_name: "renamed-owner/r", private: false, owner: { login: "o" } },
+          ],
+        },
+      }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    const repositories = await client.listInstallationRepositories("ghs_x");
+    expect(repositories).toEqual([
+      { owner: "o", name: "r", fullName: "renamed-owner/r", private: false },
+    ]);
+  });
+  it("stops after a last link page holding exactly one hundred repositories", async () => {
+    const full = Array.from({ length: 100 }, (_value, index) => ({
+      name: `r${index}`,
+      full_name: `o/r${index}`,
+      private: false,
+      owner: { login: "o" },
+    }));
+    const { fetchImpl, calls } = fakeFetch({
+      "GET /installation/repositories": () => ({ json: { repositories: full } }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(client.listInstallationRepositories("ghs_x")).resolves.toHaveLength(100);
+    expect(calls).toHaveLength(1);
+  });
+  it("throws without leaking the token when listing repositories fails", async () => {
+    const { fetchImpl } = fakeFetch({
+      "GET /installation/repositories": () => ({ status: 403, json: { message: "Forbidden" } }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    const error = await client.listInstallationRepositories("ghs_secret").catch((e: Error) => e);
+    expect(String(error)).toContain("GitHub GET /installation/repositories failed: 403 Forbidden");
+    expect(String(error)).not.toContain("ghs_secret");
+  });
+  it("rejects an installation id that is not numeric", async () => {
+    const { fetchImpl, calls } = fakeFetch({});
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(client.installationTokenById("../app")).rejects.toThrow(/installation id/);
+    expect(calls).toHaveLength(0);
+  });
+  it("fetches pull requests for more repositories than the concurrency limit", async () => {
+    const names = ["a", "b", "c", "d", "e", "f", "g"];
+    const routes = Object.fromEntries(
+      names.map((n) => [`GET /repos/o/${n}/pulls`, () => ({ json: [pull(1, "alice")] })]),
+    );
+    const { fetchImpl, calls } = fakeFetch(routes);
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    const open = await client.listOpenPullRequestsByAuthor(
+      "ghs_x",
+      names.map((name) => ({ owner: "o", name })),
+      "alice",
+    );
+    expect(open.map((p) => p.repo)).toEqual(names);
+    expect(calls).toHaveLength(names.length);
+  });
+  it("collects the author's open pull requests across repositories", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      "GET /repos/o/a/pulls": () => ({ json: [pull(1, "alice"), pull(2, "bob"), pull(4, null)] }),
+      "GET /repos/o/b/pulls": () => ({ json: [pull(3, "alice")] }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    const open = await client.listOpenPullRequestsByAuthor(
+      "ghs_x",
+      [
+        { owner: "o", name: "a" },
+        { owner: "o", name: "b" },
+      ],
+      "alice",
+    );
+    expect(open).toEqual([
+      {
+        owner: "o",
+        repo: "a",
+        number: 1,
+        title: "PR 1",
+        headRef: "feat-1",
+        headSha: "sha-1",
+        updatedAt: "2026-01-01T00:00:00Z",
+        htmlUrl: "https://github.com/pull/1",
+      },
+      {
+        owner: "o",
+        repo: "b",
+        number: 3,
+        title: "PR 3",
+        headRef: "feat-3",
+        headSha: "sha-3",
+        updatedAt: "2026-01-01T00:00:00Z",
+        htmlUrl: "https://github.com/pull/3",
+      },
+    ]);
+    expect(calls[0]!.url).toContain("state=open");
   });
 });
 
