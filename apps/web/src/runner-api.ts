@@ -68,6 +68,7 @@ export async function claimJob(request: Request, deps: ClaimDeps): Promise<Respo
     totalMs: DEFAULT_CLAIM_POLL_TOTAL_MS,
   };
   const deadline = now().getTime() + totalMs;
+  await requeueStaleJobs(deps.db, { now: now() });
 
   for (;;) {
     const claimed = await claimNextJob(deps.db, {
@@ -107,7 +108,6 @@ export async function claimJob(request: Request, deps: ClaimDeps): Promise<Respo
       return Response.json(body, { status: 200 });
     }
 
-    await requeueStaleJobs(deps.db, { now: now() });
     if (now().getTime() + intervalMs >= deadline) return new Response(null, { status: 204 });
     await sleep(intervalMs);
   }
