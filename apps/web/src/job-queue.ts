@@ -8,6 +8,11 @@ export type Run = typeof run.$inferSelect;
 
 export const DEFAULT_STALE_AFTER_SECONDS = 300;
 
+const queuedSibling = sql`exists (select 1
+                                  from ${job} waiting
+                                  where waiting.armed_pr_id = ${job.armedPrId}
+                                    and waiting.state = 'queued')`;
+
 export async function claimNextJob(
   db: Db,
   input: { runnerId: string; userId: string; now: Date },
@@ -68,10 +73,13 @@ export async function requeueStaleJobs(
     .update(job)
     .set({
       state: sql`(case
-                    when exists (select 1
-                                 from ${job} waiting
-                                 where waiting.armed_pr_id = ${job.armedPrId}
-                                   and waiting.state = 'queued')
+                    when ${queuedSibling}
+                      or exists (select 1
+                                 from ${job} newer
+                                 where newer.armed_pr_id = ${job.armedPrId}
+                                   and newer.state = 'claimed'
+                                   and newer.heartbeat_at < ${cutoff}
+                                   and (newer.created_at, newer.id) > (${job.createdAt}, ${job.id}))
                     then 'failed'
                     else 'queued'
                   end)::job_state`,
@@ -96,6 +104,33 @@ export async function requeueStaleJobs(
       ),
     );
   return swept.length;
+}
+
+export async function releaseJob(
+  db: Db,
+  input: { jobId: string; runId: string; runnerId: string; error: string; now: Date },
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx
+      .update(job)
+      .set({
+        state: sql`(case when ${queuedSibling} then 'failed' else 'queued' end)::job_state`,
+        claimedByRunnerId: null,
+        claimedAt: null,
+        heartbeatAt: null,
+      })
+      .where(
+        and(
+          eq(job.id, input.jobId),
+          eq(job.claimedByRunnerId, input.runnerId),
+          eq(job.state, "claimed"),
+        ),
+      );
+    await tx
+      .update(run)
+      .set({ status: "error", error: input.error, endedAt: input.now })
+      .where(and(eq(run.id, input.runId), eq(run.status, "running")));
+  });
 }
 
 export async function createRun(db: Db, input: { jobId: string; runnerId: string }): Promise<Run> {
@@ -137,34 +172,37 @@ export async function completeRun(
     error?: string;
   },
 ): Promise<Run | undefined> {
-  const [completed] = await db
-    .update(run)
-    .set({
-      status: input.status,
-      turns: input.turns,
-      result: input.status === "ok" ? (input.result ?? null) : null,
-      error: input.error ?? null,
-      endedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(run.id, input.runId),
-        eq(run.runnerId, input.runnerId),
-        eq(run.status, "running"),
-        sql`exists (select 1
-                    from ${job} claim
-                    where claim.id = ${run.jobId}
-                      and claim.state = 'claimed'
-                      and claim.claimed_by_runner_id = ${input.runnerId})`,
-      ),
-    )
-    .returning();
-  if (!completed) return undefined;
+  return db.transaction(async (tx) => {
+    const [claimed] = await tx
+      .update(job)
+      .set({ state: input.status === "ok" ? "done" : "failed" })
+      .where(
+        and(
+          eq(job.claimedByRunnerId, input.runnerId),
+          eq(job.state, "claimed"),
+          sql`${job.id} = (select owner.job_id
+                           from ${run} owner
+                           where owner.id = ${input.runId}
+                             and owner.runner_id = ${input.runnerId}
+                             and owner.status = 'running')`,
+        ),
+      )
+      .returning({ id: job.id });
+    if (!claimed) return undefined;
 
-  await db
-    .update(job)
-    .set({ state: input.status === "ok" ? "done" : "failed" })
-    .where(eq(job.id, completed.jobId));
-
-  return completed;
+    const [completed] = await tx
+      .update(run)
+      .set({
+        status: input.status,
+        turns: input.turns,
+        result: input.status === "ok" ? (input.result ?? null) : null,
+        error: input.error ?? null,
+        endedAt: new Date(),
+      })
+      .where(
+        and(eq(run.id, input.runId), eq(run.runnerId, input.runnerId), eq(run.status, "running")),
+      )
+      .returning();
+    return completed;
+  });
 }

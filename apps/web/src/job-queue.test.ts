@@ -211,6 +211,46 @@ describe("requeueStaleJobs", () => {
     expect(rows.find((row) => row.id === fresh.id)?.state).toBe("queued");
   });
 
+  it("requeues only the newest of two stale claims for one pull request", async () => {
+    const older = await enqueue("armed-1", minutesBefore(20));
+    await claim("runner-1");
+    const newer = await enqueue("armed-1", minutesBefore(10));
+    await claim("runner-2");
+    await db
+      .update(schema.job)
+      .set({ heartbeatAt: minutesBefore(6), createdAt: minutesBefore(20) })
+      .where(eq(schema.job.id, older.id));
+    await db
+      .update(schema.job)
+      .set({ heartbeatAt: minutesBefore(6), createdAt: minutesBefore(10) })
+      .where(eq(schema.job.id, newer.id));
+
+    expect(await requeueStaleJobs(db, { now })).toBe(2);
+
+    const rows = await db.select().from(schema.job).where(eq(schema.job.armedPrId, "armed-1"));
+    expect(rows.find((row) => row.id === newer.id)?.state).toBe("queued");
+    expect(rows.find((row) => row.id === older.id)).toMatchObject({
+      state: "failed",
+      claimedByRunnerId: null,
+      claimedAt: null,
+      heartbeatAt: null,
+    });
+  });
+
+  it("requeues stale claims of unrelated pull requests side by side", async () => {
+    const one = await enqueue("armed-1", minutesBefore(20));
+    await claim("runner-1");
+    const two = await enqueue("armed-2", minutesBefore(10));
+    await claim("runner-2");
+    await db.update(schema.job).set({ heartbeatAt: minutesBefore(6) });
+
+    expect(await requeueStaleJobs(db, { now })).toBe(2);
+
+    const rows = await db.select().from(schema.job);
+    expect(rows.find((row) => row.id === one.id)?.state).toBe("queued");
+    expect(rows.find((row) => row.id === two.id)?.state).toBe("queued");
+  });
+
   it("honours a custom staleness window", async () => {
     const stale = await enqueue("armed-1", minutesBefore(10));
     await claim();
@@ -330,6 +370,48 @@ describe("createRun and completeRun", () => {
     expect(row).toMatchObject({ status: "running", result: null, endedAt: null });
     const [jobRow] = await db.select().from(schema.job).where(eq(schema.job.id, claimed.id));
     expect(jobRow?.state).toBe("claimed");
+  });
+
+  it("changes nothing when the job is no longer claimed", async () => {
+    const claimed = await enqueue("armed-1", minutesBefore(10));
+    await claim();
+    const created = await createRun(db, { jobId: claimed.id, runnerId: "runner-1" });
+    await db
+      .update(schema.job)
+      .set({ state: "queued", claimedByRunnerId: null })
+      .where(eq(schema.job.id, claimed.id));
+
+    expect(
+      await completeRun(db, {
+        runId: created.id,
+        runnerId: "runner-1",
+        status: "ok",
+        turns: 1,
+        result: reviewResult,
+      }),
+    ).toBeUndefined();
+
+    const [row] = await db.select().from(schema.run).where(eq(schema.run.id, created.id));
+    expect(row).toMatchObject({ status: "running", endedAt: null });
+  });
+
+  it("leaves another job claimed by the same runner untouched", async () => {
+    const mine = await enqueue("armed-1", minutesBefore(10));
+    await claim("runner-1");
+    const created = await createRun(db, { jobId: mine.id, runnerId: "runner-1" });
+    const other = await enqueue("armed-2", minutesBefore(5));
+    await claim("runner-1");
+
+    await completeRun(db, {
+      runId: created.id,
+      runnerId: "runner-1",
+      status: "ok",
+      turns: 1,
+      result: reviewResult,
+    });
+
+    const [row] = await db.select().from(schema.job).where(eq(schema.job.id, other.id));
+    expect(row?.state).toBe("claimed");
   });
 });
 

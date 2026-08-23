@@ -119,6 +119,27 @@ describe("claimJob", () => {
     expect(run).toMatchObject({ jobId: queued.id, runnerId, status: "running" });
   });
 
+  it("releases the job when the installation token cannot be minted", async () => {
+    const queued = await enqueue();
+    github.installationTokenById = vi.fn(async () => {
+      throw new Error("github is down");
+    });
+
+    const response = await claimJob(request("/api/runner/jobs"), claimDeps());
+
+    expect(response.status).toBe(500);
+
+    const [job] = await db.select().from(schema.job).where(eq(schema.job.id, queued.id));
+    expect(job).toMatchObject({
+      state: "queued",
+      claimedByRunnerId: null,
+      claimedAt: null,
+      heartbeatAt: null,
+    });
+    const [run] = await db.select().from(schema.run).where(eq(schema.run.jobId, queued.id));
+    expect(run).toMatchObject({ status: "error", error: "installation token" });
+  });
+
   it("uses the user's settings when they exist", async () => {
     await enqueue();
     await db.insert(schema.userSettings).values({

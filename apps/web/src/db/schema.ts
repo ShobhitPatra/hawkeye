@@ -13,6 +13,8 @@ import {
 } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
 
+export const DEFAULT_MAX_TURNS = 40;
+export const DEFAULT_WALL_CLOCK_MINUTES = 15;
 export const DEFAULT_QUIET_WINDOW_SECONDS = 180;
 
 export * from "./auth-schema";
@@ -186,8 +188,8 @@ export const userSettings = pgTable("user_settings", {
     .primaryKey()
     .references(() => user.id),
   promptOverride: text("prompt_override"),
-  maxTurns: integer("max_turns").notNull().default(40),
-  wallClockMinutes: integer("wall_clock_min").notNull().default(15),
+  maxTurns: integer("max_turns").notNull().default(DEFAULT_MAX_TURNS),
+  wallClockMinutes: integer("wall_clock_min").notNull().default(DEFAULT_WALL_CLOCK_MINUTES),
   quietWindowSeconds: integer("quiet_window_s").notNull().default(DEFAULT_QUIET_WINDOW_SECONDS),
   reviewDrafts: boolean("review_drafts").notNull().default(false),
 });

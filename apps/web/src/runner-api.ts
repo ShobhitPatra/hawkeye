@@ -9,19 +9,25 @@ import {
 } from "@hawkeye/core";
 import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
-import { armedPr, job, run, userSettings } from "./db/schema";
+import {
+  armedPr,
+  DEFAULT_MAX_TURNS,
+  DEFAULT_WALL_CLOCK_MINUTES,
+  job,
+  run,
+  userSettings,
+} from "./db/schema";
 import {
   claimNextJob,
   completeRun,
   createRun,
   heartbeatJob,
   holdsJobClaim,
+  releaseJob,
   requeueStaleJobs,
 } from "./job-queue";
 import { requireRunner } from "./runner-auth";
 
-export const DEFAULT_MAX_TURNS = 40;
-export const DEFAULT_WALL_CLOCK_MINUTES = 15;
 export const DEFAULT_CLAIM_POLL_INTERVAL_MS = 2_000;
 export const DEFAULT_CLAIM_POLL_TOTAL_MS = 25_000;
 
@@ -74,8 +80,20 @@ export async function claimJob(request: Request, deps: ClaimDeps): Promise<Respo
       const [armed] = await deps.db.select().from(armedPr).where(eq(armedPr.id, claimed.armedPrId));
       if (!armed) throw new Error(`job ${claimed.id} has no armed pull request`);
 
-      const installationToken = await deps.github.installationTokenById(armed.installationId);
       const created = await createRun(deps.db, { jobId: claimed.id, runnerId: runner.id });
+      let installationToken: string;
+      try {
+        installationToken = await deps.github.installationTokenById(armed.installationId);
+      } catch {
+        await releaseJob(deps.db, {
+          jobId: claimed.id,
+          runId: created.id,
+          runnerId: runner.id,
+          error: "installation token",
+          now: now(),
+        });
+        return Response.json({ error: "installation token" }, { status: 500 });
+      }
       const body: ClaimedJob = {
         job: {
           id: claimed.id,
