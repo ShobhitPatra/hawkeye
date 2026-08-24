@@ -26,6 +26,7 @@ import {
   releaseJob,
   requeueStaleJobs,
 } from "./job-queue";
+import { postReviewForRun } from "./review-posting";
 import { requireRunner } from "./runner-auth";
 
 export const DEFAULT_CLAIM_POLL_INTERVAL_MS = 2_000;
@@ -39,7 +40,7 @@ export type ClaimDeps = {
   poll?: { intervalMs: number; totalMs: number };
 };
 
-export type RunnerApiDeps = { db: Db };
+export type RunnerApiDeps = { db: Db; github: GitHubClient };
 
 function claimLost(): Response {
   return Response.json({ error: "job is no longer claimed by this runner" }, { status: 409 });
@@ -186,7 +187,7 @@ function isRunResultStatus(value: unknown): value is RunResultStatus {
 function parseRunResultReport(payload: unknown): RunResultReport {
   if (typeof payload !== "object" || payload === null)
     throw new Error("a result must be an object");
-  const { status, turns, result, error } = payload as Record<string, unknown>;
+  const { status, turns, result, error, commentable } = payload as Record<string, unknown>;
   if (!isRunResultStatus(status))
     throw new Error(`status must be one of ${RUN_RESULT_STATUSES.join(", ")}`);
   if (!Number.isInteger(turns) || (turns as number) < 0)
@@ -200,7 +201,21 @@ function parseRunResultReport(payload: unknown): RunResultReport {
     turns: turns as number,
     ...(status === "ok" ? { result: parseReviewResult(result) } : {}),
     ...(error ? { error: error as string } : {}),
+    ...(commentable === undefined ? {} : { commentable: parseCommentable(commentable) }),
   };
+}
+
+function parseCommentable(payload: unknown): Record<string, number[]> {
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload))
+    throw new Error("commentable must be an object of line arrays");
+  for (const lines of Object.values(payload as Record<string, unknown>)) {
+    if (
+      !Array.isArray(lines) ||
+      !lines.every((line) => Number.isInteger(line) && (line as number) >= 0)
+    )
+      throw new Error("commentable lines must be arrays of non-negative integers");
+  }
+  return payload as Record<string, number[]>;
 }
 
 export async function recordResult(
@@ -231,5 +246,21 @@ export async function recordResult(
 
   const completed = await completeRun(deps.db, { runId, runnerId: runner.id, ...report });
   if (!completed) return claimLost();
-  return Response.json({ ok: true }, { status: 200 });
+  const { result } = report;
+  if (report.status !== "ok" || !result) return Response.json({ ok: true }, { status: 200 });
+
+  const [target] = await deps.db
+    .select({ headSha: job.headSha, armedPr })
+    .from(job)
+    .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
+    .where(eq(job.id, completed.jobId));
+  if (!target) throw new Error(`run ${runId} has no armed pull request`);
+  const posted = await postReviewForRun(deps, {
+    runId,
+    armedPr: target.armedPr,
+    headSha: target.headSha,
+    result,
+    commentable: report.commentable ?? {},
+  });
+  return Response.json({ ok: true, posted }, { status: 200 });
 }
