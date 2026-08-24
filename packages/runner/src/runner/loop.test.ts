@@ -105,7 +105,11 @@ async function deps(
     harness,
     createWorktree: (async (i: { directory: string }) => {
       await mkdir(i.directory, { recursive: true });
-      return { path: i.directory, diff: "diff", remove: async () => {} };
+      return {
+        path: i.directory,
+        diff: "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1,1 +1,2 @@\n one\n+two\n",
+        remove: async () => {},
+      };
     }) as never,
     readRepositoryRules: async () => [],
     createRunDirectory: async (reference) => {
@@ -153,7 +157,7 @@ describe("runRunnerLoop", () => {
     expect(result).toMatchObject({
       method: "POST",
       authorization: "Bearer hk_1",
-      body: { status: "ok", turns: 1, result: review },
+      body: { status: "ok", turns: 1, result: review, commentable: { "a.txt": [1, 2] } },
     });
     expect(plane.received.some((r) => r.url === "/api/runner/runs/run-1/events")).toBe(true);
     expect(d.logged).toContain("job claimed: o/r#7 head aaaaaaa");

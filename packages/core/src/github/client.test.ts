@@ -105,7 +105,7 @@ describe("createGitHubClient", () => {
         json: [{ user: { login: "hawkeye-review[bot]" }, body: "<!-- hawkeye: head=aa -->" }],
       }),
       "POST /repos/o/r/pulls/5/reviews": () => ({
-        json: { html_url: "https://github.com/o/r/pull/5#pullrequestreview-1" },
+        json: { html_url: "https://github.com/o/r/pull/5#pullrequestreview-1", id: 1 },
       }),
     });
     const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
@@ -118,6 +118,7 @@ describe("createGitHubClient", () => {
       "t",
     );
     expect(posted.url).toContain("pullrequestreview-1");
+    expect(posted.id).toBe("1");
     expect(JSON.parse(String(calls[1]!.init.body))).toEqual({
       event: "COMMENT",
       commit_id: "aa",
@@ -156,6 +157,17 @@ describe("createGitHubClient", () => {
     expect(calls).toHaveLength(2);
     expect(calls[0]!.url).toContain("per_page=100");
     expect(calls[1]!.url).toContain("page=2");
+  });
+  it("rejects a posted review without a numeric id", async () => {
+    const { fetchImpl } = fakeFetch({
+      "POST /repos/o/r/pulls/5/reviews": () => ({
+        json: { html_url: "https://github.com/o/r/pull/5#pullrequestreview-1", id: "1" },
+      }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(
+      client.postReview(ref, { event: "COMMENT", commit_id: "aa", body: "b", comments: [] }, "t"),
+    ).rejects.toThrow(/review id/);
   });
   it("rejects a posted review without a url", async () => {
     const { fetchImpl } = fakeFetch({

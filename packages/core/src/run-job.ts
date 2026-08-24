@@ -1,6 +1,7 @@
 import { fetchLinkedIssue, fetchPullRequestDetails } from "./github/client.js";
 import type { PullRequestReference } from "./github/pull-request-reference.js";
 import type { HarnessSpec } from "./harness/harness.js";
+import { commentableLines } from "./review/diff-lines.js";
 import { runReviewPipeline } from "./review-pipeline.js";
 import type { RunResultStatus } from "./runner/protocol.js";
 import type { ReviewResult } from "./contract/schema.js";
@@ -25,7 +26,7 @@ export type RunReviewJobDependencies = {
   onTurn?(turns: number): void;
 };
 export type RunReviewJobOutcome =
-  | { status: "ok"; turns: number; result: ReviewResult }
+  | { status: "ok"; turns: number; result: ReviewResult; commentable: Record<string, number[]> }
   | { status: Exclude<RunResultStatus, "ok">; turns: number; error: string };
 
 export async function runReviewJob(
@@ -66,6 +67,17 @@ export async function runReviewJob(
     deps,
   );
   return outcome.status === "ok"
-    ? { status: "ok", turns: outcome.turns, result: outcome.result }
+    ? {
+        status: "ok",
+        turns: outcome.turns,
+        result: outcome.result,
+        commentable: toCommentableRecord(commentableLines(outcome.diff)),
+      }
     : { status: outcome.status, turns: outcome.turns, error: outcome.error };
+}
+
+function toCommentableRecord(lines: Map<string, Set<number>>): Record<string, number[]> {
+  return Object.fromEntries(
+    [...lines].map(([path, set]) => [path, [...set].sort((a, b) => a - b)]),
+  );
 }

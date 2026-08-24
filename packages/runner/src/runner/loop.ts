@@ -81,7 +81,12 @@ async function reportFor(
     },
   );
   return outcome.status === "ok"
-    ? { status: "ok", turns: outcome.turns, result: outcome.result }
+    ? {
+        status: "ok",
+        turns: outcome.turns,
+        result: outcome.result,
+        commentable: outcome.commentable,
+      }
     : { status: outcome.status, turns: outcome.turns, error: outcome.error };
 }
 

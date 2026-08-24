@@ -7,6 +7,7 @@ import {
   createClaudeCodeHarness,
   createGitHubClient,
   createWorktree,
+  HAWKEYE_REPOSITORY_URL,
   parsePullRequestReference,
   readRepositoryRules,
   runReview,
@@ -21,7 +22,6 @@ const CONFIG_PATH = join(homedir(), ".config", "hawkeye", "config.json");
 const RUNNER_CONFIG_PATH = join(homedir(), ".config", "hawkeye", "runner.json");
 const DEFAULT_CONTRACT_PATH = join(homedir(), ".config", "hawkeye", "contract.md");
 const RUNS_ROOT = join(homedir(), ".cache", "hawkeye", "runs");
-const REPOSITORY_URL = "https://github.com/ShobhitPatra/hawkeye";
 
 function positiveInteger(flag: string, value: string): number {
   if (!/^\d+$/.test(value) || Number(value) <= 0) {
@@ -120,7 +120,7 @@ export function createProgram(io: {
             {
               reference,
               botLogin: `${config.appSlug}[bot]`,
-              repositoryUrl: REPOSITORY_URL,
+              repositoryUrl: HAWKEYE_REPOSITORY_URL,
               runDirectory: directory,
               maxTurns,
               wallClockMs: wallClockMinutes * 60_000,

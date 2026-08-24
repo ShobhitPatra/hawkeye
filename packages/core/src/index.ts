@@ -20,6 +20,13 @@ export {
   type RunReviewOutcome,
 } from "./run.js";
 export type { RenderedReview } from "./review/render.js";
+export { renderReview, type RenderInput } from "./review/render.js";
+export {
+  postRenderedReview,
+  type PostRenderedReviewInput,
+  type PostedReview,
+} from "./review/post.js";
+export { HAWKEYE_REPOSITORY_URL } from "./repository-url.js";
 export type { ReviewResult, Finding, Severity, Lens } from "./contract/schema.js";
 export { parseReviewResult } from "./contract/schema.js";
 export {
