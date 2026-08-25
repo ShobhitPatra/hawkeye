@@ -1,5 +1,5 @@
 import { randomBytes, randomInt } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, gt, isNull, lte } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { runnerLogin } from "./db/schema";
 import { createRunnerToken, hashRunnerToken } from "./runner-tokens";
@@ -52,6 +52,7 @@ export async function startRunnerLogin(
   const code = mintCode();
   const deviceSecret = mintDeviceSecret();
   const expiresAt = new Date(now.getTime() + RUNNER_LOGIN_TTL_MS);
+  await db.delete(runnerLogin).where(lte(runnerLogin.expiresAt, now));
   await db.insert(runnerLogin).values({
     code,
     deviceSecretHash: hashRunnerToken(deviceSecret),
@@ -62,26 +63,56 @@ export async function startRunnerLogin(
   return { code, deviceSecret, expiresAt };
 }
 
+export async function findRunnerLogin(
+  db: Db,
+  input: { code: string; now?: Date },
+): Promise<{ runnerName: string; createdAt: Date; state: "pending" | "approved" | "expired" }> {
+  const now = input.now ?? new Date();
+  const code = normalizeRunnerLoginCode(input.code);
+  const [login] = await db.select().from(runnerLogin).where(eq(runnerLogin.code, code));
+  if (!login) throw new Error("unknown login code");
+  const state = login.approvedAt
+    ? "approved"
+    : login.expiresAt.getTime() <= now.getTime()
+      ? "expired"
+      : "pending";
+  return { runnerName: login.runnerName, createdAt: login.createdAt, state };
+}
+
 export async function approveRunnerLogin(
   db: Db,
   input: { userId: string; code: string; now?: Date },
 ): Promise<{ runnerName: string }> {
   const now = input.now ?? new Date();
   const code = normalizeRunnerLoginCode(input.code);
-  const [login] = await db.select().from(runnerLogin).where(eq(runnerLogin.code, code));
-  if (!login) throw new Error("unknown login code");
-  if (login.approvedAt) throw new Error("this login code was already approved");
-  if (login.expiresAt.getTime() <= now.getTime()) throw new Error("this login code has expired");
-
-  const { runner, token } = await createRunnerToken(db, {
-    userId: input.userId,
-    name: login.runnerName,
+  return db.transaction(async (tx) => {
+    const [claimed] = await tx
+      .update(runnerLogin)
+      .set({ approvedAt: now, userId: input.userId })
+      .where(
+        and(
+          eq(runnerLogin.code, code),
+          isNull(runnerLogin.approvedAt),
+          gt(runnerLogin.expiresAt, now),
+        ),
+      )
+      .returning();
+    if (!claimed) {
+      const [login] = await tx.select().from(runnerLogin).where(eq(runnerLogin.code, code));
+      if (!login) throw new Error("unknown login code");
+      if (login.approvedAt) throw new Error("this login code was already approved");
+      throw new Error("this login code has expired");
+    }
+    const { runner, token } = await createRunnerToken(tx, {
+      userId: input.userId,
+      name: claimed.runnerName,
+    });
+    await tx
+      .update(runnerLogin)
+      .set({ runnerId: runner.id, token })
+      .where(eq(runnerLogin.id, claimed.id));
+    return { runnerName: runner.name };
   });
-  await db
-    .update(runnerLogin)
-    .set({ userId: input.userId, runnerId: runner.id, token, approvedAt: now })
-    .where(eq(runnerLogin.id, login.id));
-  return { runnerName: runner.name };
 }
 
 export async function collectRunnerLogin(
@@ -89,20 +120,23 @@ export async function collectRunnerLogin(
   input: { deviceSecret: string; now?: Date },
 ): Promise<CollectRunnerLoginResult> {
   const now = input.now ?? new Date();
-  const [login] = await db
-    .select()
-    .from(runnerLogin)
-    .where(eq(runnerLogin.deviceSecretHash, hashRunnerToken(input.deviceSecret)));
-  if (!login) return { status: "expired" };
-  if (!login.approvedAt) {
-    return login.expiresAt.getTime() <= now.getTime()
-      ? { status: "expired" }
-      : { status: "pending" };
-  }
-  if (!login.token) return { status: "expired" };
-  await db
-    .update(runnerLogin)
-    .set({ token: null, collectedAt: now })
-    .where(eq(runnerLogin.id, login.id));
-  return { status: "approved", token: login.token };
+  const secretHash = hashRunnerToken(input.deviceSecret);
+  return db.transaction(async (tx) => {
+    const [login] = await tx
+      .select()
+      .from(runnerLogin)
+      .where(eq(runnerLogin.deviceSecretHash, secretHash))
+      .for("update");
+    if (!login) return { status: "expired" };
+    if (login.token) {
+      await tx
+        .update(runnerLogin)
+        .set({ token: null, collectedAt: now })
+        .where(eq(runnerLogin.id, login.id));
+      return { status: "approved", token: login.token };
+    }
+    if (login.approvedAt || login.expiresAt.getTime() <= now.getTime())
+      return { status: "expired" };
+    return { status: "pending" };
+  });
 }

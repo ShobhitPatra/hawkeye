@@ -5,6 +5,7 @@ import * as schema from "./db/schema";
 import {
   approveRunnerLogin,
   collectRunnerLogin,
+  findRunnerLogin,
   formatRunnerLoginCode,
   normalizeRunnerLoginCode,
   RUNNER_LOGIN_TTL_MS,
@@ -129,5 +130,32 @@ describe("collectRunnerLogin", () => {
     expect(await collectRunnerLogin(db, { deviceSecret, now: later })).toEqual({
       status: "expired",
     });
+  });
+});
+
+describe("findRunnerLogin", () => {
+  it("describes a pending, approved or expired code and rejects an unknown one", async () => {
+    const { code } = await startRunnerLogin(db, { runnerName: "laptop", now });
+    expect(await findRunnerLogin(db, { code, now })).toEqual({
+      runnerName: "laptop",
+      createdAt: now,
+      state: "pending",
+    });
+    expect((await findRunnerLogin(db, { code, now: later })).state).toBe("expired");
+    await approveRunnerLogin(db, { userId: "user-1", code, now });
+    expect((await findRunnerLogin(db, { code, now })).state).toBe("approved");
+    await expect(findRunnerLogin(db, { code: "AAAA-AAAA", now })).rejects.toThrow(
+      "unknown login code",
+    );
+  });
+});
+
+describe("sweep", () => {
+  it("deletes expired logins when a new one starts", async () => {
+    const { code } = await startRunnerLogin(db, { runnerName: "old", now });
+    await startRunnerLogin(db, { runnerName: "new", now: later });
+    const rows = await db.select().from(schema.runnerLogin);
+    expect(rows.map((row) => row.runnerName)).toEqual(["new"]);
+    await expect(findRunnerLogin(db, { code, now: later })).rejects.toThrow("unknown login code");
   });
 });
