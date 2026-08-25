@@ -156,6 +156,16 @@ describe("sweep", () => {
     await startRunnerLogin(db, { runnerName: "new", now: later });
     const rows = await db.select().from(schema.runnerLogin);
     expect(rows.map((row) => row.runnerName)).toEqual(["new"]);
+    const { code: parked } = await startRunnerLogin(db, { runnerName: "parked", now: later });
+    await approveRunnerLogin(db, { userId: "user-1", code: parked, now: later });
+    await startRunnerLogin(db, {
+      runnerName: "newer",
+      now: new Date(later.getTime() + RUNNER_LOGIN_TTL_MS),
+    });
+    expect((await db.select().from(schema.runnerLogin)).map((row) => row.runnerName)).toEqual([
+      "parked",
+      "newer",
+    ]);
     await expect(findRunnerLogin(db, { code, now: later })).rejects.toThrow("unknown login code");
   });
 });

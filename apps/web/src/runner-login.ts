@@ -52,7 +52,9 @@ export async function startRunnerLogin(
   const code = mintCode();
   const deviceSecret = mintDeviceSecret();
   const expiresAt = new Date(now.getTime() + RUNNER_LOGIN_TTL_MS);
-  await db.delete(runnerLogin).where(lte(runnerLogin.expiresAt, now));
+  await db
+    .delete(runnerLogin)
+    .where(and(lte(runnerLogin.expiresAt, now), isNull(runnerLogin.token)));
   await db.insert(runnerLogin).values({
     code,
     deviceSecretHash: hashRunnerToken(deviceSecret),
