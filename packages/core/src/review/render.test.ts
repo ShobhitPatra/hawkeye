@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LENSES, type ReviewResult } from "../contract/schema.js";
+import { LENSES, type ReviewResult, VERDICTS } from "../contract/schema.js";
 import { renderReview } from "./render.js";
 
 const base = (): ReviewResult => ({
@@ -47,17 +47,12 @@ describe("renderReview", () => {
       r.body.indexOf("Mostly fine."),
     );
   });
-  it("renders each verdict as its label", () => {
-    const labels = {
-      ship: "ship",
-      mergeable: "mergeable",
-      changes_needed: "changes needed",
-      blocked: "blocked",
-    } as const;
-    for (const [verdict, label] of Object.entries(labels)) {
+  it("renders every verdict as a heading without underscores", () => {
+    for (const verdict of VERDICTS) {
       const i = input();
-      i.result.verdict = verdict as keyof typeof labels;
-      expect(renderReview(i).body).toContain(`## <small>Verdict:</small> ${label}\n`);
+      i.result.verdict = verdict;
+      const heading = /^## <small>Verdict:<\/small> (.+)$/m.exec(renderReview(i).body)?.[1];
+      expect(heading).toBe(verdict.replaceAll("_", " "));
     }
   });
   it("orders marker, verdict, findings, lens details and footer", () => {
