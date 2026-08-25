@@ -12,12 +12,14 @@ export async function createRunnerAction(
   formData: FormData,
 ): Promise<CreateRunnerState> {
   const session = await requireSession();
-  const name = String(formData.get("name") ?? "").trim();
-  if (!name) return { error: "A runner needs a name." };
-
-  const { token } = await createRunnerToken(getDb(), { userId: session.user.id, name });
-  revalidatePath("/runners");
-  return { token };
+  const name = String(formData.get("name") ?? "");
+  try {
+    const { token } = await createRunnerToken(getDb(), { userId: session.user.id, name });
+    revalidatePath("/runners");
+    return { token };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "could not create the runner" };
+  }
 }
 
 export async function revokeRunnerAction(formData: FormData) {

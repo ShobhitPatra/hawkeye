@@ -1,9 +1,10 @@
 import type { Db } from "./db/client";
+import { normalizeRunnerName } from "./runner-tokens";
 import {
   collectRunnerLogin,
   formatRunnerLoginCode,
-  normalizeRunnerName,
   startRunnerLogin,
+  TooManyRunnerLoginsError,
 } from "./runner-login";
 
 export const RUNNER_LOGIN_POLL_INTERVAL_SECONDS = 5;
@@ -29,7 +30,15 @@ export async function startLogin(request: Request, deps: RunnerLoginApiDeps): Pr
     );
   }
   const now = deps.now?.() ?? new Date();
-  const { code, deviceSecret, expiresAt } = await startRunnerLogin(deps.db, { runnerName, now });
+  let started: Awaited<ReturnType<typeof startRunnerLogin>>;
+  try {
+    started = await startRunnerLogin(deps.db, { runnerName, now });
+  } catch (error) {
+    if (error instanceof TooManyRunnerLoginsError)
+      return Response.json({ error: error.message }, { status: 429 });
+    throw error;
+  }
+  const { code, deviceSecret, expiresAt } = started;
   const verifyUrl = `${deps.siteUrl}/connect?code=${formatRunnerLoginCode(code)}`;
   return Response.json(
     {

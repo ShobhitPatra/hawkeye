@@ -7,6 +7,7 @@ import {
   collectRunnerLogin,
   findRunnerLogin,
   formatRunnerLoginCode,
+  MAX_OPEN_RUNNER_LOGINS,
   normalizeRunnerLoginCode,
   RUNNER_LOGIN_TTL_MS,
   startRunnerLogin,
@@ -47,6 +48,20 @@ describe("startRunnerLogin", () => {
   it("rejects a name with other characters", async () => {
     for (const runnerName of ["lap\ntop", "-x", "x".repeat(65)])
       await expect(startRunnerLogin(db, { runnerName })).rejects.toThrow();
+  });
+
+  it("refuses a new login once too many are open", async () => {
+    await db.insert(schema.runnerLogin).values(
+      Array.from({ length: MAX_OPEN_RUNNER_LOGINS }, (_, index) => ({
+        code: index.toString(36).padStart(8, "0").toUpperCase(),
+        deviceSecretHash: `hash-${index}`,
+        runnerName: "flood",
+        expiresAt: later,
+      })),
+    );
+    await expect(startRunnerLogin(db, { runnerName: "laptop", now })).rejects.toThrow(
+      "too many logins",
+    );
   });
 
   it("rejects a blank name", async () => {

@@ -1,26 +1,21 @@
 import { randomBytes, randomInt } from "node:crypto";
-import { and, eq, gt, isNull, lte } from "drizzle-orm";
+import { and, count, eq, gt, isNull, lte } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { runnerLogin } from "./db/schema";
-import { createRunnerToken, hashRunnerToken } from "./runner-tokens";
+import { createRunnerToken, hashRunnerToken, normalizeRunnerName } from "./runner-tokens";
 
 export const RUNNER_LOGIN_TTL_MS = 10 * 60 * 1000;
+export const MAX_OPEN_RUNNER_LOGINS = 1000;
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 8;
 const DEVICE_SECRET_PREFIX = "hkd_";
 const DEVICE_SECRET_BYTES = 32;
-const RUNNER_NAME_MAX_LENGTH = 64;
-const RUNNER_NAME = /^[A-Za-z0-9][A-Za-z0-9 ._-]*$/;
-
-export function normalizeRunnerName(input: string): string {
-  const name = input.trim();
-  if (!name) throw new Error("a runner needs a name");
-  if (name.length > RUNNER_NAME_MAX_LENGTH)
-    throw new Error(`a runner name is at most ${RUNNER_NAME_MAX_LENGTH} characters`);
-  if (!RUNNER_NAME.test(name))
-    throw new Error("a runner name uses letters, digits, spaces, dots, underscores and dashes");
-  return name;
+export class TooManyRunnerLoginsError extends Error {
+  constructor() {
+    super("too many logins are waiting for approval; try again in a few minutes");
+    this.name = "TooManyRunnerLoginsError";
+  }
 }
 
 export type CollectRunnerLoginResult =
@@ -68,6 +63,8 @@ export async function startRunnerLogin(
   const deviceSecret = mintDeviceSecret();
   const expiresAt = new Date(now.getTime() + RUNNER_LOGIN_TTL_MS);
   await sweepRunnerLogins(db, now);
+  const [open] = await db.select({ open: count() }).from(runnerLogin);
+  if ((open?.open ?? 0) >= MAX_OPEN_RUNNER_LOGINS) throw new TooManyRunnerLoginsError();
   await db.insert(runnerLogin).values({
     code,
     deviceSecretHash: hashRunnerToken(deviceSecret),

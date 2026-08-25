@@ -38,6 +38,9 @@ describe("createRunnerToken", () => {
     await expect(createRunnerToken(db, { userId: "user-1", name: "   " })).rejects.toThrow(
       "a runner needs a name",
     );
+    await expect(createRunnerToken(db, { userId: "user-1", name: "desk\ntop" })).rejects.toThrow(
+      "a runner name uses",
+    );
   });
 
   it("mints a distinct token per runner", async () => {
