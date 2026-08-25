@@ -35,6 +35,9 @@ export {
   type RunResultStatus,
   type RunResultReport,
   type RunEvent,
+  REVIEW_POSTING_OUTCOMES,
+  type ReviewPostingOutcome,
+  type RunResultAcknowledgement,
 } from "./runner/protocol.js";
 export {
   runReviewJob,

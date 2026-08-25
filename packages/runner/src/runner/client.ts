@@ -1,4 +1,11 @@
-import type { ClaimedJob, RunEvent, RunResultReport } from "@hawkeye/core";
+import {
+  type ClaimedJob,
+  REVIEW_POSTING_OUTCOMES,
+  type ReviewPostingOutcome,
+  type RunEvent,
+  type RunResultAcknowledgement,
+  type RunResultReport,
+} from "@hawkeye/core";
 
 export class ControlPlaneRequestError extends Error {
   constructor(
@@ -14,8 +21,19 @@ export type ControlPlaneClient = {
   claimJob(options?: { signal?: AbortSignal }): Promise<ClaimedJob | undefined>;
   heartbeat(jobId: string): Promise<void>;
   sendEvents(runId: string, events: RunEvent[]): Promise<void>;
-  sendResult(runId: string, report: RunResultReport): Promise<void>;
+  sendResult(runId: string, report: RunResultReport): Promise<RunResultAcknowledgement>;
 };
+
+function acknowledgement(payload: unknown): RunResultAcknowledgement {
+  const posted =
+    typeof payload === "object" && payload !== null
+      ? (payload as { posted?: unknown }).posted
+      : undefined;
+  if (posted === undefined) return { ok: true };
+  if (!REVIEW_POSTING_OUTCOMES.includes(posted as ReviewPostingOutcome))
+    throw new Error(`invalid result acknowledgement: posted ${String(posted)}`);
+  return { ok: true, posted: posted as ReviewPostingOutcome };
+}
 
 function invalid(field: string): never {
   throw new Error(`invalid claimed job payload: ${field}`);
@@ -110,7 +128,12 @@ export function createControlPlaneClient(input: {
       await send("POST", `/api/runner/runs/${encodeURIComponent(runId)}/events`, events);
     },
     async sendResult(runId, report) {
-      await send("POST", `/api/runner/runs/${encodeURIComponent(runId)}/result`, report);
+      const response = await send(
+        "POST",
+        `/api/runner/runs/${encodeURIComponent(runId)}/result`,
+        report,
+      );
+      return acknowledgement(await response.json());
     },
   };
 }

@@ -40,7 +40,7 @@ export type ClaimDeps = {
   poll?: { intervalMs: number; totalMs: number };
 };
 
-export type RunnerApiDeps = { db: Db; github: GitHubClient };
+export type RunnerApiDeps = { db: Db; github: GitHubClient; log?: (line: string) => void };
 
 function claimLost(): Response {
   return Response.json({ error: "job is no longer claimed by this runner" }, { status: 409 });

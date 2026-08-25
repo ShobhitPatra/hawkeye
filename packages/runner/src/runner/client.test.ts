@@ -50,11 +50,28 @@ describe("createControlPlaneClient", () => {
       "control plane GET /api/runner/jobs failed: 401 invalid runner token",
     );
   });
+  it("returns the posting outcome acknowledged for a result", async () => {
+    const { client: c } = client(() => Response.json({ ok: true, posted: "already-posted" }));
+    await expect(c.sendResult("r1", { status: "ok", turns: 1 })).resolves.toEqual({
+      ok: true,
+      posted: "already-posted",
+    });
+  });
+  it("rejects an unknown posting outcome", async () => {
+    const { client: c } = client(() => Response.json({ ok: true, posted: "maybe" }));
+    await expect(c.sendResult("r1", { status: "ok", turns: 1 })).rejects.toThrow(
+      "invalid result acknowledgement: posted maybe",
+    );
+  });
   it("posts heartbeats, events and results as JSON", async () => {
     const { fetch, client: c } = client(() => Response.json({ ok: true }));
     await c.heartbeat("j 1");
     await c.sendEvents("r1", [{ type: "turn", at: "2026-01-01T00:00:00.000Z" }]);
-    await c.sendResult("r1", { status: "error", turns: 2, error: "boom" });
+    await expect(c.sendResult("r1", { status: "error", turns: 2, error: "boom" })).resolves.toEqual(
+      {
+        ok: true,
+      },
+    );
     const calls = fetch.mock.calls.map(([url, init]) => ({
       url,
       method: init.method,

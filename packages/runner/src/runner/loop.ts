@@ -103,8 +103,9 @@ async function deliverResult(
   const delays = deps.resultRetryDelaysMs ?? DEFAULT_RESULT_RETRY_DELAYS_MS;
   for (let attempt = 0; ; attempt += 1) {
     try {
-      await deps.client.sendResult(runId, report);
+      const acknowledged = await deps.client.sendResult(runId, report);
       deps.log(`result ${report.status} after ${report.turns} turn(s)`);
+      if (acknowledged.posted !== undefined) deps.log(`review ${acknowledged.posted}`);
       return "delivered";
     } catch (error) {
       if (error instanceof ControlPlaneRequestError && error.status === 409) {

@@ -4,5 +4,9 @@ import { recordResult } from "@/runner-api";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return recordResult(request, { db: getDb(), github: createGitHubAppClient({ fetch }) }, id);
+  return recordResult(
+    request,
+    { db: getDb(), github: createGitHubAppClient({ fetch }), log: console.error },
+    id,
+  );
 }
