@@ -24,7 +24,7 @@ export default async function ConnectPage({
       <h1>Connect a runner</h1>
       <p>On the machine that holds your Claude Code login, run:</p>
       <pre>
-        <code>npx hawkeye runner login --url {siteUrl()}</code>
+        <code>node packages/runner/dist/bin.js runner login --url {siteUrl()}</code>
       </pre>
       <p>Then enter the code it shows and approve it.</p>
       {pending &&
