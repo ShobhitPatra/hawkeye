@@ -40,7 +40,6 @@ describe("startRunnerLogin", () => {
       deviceSecretHash: hashRunnerToken(login.deviceSecret),
       userId: null,
       runnerId: null,
-      token: null,
       approvedAt: null,
     });
   });
@@ -67,7 +66,7 @@ describe("codes", () => {
 });
 
 describe("approveRunnerLogin", () => {
-  it("creates a runner owned by the user and parks its token on the login", async () => {
+  it("marks the login approved for the user without creating a runner yet", async () => {
     const login = await startRunnerLogin(db, { runnerName: "laptop", now });
 
     const approved = await approveRunnerLogin(db, {
@@ -77,11 +76,9 @@ describe("approveRunnerLogin", () => {
     });
 
     expect(approved).toEqual({ runnerName: "laptop" });
-    const [runner] = await db.select().from(schema.runner);
-    expect(runner).toMatchObject({ userId: "user-1", name: "laptop" });
+    expect(await db.select().from(schema.runner)).toHaveLength(0);
     const [row] = await db.select().from(schema.runnerLogin);
-    expect(row).toMatchObject({ userId: "user-1", runnerId: runner?.id, approvedAt: now });
-    expect(row?.token).toMatch(/^hk_/);
+    expect(row).toMatchObject({ userId: "user-1", runnerId: null, approvedAt: now });
   });
 
   it("throws on an unknown, approved or expired code", async () => {
@@ -98,12 +95,12 @@ describe("approveRunnerLogin", () => {
     await expect(
       approveRunnerLogin(db, { userId: "user-1", code: login.code, now }),
     ).rejects.toThrow("this login code was already approved");
-    expect(await db.select().from(schema.runner)).toHaveLength(1);
+    expect(await db.select().from(schema.runner)).toHaveLength(0);
   });
 });
 
 describe("collectRunnerLogin", () => {
-  it("is pending until approved, then hands the token out once", async () => {
+  it("is pending until approved, then mints the runner and hands the token out once", async () => {
     const { code, deviceSecret } = await startRunnerLogin(db, { runnerName: "laptop", now });
 
     expect(await collectRunnerLogin(db, { deviceSecret, now })).toEqual({ status: "pending" });
@@ -118,8 +115,10 @@ describe("collectRunnerLogin", () => {
       .select()
       .from(schema.runnerLogin)
       .where(eq(schema.runnerLogin.code, code));
-    expect(row).toMatchObject({ token: null, collectedAt: now });
+    const [runner] = await db.select().from(schema.runner);
+    expect(row).toMatchObject({ runnerId: runner?.id, collectedAt: now });
     expect(await collectRunnerLogin(db, { deviceSecret, now })).toEqual({ status: "expired" });
+    expect(await db.select().from(schema.runner)).toHaveLength(1);
   });
 
   it("expires an unknown secret and a login past its time", async () => {
@@ -131,6 +130,16 @@ describe("collectRunnerLogin", () => {
     expect(await collectRunnerLogin(db, { deviceSecret, now: later })).toEqual({
       status: "expired",
     });
+    expect(await db.select().from(schema.runnerLogin)).toEqual([]);
+  });
+
+  it("never mints a runner for a login approved but not collected in time", async () => {
+    const { code, deviceSecret } = await startRunnerLogin(db, { runnerName: "laptop", now });
+    await approveRunnerLogin(db, { userId: "user-1", code, now });
+    expect(await collectRunnerLogin(db, { deviceSecret, now: later })).toEqual({
+      status: "expired",
+    });
+    expect(await db.select().from(schema.runner)).toHaveLength(0);
   });
 });
 
@@ -151,34 +160,14 @@ describe("findRunnerLogin", () => {
 });
 
 describe("sweep", () => {
-  it("deletes expired logins on start, collect and sweep and revokes an uncollected runner", async () => {
+  it("deletes expired logins when a new one starts or the sweep runs", async () => {
     const { code } = await startRunnerLogin(db, { runnerName: "old", now });
     await startRunnerLogin(db, { runnerName: "new", now: later });
-    const rows = await db.select().from(schema.runnerLogin);
-    expect(rows.map((row) => row.runnerName)).toEqual(["new"]);
-    expect(await findRunnerLogin(db, { code, now: later })).toBeUndefined();
-
-    const parked = await startRunnerLogin(db, { runnerName: "parked", now: later });
-    await approveRunnerLogin(db, { userId: "user-1", code: parked.code, now: later });
-    const afterLater = new Date(later.getTime() + RUNNER_LOGIN_TTL_MS);
-    expect(
-      await collectRunnerLogin(db, { deviceSecret: parked.deviceSecret, now: afterLater }),
-    ).toEqual({ status: "expired" });
     expect((await db.select().from(schema.runnerLogin)).map((row) => row.runnerName)).toEqual([
       "new",
     ]);
-    const [orphan] = await db.select().from(schema.runner).where(eq(schema.runner.name, "parked"));
-    expect(orphan?.revokedAt).toEqual(afterLater);
-
-    const idle = await startRunnerLogin(db, { runnerName: "idle", now: afterLater });
-    await approveRunnerLogin(db, { userId: "user-1", code: idle.code, now: afterLater });
-    const muchLater = new Date(afterLater.getTime() + RUNNER_LOGIN_TTL_MS);
-    await sweepRunnerLogins(db, muchLater);
+    expect(await findRunnerLogin(db, { code, now: later })).toBeUndefined();
+    await sweepRunnerLogins(db, new Date(later.getTime() + RUNNER_LOGIN_TTL_MS));
     expect(await db.select().from(schema.runnerLogin)).toEqual([]);
-    const [idleRunner] = await db
-      .select()
-      .from(schema.runner)
-      .where(eq(schema.runner.name, "idle"));
-    expect(idleRunner?.revokedAt).toEqual(muchLater);
   });
 });

@@ -1,7 +1,7 @@
 import { randomBytes, randomInt } from "node:crypto";
-import { and, eq, gt, inArray, isNotNull, isNull, lte } from "drizzle-orm";
+import { and, eq, gt, isNull, lte } from "drizzle-orm";
 import type { Db } from "./db/client";
-import { runner, runnerLogin } from "./db/schema";
+import { runnerLogin } from "./db/schema";
 import { createRunnerToken, hashRunnerToken } from "./runner-tokens";
 
 export const RUNNER_LOGIN_TTL_MS = 10 * 60 * 1000;
@@ -29,16 +29,7 @@ function mintDeviceSecret(): string {
 }
 
 export async function sweepRunnerLogins(db: Db, now = new Date()): Promise<void> {
-  await db.transaction(async (tx) => {
-    const lapsed = await tx
-      .select({ runnerId: runnerLogin.runnerId })
-      .from(runnerLogin)
-      .where(and(lte(runnerLogin.expiresAt, now), isNotNull(runnerLogin.token)));
-    const orphaned = lapsed.flatMap((row) => (row.runnerId ? [row.runnerId] : []));
-    if (orphaned.length > 0)
-      await tx.update(runner).set({ revokedAt: now }).where(inArray(runner.id, orphaned));
-    await tx.delete(runnerLogin).where(lte(runnerLogin.expiresAt, now));
-  });
+  await db.delete(runnerLogin).where(lte(runnerLogin.expiresAt, now));
 }
 
 export function formatRunnerLoginCode(code: string): string {
@@ -109,34 +100,22 @@ export async function approveRunnerLogin(
 ): Promise<{ runnerName: string }> {
   const now = input.now ?? new Date();
   const code = normalizeRunnerLoginCode(input.code);
-  return db.transaction(async (tx) => {
-    const [claimed] = await tx
-      .update(runnerLogin)
-      .set({ approvedAt: now, userId: input.userId })
-      .where(
-        and(
-          eq(runnerLogin.code, code),
-          isNull(runnerLogin.approvedAt),
-          gt(runnerLogin.expiresAt, now),
-        ),
-      )
-      .returning();
-    if (!claimed) {
-      const [login] = await tx.select().from(runnerLogin).where(eq(runnerLogin.code, code));
-      if (!login) throw new Error("unknown login code");
-      if (login.approvedAt) throw new Error("this login code was already approved");
-      throw new Error("this login code has expired");
-    }
-    const { runner, token } = await createRunnerToken(tx, {
-      userId: input.userId,
-      name: claimed.runnerName,
-    });
-    await tx
-      .update(runnerLogin)
-      .set({ runnerId: runner.id, token })
-      .where(eq(runnerLogin.id, claimed.id));
-    return { runnerName: runner.name };
-  });
+  const [claimed] = await db
+    .update(runnerLogin)
+    .set({ approvedAt: now, userId: input.userId })
+    .where(
+      and(
+        eq(runnerLogin.code, code),
+        isNull(runnerLogin.approvedAt),
+        gt(runnerLogin.expiresAt, now),
+      ),
+    )
+    .returning({ runnerName: runnerLogin.runnerName });
+  if (claimed) return claimed;
+  const [login] = await db.select().from(runnerLogin).where(eq(runnerLogin.code, code));
+  if (!login) throw new Error("unknown login code");
+  if (login.approvedAt) throw new Error("this login code was already approved");
+  throw new Error("this login code has expired");
 }
 
 export async function collectRunnerLogin(
@@ -151,20 +130,20 @@ export async function collectRunnerLogin(
       .from(runnerLogin)
       .where(eq(runnerLogin.deviceSecretHash, secretHash))
       .for("update");
-    if (!login) return { status: "expired" };
+    if (!login || login.collectedAt) return { status: "expired" };
     if (login.expiresAt.getTime() <= now.getTime()) {
-      if (login.token && login.runnerId)
-        await tx.update(runner).set({ revokedAt: now }).where(eq(runner.id, login.runnerId));
       await tx.delete(runnerLogin).where(eq(runnerLogin.id, login.id));
       return { status: "expired" };
     }
-    if (login.token) {
-      await tx
-        .update(runnerLogin)
-        .set({ token: null, collectedAt: now })
-        .where(eq(runnerLogin.id, login.id));
-      return { status: "approved", token: login.token };
-    }
-    return login.approvedAt ? { status: "expired" } : { status: "pending" };
+    if (!login.approvedAt || !login.userId) return { status: "pending" };
+    const { runner, token } = await createRunnerToken(tx, {
+      userId: login.userId,
+      name: login.runnerName,
+    });
+    await tx
+      .update(runnerLogin)
+      .set({ runnerId: runner.id, collectedAt: now })
+      .where(eq(runnerLogin.id, login.id));
+    return { status: "approved", token };
   });
 }

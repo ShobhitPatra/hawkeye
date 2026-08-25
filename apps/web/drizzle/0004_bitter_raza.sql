@@ -5,7 +5,6 @@ CREATE TABLE "runner_login" (
 	"runner_name" text NOT NULL,
 	"user_id" text,
 	"runner_id" text,
-	"token" text,
 	"expires_at" timestamp with time zone NOT NULL,
 	"approved_at" timestamp with time zone,
 	"collected_at" timestamp with time zone,

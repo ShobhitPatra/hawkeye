@@ -1,5 +1,5 @@
 {
-  "id": "8c63d009-358c-41e9-ace6-1547fb62879c",
+  "id": "e42f5170-6185-4a36-90c0-4dd9db6f8c03",
   "prevId": "955c8e6c-ef1b-4fba-bba2-b6e8316518ee",
   "version": "7",
   "dialect": "postgresql",
@@ -746,12 +746,6 @@
         },
         "runner_id": {
           "name": "runner_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "token": {
-          "name": "token",
           "type": "text",
           "primaryKey": false,
           "notNull": false
