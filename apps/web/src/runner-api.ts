@@ -7,16 +7,18 @@ import {
   type RunResultReport,
   type RunResultStatus,
 } from "@hawkeye/core";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
 import {
   armedPr,
   DEFAULT_MAX_TURNS,
   DEFAULT_WALL_CLOCK_MINUTES,
   job,
+  reviewPosted,
   run,
   userSettings,
 } from "./db/schema";
+import { recordFindings } from "./findings";
 import {
   claimNextJob,
   completeRun,
@@ -266,5 +268,28 @@ export async function recordResult(
     result,
     commentable: report.commentable ?? {},
   });
-  return Response.json({ ok: true, posted }, { status: 200 });
+  const [recordedBefore] = await deps.db
+    .select({ id: reviewPosted.id })
+    .from(reviewPosted)
+    .where(
+      and(
+        eq(reviewPosted.armedPrId, target.armedPr.id),
+        eq(reviewPosted.headSha, target.headSha),
+        ne(reviewPosted.runId, runId),
+      ),
+    )
+    .limit(1);
+  if (recordedBefore)
+    return Response.json({ ok: true, posted, findings: "already-posted" }, { status: 200 });
+  const findings = await recordFindings(deps.db, {
+    armedPrId: target.armedPr.id,
+    headSha: target.headSha,
+    findings: result.findings,
+    jobId: completed.jobId,
+  }).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    deps.log?.(`findings not recorded for run ${runId}: ${message}`);
+    return "failed" as const;
+  });
+  return Response.json({ ok: true, posted, findings }, { status: 200 });
 }

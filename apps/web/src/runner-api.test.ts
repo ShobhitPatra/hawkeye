@@ -1,4 +1,4 @@
-import type { GitHubClient, ReviewResult } from "@hawkeye/core";
+import { findingId, type GitHubClient, type ReviewResult } from "@hawkeye/core";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "./db/client";
@@ -287,7 +287,7 @@ function jsonRequest(path: string, body: unknown, bearer?: string | null) {
     method: "POST",
     body: JSON.stringify(body),
     headers: { "content-type": "application/json" },
-    ...(bearer === null ? { bearer: null } : {}),
+    ...(bearer === undefined ? {} : { bearer }),
   });
 }
 
@@ -400,7 +400,11 @@ describe("recordResult", () => {
       runId,
     );
 
-    expect(await response.json()).toEqual({ ok: true, posted: "posted" });
+    expect(await response.json()).toEqual({
+      ok: true,
+      posted: "posted",
+      findings: { created: 0, updated: 0, resolved: 0 },
+    });
     expect(github.installationTokenById).toHaveBeenCalledWith("10");
     const [reference, review, token] = (github.postReview as ReturnType<typeof vi.fn>).mock
       .calls[0]!;
@@ -413,6 +417,44 @@ describe("recordResult", () => {
       armedPrId: "armed-1",
       headSha: "a".repeat(40),
       githubReviewId: "9",
+    });
+  });
+
+  it("records the findings of an ok result and reports the counts", async () => {
+    const withFindings: ReviewResult = {
+      ...reviewResult,
+      verdict: "revise",
+      findings: [
+        { path: "a.txt", line: 2, severity: "should_fix", claim: "Leaks a handle", detail: "d" },
+        { severity: "must_fix", claim: "Missing tests", detail: "d" },
+      ],
+    };
+    const runId = await claimedRunId();
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: withFindings,
+      }),
+      { db, github },
+      runId,
+    );
+
+    expect(await response.json()).toEqual({
+      ok: true,
+      posted: "posted",
+      findings: { created: 2, updated: 0, resolved: 0 },
+    });
+    const rows = await db.select().from(schema.finding);
+    expect(rows).toHaveLength(2);
+    expect(rows.find((row) => row.path === "a.txt")).toMatchObject({
+      armedPrId: "armed-1",
+      stableId: findingId("a.txt", "Leaks a handle"),
+      severity: "should_fix",
+      line: 2,
+      firstSeenSha: "a".repeat(40),
+      resolvedSha: null,
     });
   });
 
@@ -439,7 +481,11 @@ describe("recordResult", () => {
       secondRunId,
     );
 
-    expect(await response.json()).toEqual({ ok: true, posted: "already-posted" });
+    expect(await response.json()).toEqual({
+      ok: true,
+      posted: "already-posted",
+      findings: "already-posted",
+    });
     expect(github.postReview).toHaveBeenCalledTimes(1);
     expect(await db.select().from(schema.reviewPosted)).toHaveLength(1);
   });
@@ -454,21 +500,173 @@ describe("recordResult", () => {
       jsonRequest(`/api/runner/runs/${runId}/result`, {
         status: "ok",
         turns: 1,
-        result: reviewResult,
+        result: {
+          ...reviewResult,
+          findings: [{ severity: "should_fix", claim: "kept", detail: "d", path: "a.ts", line: 1 }],
+        },
       }),
       { db, github },
       runId,
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, posted: "failed" });
-    const [row] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
-    expect(row).toMatchObject({
-      status: "ok",
-      result: reviewResult,
-      error: "post: GitHub POST failed: 500",
+    expect(await response.json()).toEqual({
+      ok: true,
+      posted: "failed",
+      findings: { created: 1, updated: 0, resolved: 0 },
     });
+    expect(await db.select().from(schema.finding)).toHaveLength(1);
+    const [row] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
+    expect(row).toMatchObject({ status: "ok", error: "post: GitHub POST failed: 500" });
     expect(await db.select().from(schema.reviewPosted)).toHaveLength(0);
+  });
+
+  it("reports failed findings and keeps the posted review when recording throws", async () => {
+    const runId = await claimedRunId();
+    const log = vi.fn();
+    let transactions = 0;
+    const broken = Object.create(db, {
+      transaction: {
+        value: (...args: Parameters<typeof db.transaction>) => {
+          transactions += 1;
+          if (transactions > 1) throw new Error("db gone");
+          return db.transaction(...args);
+        },
+      },
+    }) as typeof db;
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: reviewResult,
+      }),
+      { db: broken, github, log },
+      runId,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, posted: "posted", findings: "failed" });
+    expect(log).toHaveBeenCalledWith(`findings not recorded for run ${runId}: db gone`);
+  });
+
+  it("leaves the rows alone when the head was already posted", async () => {
+    const first = await claimedRunId();
+    const withFinding = {
+      ...reviewResult,
+      findings: [{ severity: "should_fix", claim: "first", detail: "d", path: "a.ts", line: 1 }],
+    };
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${first}/result`, {
+        status: "ok",
+        turns: 1,
+        result: withFinding,
+      }),
+      { db, github },
+      first,
+    );
+    const second = await claimedRunId();
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${second}/result`, {
+        status: "ok",
+        turns: 1,
+        result: reviewResult,
+      }),
+      { db, github },
+      second,
+    );
+
+    expect(await response.json()).toEqual({
+      ok: true,
+      posted: "already-posted",
+      findings: "already-posted",
+    });
+    const stored = await db.select().from(schema.finding);
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.resolvedSha).toBeNull();
+  });
+
+  it("records findings for a second user armed on a pull request another user already posted", async () => {
+    const first = await claimedRunId();
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${first}/result`, {
+        status: "ok",
+        turns: 1,
+        result: reviewResult,
+      }),
+      { db, github },
+      first,
+    );
+    await db.insert(schema.user).values({ id: "user-2", name: "other", email: "x@example.com" });
+    await seedArmedPullRequest(db, {
+      armedPrId: "armed-2",
+      userId: "user-2",
+      repo: "a",
+      number: 1,
+    });
+    const other = await createRunnerToken(db, { userId: "user-2", name: "desk" });
+    await enqueueJob(db, {
+      armedPrId: "armed-2",
+      headSha: "a".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: new Date(now.getTime() - 60_000),
+    });
+    const claim = await claimJob(request("/api/runner/jobs", { bearer: other.token }), claimDeps());
+    const second = (await claim.json()).job.runId as string;
+
+    const response = await recordResult(
+      jsonRequest(
+        `/api/runner/runs/${second}/result`,
+        {
+          status: "ok",
+          turns: 1,
+          result: {
+            ...reviewResult,
+            findings: [
+              { severity: "should_fix", claim: "theirs", detail: "d", path: "a.ts", line: 1 },
+            ],
+          },
+        },
+        other.token,
+      ),
+      { db, github },
+      second,
+    );
+
+    expect(await response.json()).toEqual({
+      ok: true,
+      posted: "already-posted",
+      findings: { created: 1, updated: 0, resolved: 0 },
+    });
+  });
+
+  it("does not record findings from a result whose head a newer done job superseded", async () => {
+    const runId = await claimedRunId();
+    const newer = await enqueueJob(db, {
+      armedPrId: "armed-1",
+      headSha: "c".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: now,
+    });
+    await db.update(schema.job).set({ state: "done" }).where(eq(schema.job.id, newer.id));
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: {
+          ...reviewResult,
+          findings: [{ severity: "should_fix", claim: "old", detail: "d", path: "a.ts", line: 1 }],
+        },
+      }),
+      { db, github },
+      runId,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, posted: "posted", findings: "superseded" });
+    expect(await db.select().from(schema.finding)).toHaveLength(0);
   });
 
   it("rejects malformed commentable lines", async () => {
