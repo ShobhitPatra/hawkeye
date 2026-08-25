@@ -100,8 +100,7 @@ export async function runReview(
       repositoryUrl: input.repositoryUrl,
     });
   const reviewPath = join(runDirectory, "review.json");
-  const commentable = commentableLines(diff);
-  const review = render(commentable);
+  const review = render(commentableLines(diff));
   await writeFile(reviewPath, JSON.stringify(review, null, 2));
 
   if (input.dryRun) return { kind: "dry-run", review, headSha: pullRequest.headSha };
@@ -109,8 +108,8 @@ export async function runReview(
     github: deps.github,
     reference,
     token,
-    render,
-    commentable,
+    review,
+    renderBodyOnly: () => render(new Map()),
     log: deps.log,
   });
   if (sent !== review) await writeFile(reviewPath, JSON.stringify(sent, null, 2));

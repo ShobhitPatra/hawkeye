@@ -6,15 +6,14 @@ export type PostRenderedReviewInput = {
   github: Pick<GitHubClient, "postReview">;
   reference: PullRequestReference;
   token: string;
-  render(commentable: Map<string, Set<number>>): RenderedReview;
-  commentable: Map<string, Set<number>>;
+  review: RenderedReview;
+  renderBodyOnly(): RenderedReview;
   log(line: string): void;
 };
 export type PostedReview = { review: RenderedReview; posted: { url: string; id: string } };
 
 export async function postRenderedReview(input: PostRenderedReviewInput): Promise<PostedReview> {
-  const { github, reference, token } = input;
-  const review = input.render(input.commentable);
+  const { github, reference, token, review } = input;
   try {
     return { review, posted: await github.postReview(reference, review, token) };
   } catch (error) {
@@ -24,7 +23,7 @@ export async function postRenderedReview(input: PostRenderedReviewInput): Promis
     )
       throw error;
     input.log("inline anchors rejected (422); posting body only");
-    const bodyOnly = input.render(new Map());
+    const bodyOnly = input.renderBodyOnly();
     return { review: bodyOnly, posted: await github.postReview(reference, bodyOnly, token) };
   }
 }

@@ -44,20 +44,21 @@ export async function postReviewForRun(
     );
   if (existing) return "already-posted";
 
+  const render = (commentable: Map<string, Set<number>>) =>
+    renderReview({
+      result: input.result,
+      headSha,
+      commentable,
+      repositoryUrl: HAWKEYE_REPOSITORY_URL,
+    });
   try {
     const token = await github.installationTokenById(armedPr.installationId);
     const { posted } = await postRenderedReview({
       github,
       reference: { owner: armedPr.owner, repo: armedPr.repo, number: armedPr.number },
       token,
-      render: (commentable) =>
-        renderReview({
-          result: input.result,
-          headSha,
-          commentable,
-          repositoryUrl: HAWKEYE_REPOSITORY_URL,
-        }),
-      commentable: toCommentableMap(input.commentable),
+      review: render(toCommentableMap(input.commentable)),
+      renderBodyOnly: () => render(new Map()),
       log,
     });
     const inserted = await db

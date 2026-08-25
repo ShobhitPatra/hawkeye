@@ -25,8 +25,8 @@ describe("postRenderedReview", () => {
       github: { postReview },
       reference,
       token: "t",
-      render,
-      commentable,
+      review: render(commentable),
+      renderBodyOnly: () => render(new Map()),
       log,
     });
     expect(outcome.posted).toEqual(posted);
@@ -44,8 +44,8 @@ describe("postRenderedReview", () => {
       github: { postReview },
       reference,
       token: "t",
-      render,
-      commentable,
+      review: render(commentable),
+      renderBodyOnly: () => render(new Map()),
       log,
     });
     expect(postReview).toHaveBeenCalledTimes(2);
@@ -60,8 +60,8 @@ describe("postRenderedReview", () => {
         github: { postReview },
         reference,
         token: "t",
-        render,
-        commentable: new Map(),
+        review: render(new Map()),
+        renderBodyOnly: () => render(new Map()),
         log: vi.fn(),
       }),
     ).rejects.toThrow(/422/);
@@ -74,8 +74,8 @@ describe("postRenderedReview", () => {
         github: { postReview },
         reference,
         token: "t",
-        render,
-        commentable,
+        review: render(commentable),
+        renderBodyOnly: () => render(new Map()),
         log: vi.fn(),
       }),
     ).rejects.toThrow(/500/);
