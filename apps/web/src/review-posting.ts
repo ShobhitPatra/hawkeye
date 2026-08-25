@@ -3,7 +3,6 @@ import {
   HAWKEYE_REPOSITORY_URL,
   postRenderedReview,
   renderReview,
-  type ReviewPostingOutcome,
   type ReviewResult,
 } from "@hawkeye/core";
 import { and, eq } from "drizzle-orm";
@@ -18,7 +17,7 @@ export type ReviewPostingInput = {
   result: ReviewResult;
   commentable: Record<string, number[]>;
 };
-export type { ReviewPostingOutcome };
+export type ReviewPostingOutcome = "posted" | "already-posted" | "failed";
 
 function toCommentableMap(commentable: Record<string, number[]>): Map<string, Set<number>> {
   return new Map(Object.entries(commentable).map(([path, lines]) => [path, new Set(lines)]));

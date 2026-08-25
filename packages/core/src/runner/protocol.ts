@@ -38,10 +38,4 @@ export type RunResultReport = {
   commentable?: Record<string, number[]>;
 };
 
-export const REVIEW_POSTING_OUTCOMES = ["posted", "already-posted", "failed"] as const;
-
-export type ReviewPostingOutcome = (typeof REVIEW_POSTING_OUTCOMES)[number];
-
-export type RunResultAcknowledgement = { ok: true; posted?: ReviewPostingOutcome };
-
 export type RunEvent = { type: string; at: string; data?: unknown };
