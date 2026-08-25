@@ -10,8 +10,13 @@ export const LENSES = [
 ] as const;
 export type Lens = (typeof LENSES)[number];
 
-export const SEVERITIES = ["must_fix", "should_fix", "inherited"] as const;
+export const SEVERITIES = ["must_fix", "should_fix", "optional", "inherited"] as const;
 export type Severity = (typeof SEVERITIES)[number];
+
+export const VERDICTS = ["ship", "mergeable", "changes_needed", "blocked"] as const;
+export type Verdict = (typeof VERDICTS)[number];
+
+const LEGACY_VERDICTS: Record<string, Verdict> = { revise: "changes_needed", hold: "blocked" };
 
 const FindingSchema = z
   .object({
@@ -30,7 +35,11 @@ const FindingSchema = z
   });
 
 export const ReviewResultSchema = z.object({
-  verdict: z.enum(["ship", "revise", "hold"]),
+  verdict: z.preprocess(
+    (value) => (typeof value === "string" ? (LEGACY_VERDICTS[value] ?? value) : value),
+    z.enum(VERDICTS),
+  ),
+  reportedVerdict: z.enum(VERDICTS).optional(),
   summary: z.string().min(1),
   lenses: z
     .array(z.object({ name: z.enum(LENSES), assessment: z.string().min(1) }))
@@ -44,11 +53,23 @@ export const ReviewResultSchema = z.object({
 export type Finding = z.infer<typeof FindingSchema>;
 export type ReviewResult = z.infer<typeof ReviewResultSchema>;
 
+export function verdictFor(findings: readonly Finding[]): Verdict {
+  const severities = new Set(findings.map((finding) => finding.severity));
+  if (severities.has("must_fix")) return "blocked";
+  if (severities.has("should_fix")) return "changes_needed";
+  if (severities.size > 0) return "mergeable";
+  return "ship";
+}
+
 export function parseReviewResult(raw: unknown): ReviewResult {
   const parsed = ReviewResultSchema.safeParse(raw);
   if (!parsed.success)
     throw new Error(
       `Invalid review result: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
     );
-  return parsed.data;
+  return {
+    ...parsed.data,
+    verdict: verdictFor(parsed.data.findings),
+    reportedVerdict: parsed.data.reportedVerdict ?? parsed.data.verdict,
+  };
 }

@@ -9,7 +9,7 @@ import { runReviewJob, type RunReviewJobDependencies, type RunReviewJobInput } f
 const headSha = "a".repeat(40);
 const baseSha = "b".repeat(40);
 const result = {
-  verdict: "revise",
+  verdict: "changes_needed",
   summary: "s",
   lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
   findings: [{ path: "a.txt", line: 2, severity: "should_fix", claim: "c", detail: "d" }],
@@ -102,7 +102,12 @@ describe("runReviewJob", () => {
     const d = deps();
     const i = await input();
     const outcome = await runReviewJob(i, d);
-    expect(outcome).toEqual({ status: "ok", turns: 2, result, commentable: { "a.txt": [1, 2] } });
+    expect(outcome).toEqual({
+      status: "ok",
+      turns: 2,
+      result: { ...result, reportedVerdict: result.verdict },
+      commentable: { "a.txt": [1, 2] },
+    });
     expect(d.createWorktree.mock.calls[0]![0]).toEqual({
       cloneUrl: "https://github.com/o/r.git",
       token: "ghs_t",

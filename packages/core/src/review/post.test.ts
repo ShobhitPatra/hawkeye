@@ -7,7 +7,7 @@ import { renderReview } from "./render.js";
 const reference = { owner: "o", repo: "r", number: 1 };
 const headSha = "a".repeat(40);
 const result = {
-  verdict: "revise" as const,
+  verdict: "changes_needed" as const,
   summary: "s",
   lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
   findings: [{ path: "a.txt", line: 2, severity: "should_fix" as const, claim: "c", detail: "d" }],

@@ -22,7 +22,8 @@ describe("buildPrompt", () => {
     const p = buildPrompt(input);
     for (const lens of ["intent", "behavior", "blast_radius", "verification", "fit", "hygiene"])
       expect(p).toContain(lens);
-    for (const severity of ["must_fix", "should_fix", "inherited"]) expect(p).toContain(severity);
+    for (const severity of ["must_fix", "should_fix", "optional", "inherited"])
+      expect(p).toContain(severity);
   });
   it("states that the checkout's Claude config was removed and generated files are excluded", () => {
     const p = buildPrompt(input);
@@ -33,7 +34,16 @@ describe("buildPrompt", () => {
   });
   it("states the verdict values", () => {
     const p = buildPrompt(input);
-    for (const verdict of ["ship", "revise", "hold"]) expect(p).toContain(`"${verdict}"`);
+    for (const verdict of ["ship", "mergeable", "changes_needed", "blocked"])
+      expect(p).toContain(`"${verdict}"`);
+  });
+  it("states the severity definitions, the tie-break and the verdict rule", () => {
+    const p = buildPrompt(input);
+    expect(p).toContain("When unsure between should_fix and optional, choose optional");
+    expect(p).toContain("a should_fix must name the concrete input or sequence that goes wrong");
+    expect(p).toContain(
+      "verdict is blocked if any finding is must_fix; changes_needed if any finding is should_fix; mergeable if any finding is optional or inherited; otherwise ship.",
+    );
   });
   it("fences untrusted text and the result path", () => {
     const p = buildPrompt(input);
@@ -111,7 +121,7 @@ describe("buildPrompt", () => {
     expect(p).toContain('<untrusted_data source="diff">');
     expect(p).toContain('<repository_rules path="AGENTS.md">');
     expect(p).toContain("# Output");
-    expect(p).toContain('"must_fix" | "should_fix" | "inherited"');
+    expect(p).toContain('"must_fix" | "should_fix" | "optional" | "inherited"');
     expect(p).not.toContain("# Lenses");
     expect(p).not.toContain("Assess each of these six lenses once");
     expect(p).not.toContain("# Findings");

@@ -1,4 +1,4 @@
-import { RUN_RESULT_STATUSES } from "@hawkeye/core";
+import { RUN_RESULT_STATUSES, SEVERITIES } from "@hawkeye/core";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
@@ -304,5 +304,15 @@ describe("schema migrations", () => {
 describe("run status enum", () => {
   it("matches core's run result statuses plus running", () => {
     expect(schema.runStatus.enumValues).toEqual(["running", ...RUN_RESULT_STATUSES]);
+  });
+});
+
+describe("finding severity enum", () => {
+  it("matches core's severities in the schema and in the migrated database", async () => {
+    expect(schema.findingSeverity.enumValues).toEqual([...SEVERITIES]);
+    const { rows } = await client.query<{ label: string }>(
+      "select enumlabel as label from pg_enum join pg_type on pg_type.oid = enumtypid where typname = 'finding_severity' order by enumsortorder",
+    );
+    expect(rows.map((row) => row.label)).toEqual([...SEVERITIES]);
   });
 });

@@ -28,7 +28,12 @@ export const runStatus = pgEnum("run_status", [
   "error",
   "invalid-output",
 ]);
-export const findingSeverity = pgEnum("finding_severity", ["must_fix", "should_fix", "inherited"]);
+export const findingSeverity = pgEnum("finding_severity", [
+  "must_fix",
+  "should_fix",
+  "optional",
+  "inherited",
+]);
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

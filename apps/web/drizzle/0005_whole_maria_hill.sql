@@ -1,0 +1,1 @@
+ALTER TYPE "public"."finding_severity" ADD VALUE 'optional' BEFORE 'inherited';
