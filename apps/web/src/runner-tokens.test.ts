@@ -41,6 +41,11 @@ describe("createRunnerToken", () => {
     await expect(createRunnerToken(db, { userId: "user-1", name: "desk\ntop" })).rejects.toThrow(
       "a runner name uses",
     );
+    const { runner: unicode } = await createRunnerToken(db, {
+      userId: "user-1",
+      name: "Büro-Laptop",
+    });
+    expect(unicode.name).toBe("Büro-Laptop");
   });
 
   it("mints a distinct token per runner", async () => {

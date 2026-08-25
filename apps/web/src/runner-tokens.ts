@@ -25,7 +25,7 @@ export function parseRunnerToken(authorization: string | null | undefined): stri
 }
 
 const RUNNER_NAME_MAX_LENGTH = 64;
-const RUNNER_NAME = /^[A-Za-z0-9][A-Za-z0-9 ._-]*$/;
+const RUNNER_NAME = /^[\p{L}\p{N}][\p{L}\p{N} ._-]*$/u;
 
 export function normalizeRunnerName(input: string): string {
   const name = input.trim();

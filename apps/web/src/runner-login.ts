@@ -110,11 +110,12 @@ export async function findRunnerLogin(
   }
   const [login] = await db.select().from(runnerLogin).where(eq(runnerLogin.code, code));
   if (!login) return undefined;
-  const state = login.approvedAt
-    ? "approved"
-    : login.expiresAt.getTime() <= now.getTime()
+  const state =
+    login.expiresAt.getTime() <= now.getTime()
       ? "expired"
-      : "pending";
+      : login.approvedAt
+        ? "approved"
+        : "pending";
   return { runnerName: login.runnerName, createdAt: login.createdAt, state };
 }
 

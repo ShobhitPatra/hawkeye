@@ -175,6 +175,7 @@ describe("findRunnerLogin", () => {
     expect((await findRunnerLogin(db, { code, now: later }))?.state).toBe("expired");
     await approveRunnerLogin(db, { userId: "user-1", code, now });
     expect((await findRunnerLogin(db, { code, now }))?.state).toBe("approved");
+    expect((await findRunnerLogin(db, { code, now: later }))?.state).toBe("expired");
     expect(await findRunnerLogin(db, { code: "AAAA-AAAA", now })).toBeUndefined();
     expect(await findRunnerLogin(db, { code: "nope", now })).toBeUndefined();
   });
