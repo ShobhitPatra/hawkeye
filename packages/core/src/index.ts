@@ -28,7 +28,7 @@ export {
 } from "./review/post.js";
 export { HAWKEYE_REPOSITORY_URL } from "./repository-url.js";
 export type { ReviewResult, Finding, Severity, Verdict, Lens } from "./contract/schema.js";
-export { parseReviewResult, SEVERITIES, VERDICTS } from "./contract/schema.js";
+export { parseReviewResult, SEVERITIES, VERDICTS, verdictFor } from "./contract/schema.js";
 export {
   RUN_RESULT_STATUSES,
   type ClaimedJob,

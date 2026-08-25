@@ -52,11 +52,19 @@ export const ReviewResultSchema = z.object({
 export type Finding = z.infer<typeof FindingSchema>;
 export type ReviewResult = z.infer<typeof ReviewResultSchema>;
 
+export function verdictFor(findings: readonly Finding[]): Verdict {
+  const severities = new Set(findings.map((finding) => finding.severity));
+  if (severities.has("must_fix")) return "blocked";
+  if (severities.has("should_fix")) return "changes_needed";
+  if (severities.size > 0) return "mergeable";
+  return "ship";
+}
+
 export function parseReviewResult(raw: unknown): ReviewResult {
   const parsed = ReviewResultSchema.safeParse(raw);
   if (!parsed.success)
     throw new Error(
       `Invalid review result: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
     );
-  return parsed.data;
+  return { ...parsed.data, verdict: verdictFor(parsed.data.findings) };
 }

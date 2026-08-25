@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LENSES, SEVERITIES, VERDICTS, parseReviewResult } from "./schema.js";
+import { LENSES, SEVERITIES, VERDICTS, parseReviewResult, verdictFor } from "./schema.js";
 
 const valid = () => ({
   verdict: "changes_needed",
@@ -43,19 +43,28 @@ describe("parseReviewResult", () => {
       expect(parseReviewResult(r).findings[0]!.severity).toBe(severity);
     }
   });
-  it("accepts every verdict", () => {
+  it("accepts every verdict on the wire and derives the stored one from the findings", () => {
     for (const verdict of VERDICTS) {
       const r = valid();
       r.verdict = verdict;
-      expect(parseReviewResult(r).verdict).toBe(verdict);
+      expect(parseReviewResult(r).verdict).toBe("blocked");
     }
   });
-  it("normalises the legacy verdicts", () => {
-    const r = valid();
-    r.verdict = "revise";
-    expect(parseReviewResult(r).verdict).toBe("changes_needed");
-    r.verdict = "hold";
-    expect(parseReviewResult(r).verdict).toBe("blocked");
+  it("derives the verdict from the worst finding", () => {
+    const finding = (severity: string) => ({ ...valid().findings[0]!, severity }) as never;
+    expect(verdictFor([])).toBe("ship");
+    expect(verdictFor([finding("inherited")])).toBe("mergeable");
+    expect(verdictFor([finding("optional"), finding("inherited")])).toBe("mergeable");
+    expect(verdictFor([finding("optional"), finding("should_fix")])).toBe("changes_needed");
+    expect(verdictFor([finding("should_fix"), finding("must_fix")])).toBe("blocked");
+  });
+  it("still accepts the legacy verdicts on the wire", () => {
+    for (const legacy of ["revise", "hold"]) {
+      const r = valid();
+      r.verdict = legacy;
+      r.findings = [];
+      expect(parseReviewResult(r).verdict).toBe("ship");
+    }
   });
   it("rejects an unknown verdict", () => {
     const r = valid();
