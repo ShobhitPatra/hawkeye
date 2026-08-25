@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { type ApproveRunnerLoginState, approveRunnerLoginAction } from "./actions";
 
-export function ApproveLoginForm({ code }: { code: string }) {
+export function ApproveLoginForm() {
   const [state, formAction, pending] = useActionState<ApproveRunnerLoginState, FormData>(
     approveRunnerLoginAction,
     {},
@@ -20,7 +20,7 @@ export function ApproveLoginForm({ code }: { code: string }) {
   return (
     <>
       <form action={formAction}>
-        <input name="code" defaultValue={code} placeholder="XXXX-XXXX" aria-label="Login code" />
+        <input name="code" placeholder="XXXX-XXXX" aria-label="Login code" autoComplete="off" />
         <button type="submit" disabled={pending}>
           Approve
         </button>

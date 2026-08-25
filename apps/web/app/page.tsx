@@ -3,8 +3,17 @@ import { getSession } from "@/session";
 import { SignInButton } from "./sign-in-button";
 import { SignOutButton } from "./sign-out-button";
 
-export default async function HomePage() {
+function localPath(value: string | undefined): string | undefined {
+  return value !== undefined && /^\/(?!\/)/.test(value) ? value : undefined;
+}
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ returnTo?: string }>;
+}) {
   const session = await getSession();
+  const returnTo = localPath((await searchParams).returnTo);
   return (
     <main>
       <h1>Hawkeye</h1>
@@ -17,7 +26,7 @@ export default async function HomePage() {
           <SignOutButton />
         </>
       ) : (
-        <SignInButton />
+        <SignInButton {...(returnTo ? { callbackURL: returnTo } : {})} />
       )}
     </main>
   );

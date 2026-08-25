@@ -12,8 +12,10 @@ export default async function ConnectPage({
 }: {
   searchParams: Promise<{ code?: string }>;
 }) {
-  const session = await requireSession();
   const { code = "" } = await searchParams;
+  const session = await requireSession(
+    code ? `/connect?code=${encodeURIComponent(code)}` : "/connect",
+  );
   await sweepRunnerLogins(getDb());
   const status = await runnerStatus(getDb(), session.user.id);
   const pending = code ? await findRunnerLogin(getDb(), { code }) : undefined;
@@ -25,7 +27,7 @@ export default async function ConnectPage({
       <pre>
         <code>node packages/runner/dist/bin.js runner login --url {siteUrl()}</code>
       </pre>
-      <p>Then enter the code it shows and approve it.</p>
+      <p>Then type the code it shows and approve it.</p>
       {pending &&
         (pending.state === "pending" ? (
           <p>
@@ -35,7 +37,7 @@ export default async function ConnectPage({
         ) : (
           <p>This code is {pending.state}.</p>
         ))}
-      <ApproveLoginForm code={code} />
+      <ApproveLoginForm />
       <h2>Runner status</h2>
       <p>
         {status.online ? "Runner online" : `Runner offline, ${status.waitingJobs} jobs waiting`}
