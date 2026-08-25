@@ -42,3 +42,4 @@ export {
   type RunReviewJobDependencies,
   type RunReviewJobOutcome,
 } from "./run-job.js";
+export { findingId } from "./review/finding-id.js";
