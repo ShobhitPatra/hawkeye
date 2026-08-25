@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
-import { approveRunnerLogin } from "@/runner-login";
+import { approveRunnerLogin, RunnerLoginError } from "@/runner-login";
 import { requireSession } from "@/session";
 
 export type ApproveRunnerLoginState = { runnerName?: string; error?: string };
@@ -19,6 +19,7 @@ export async function approveRunnerLoginAction(
     revalidatePath("/runners");
     return { runnerName };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "could not approve the login" };
+    if (error instanceof RunnerLoginError) return { error: error.message };
+    throw error;
   }
 }
