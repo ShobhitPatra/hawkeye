@@ -500,7 +500,10 @@ describe("recordResult", () => {
       jsonRequest(`/api/runner/runs/${runId}/result`, {
         status: "ok",
         turns: 1,
-        result: reviewResult,
+        result: {
+          ...reviewResult,
+          findings: [{ severity: "should_fix", claim: "kept", detail: "d", path: "a.ts", line: 1 }],
+        },
       }),
       { db, github },
       runId,
@@ -510,15 +513,39 @@ describe("recordResult", () => {
     expect(await response.json()).toEqual({
       ok: true,
       posted: "failed",
-      findings: { created: 0, updated: 0, resolved: 0 },
+      findings: { created: 1, updated: 0, resolved: 0 },
     });
+    expect(await db.select().from(schema.finding)).toHaveLength(1);
     const [row] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
-    expect(row).toMatchObject({
-      status: "ok",
-      result: reviewResult,
-      error: "post: GitHub POST failed: 500",
-    });
+    expect(row).toMatchObject({ status: "ok", error: "post: GitHub POST failed: 500" });
     expect(await db.select().from(schema.reviewPosted)).toHaveLength(0);
+  });
+
+  it("does not record findings from a result whose head a newer job superseded", async () => {
+    const runId = await claimedRunId();
+    await enqueueJob(db, {
+      armedPrId: "armed-1",
+      headSha: "c".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: now,
+    });
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: {
+          ...reviewResult,
+          findings: [{ severity: "should_fix", claim: "old", detail: "d", path: "a.ts", line: 1 }],
+        },
+      }),
+      { db, github },
+      runId,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, posted: "posted", findings: "superseded" });
+    expect(await db.select().from(schema.finding)).toHaveLength(0);
   });
 
   it("rejects malformed commentable lines", async () => {
