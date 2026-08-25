@@ -9,7 +9,7 @@ import { runReview, type RunReviewDependencies, type RunReviewInput } from "./ru
 
 const sha = "a".repeat(40);
 const result = {
-  verdict: "revise",
+  verdict: "changes_needed",
   summary: "s",
   lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
   findings: [{ path: "a.txt", line: 2, severity: "should_fix", claim: "c", detail: "d" }],

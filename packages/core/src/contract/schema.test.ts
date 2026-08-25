@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { LENSES, parseReviewResult } from "./schema.js";
+import { LENSES, SEVERITIES, VERDICTS, parseReviewResult } from "./schema.js";
 
 const valid = () => ({
-  verdict: "revise",
+  verdict: "changes_needed",
   summary: "One bug.",
   lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
   findings: [
@@ -34,6 +34,28 @@ describe("parseReviewResult", () => {
     const r = valid();
     (r.findings[0] as { severity: string }).severity = "nit";
     expect(() => parseReviewResult(r)).toThrow();
+  });
+  it("accepts every severity", () => {
+    expect(SEVERITIES).toContain("optional");
+    for (const severity of SEVERITIES) {
+      const r = valid();
+      r.findings[0]!.severity = severity;
+      expect(parseReviewResult(r).findings[0]!.severity).toBe(severity);
+    }
+  });
+  it("accepts every verdict", () => {
+    for (const verdict of VERDICTS) {
+      const r = valid();
+      r.verdict = verdict;
+      expect(parseReviewResult(r).verdict).toBe(verdict);
+    }
+  });
+  it("normalises the legacy verdicts", () => {
+    const r = valid();
+    r.verdict = "revise";
+    expect(parseReviewResult(r).verdict).toBe("changes_needed");
+    r.verdict = "hold";
+    expect(parseReviewResult(r).verdict).toBe("blocked");
   });
   it("rejects an unknown verdict", () => {
     const r = valid();

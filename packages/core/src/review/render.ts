@@ -1,4 +1,9 @@
-import { type Finding, type ReviewResult, type Severity } from "../contract/schema.js";
+import {
+  type Finding,
+  type ReviewResult,
+  type Severity,
+  type Verdict,
+} from "../contract/schema.js";
 import { findingId } from "./finding-id.js";
 import { encodeMarker } from "./marker.js";
 
@@ -16,11 +21,19 @@ export type RenderInput = {
   repositoryUrl: string;
 };
 
-const SEVERITY_ORDER = ["must_fix", "should_fix", "inherited"] as const;
+const SEVERITY_ORDER = ["must_fix", "should_fix", "optional", "inherited"] as const;
+
+const VERDICT_LABEL: Record<Verdict, string> = {
+  ship: "ship",
+  mergeable: "mergeable",
+  changes_needed: "changes needed",
+  blocked: "blocked",
+};
 
 const SEVERITY_BADGE: Record<Severity, string> = {
   must_fix: "must-fix",
   should_fix: "should-fix",
+  optional: "optional",
   inherited: "inherited",
 };
 
@@ -90,7 +103,7 @@ export function renderReview({
   const lines: string[] = [
     encodeMarker(headSha),
     "",
-    `## <small>Verdict:</small> ${result.verdict}`,
+    `## <small>Verdict:</small> ${VERDICT_LABEL[result.verdict]}`,
     "",
     result.summary,
   ];

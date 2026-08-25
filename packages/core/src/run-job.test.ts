@@ -9,7 +9,7 @@ import { runReviewJob, type RunReviewJobDependencies, type RunReviewJobInput } f
 const headSha = "a".repeat(40);
 const baseSha = "b".repeat(40);
 const result = {
-  verdict: "revise",
+  verdict: "changes_needed",
   summary: "s",
   lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
   findings: [{ path: "a.txt", line: 2, severity: "should_fix", claim: "c", detail: "d" }],

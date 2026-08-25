@@ -3,7 +3,7 @@ import { LENSES, type ReviewResult } from "../contract/schema.js";
 import { renderReview } from "./render.js";
 
 const base = (): ReviewResult => ({
-  verdict: "revise",
+  verdict: "changes_needed",
   summary: "Mostly fine.",
   lenses: LENSES.map((name) => ({ name, assessment: `${name} ok` })),
   findings: [
@@ -16,6 +16,7 @@ const base = (): ReviewResult => ({
       suggestion: "const y = x ?? 0;",
     },
     { path: "src/a.ts", line: 99, severity: "should_fix", claim: "Rename", detail: "too short" },
+    { severity: "optional", claim: "Extra test", detail: "cover the empty case" },
     { severity: "inherited", claim: "Global state", detail: "module singleton" },
   ],
 });
@@ -41,10 +42,23 @@ describe("renderReview", () => {
   });
   it("renders the verdict as a heading above the summary", () => {
     const r = renderReview(input());
-    expect(r.body).toContain("## <small>Verdict:</small> revise");
-    expect(r.body.indexOf("## <small>Verdict:</small> revise")).toBeLessThan(
+    expect(r.body).toContain("## <small>Verdict:</small> changes needed");
+    expect(r.body.indexOf("## <small>Verdict:</small> changes needed")).toBeLessThan(
       r.body.indexOf("Mostly fine."),
     );
+  });
+  it("renders each verdict as its label", () => {
+    const labels = {
+      ship: "ship",
+      mergeable: "mergeable",
+      changes_needed: "changes needed",
+      blocked: "blocked",
+    } as const;
+    for (const [verdict, label] of Object.entries(labels)) {
+      const i = input();
+      i.result.verdict = verdict as keyof typeof labels;
+      expect(renderReview(i).body).toContain(`## <small>Verdict:</small> ${label}\n`);
+    }
   });
   it("orders marker, verdict, findings, lens details and footer", () => {
     const r = renderReview(input());
@@ -69,8 +83,11 @@ describe("renderReview", () => {
   it("groups body findings by severity with hyphenated headings", () => {
     const r = renderReview(input());
     expect(r.body).toContain("### should-fix");
+    expect(r.body).toContain("### optional");
     expect(r.body).toContain("### inherited");
-    expect(r.body.indexOf("### should-fix")).toBeLessThan(r.body.indexOf("### inherited"));
+    expect(r.body.indexOf("### must-fix")).toBeLessThan(r.body.indexOf("### should-fix"));
+    expect(r.body.indexOf("### should-fix")).toBeLessThan(r.body.indexOf("### optional"));
+    expect(r.body.indexOf("### optional")).toBeLessThan(r.body.indexOf("### inherited"));
   });
   it("anchors in-diff findings as comments with a suggestion fence", () => {
     const r = renderReview(input());

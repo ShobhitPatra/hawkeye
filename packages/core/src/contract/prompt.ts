@@ -81,10 +81,12 @@ Assess each of these six lenses once:
 ${LENSES.map((lens) => `- ${lens}: ${LENS_GUIDE[lens]}`).join("\n")}`);
 
     sections.push(`# Findings
-Each finding has a severity:
-- must_fix: must be fixed before merge (bugs, broken promises, security, data loss).
-- should_fix: worth fixing, not gating.
+Each finding has a severity, defined by its consequence:
+- must_fix: security, data loss, a broken promise of the PR, or a crash on a realistic path.
+- should_fix: incorrect or unsafe for a realistic case a user will hit, or a trap that will bite the next change.
+- optional: the PR is correct without it (structure, naming, an extra test, docs wording, a simpler alternative, future hardening).
 - inherited: a problem in code the PR touches but did not introduce.
+When unsure between should_fix and optional, choose optional; a should_fix must name the concrete input or sequence that goes wrong.
 Rules:
 - Give path and line only when the finding is about specific changed lines; line is the line number in the head version (RIGHT side). Otherwise omit path and line.
 - Give suggestion only when an exact textual replacement of that single line fully fixes the finding; suggestion is the replacement text, no fences.
@@ -104,12 +106,12 @@ Be terse. A reader skims the review and acts on it.
   sections.push(`# Output
 When you are done, write the result as JSON to ${resultPath} and stop. Write nothing else. Schema:
 {
-  "verdict": "ship" | "revise" | "hold",
+  "verdict": "ship" | "mergeable" | "changes_needed" | "blocked",
   "summary": string,
   "lenses": [{ "name": "intent" | "behavior" | "blast_radius" | "verification" | "fit" | "hygiene", "assessment": string }],
-  "findings": [{ "path"?: string, "line"?: number, "side"?: "RIGHT" | "LEFT", "severity": "must_fix" | "should_fix" | "inherited", "claim": string, "detail": string, "rationale"?: string, "suggestion"?: string }]
+  "findings": [{ "path"?: string, "line"?: number, "side"?: "RIGHT" | "LEFT", "severity": "must_fix" | "should_fix" | "optional" | "inherited", "claim": string, "detail": string, "rationale"?: string, "suggestion"?: string }]
 }
-lenses must list each of the six lenses exactly once. verdict is hold if any finding is must_fix, ship if there are no must_fix or should_fix findings, otherwise revise.`);
+lenses must list each of the six lenses exactly once. verdict is blocked if any finding is must_fix; changes_needed if any finding is should_fix; mergeable if any finding is optional or inherited; otherwise ship.`);
 
   return sections.join("\n\n");
 }
