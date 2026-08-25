@@ -1,4 +1,4 @@
-import type { GitHubClient, ReviewResult } from "@hawkeye/core";
+import { findingId, type GitHubClient, type ReviewResult } from "@hawkeye/core";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "./db/client";
@@ -400,7 +400,11 @@ describe("recordResult", () => {
       runId,
     );
 
-    expect(await response.json()).toEqual({ ok: true, posted: "posted" });
+    expect(await response.json()).toEqual({
+      ok: true,
+      posted: "posted",
+      findings: { created: 0, updated: 0, resolved: 0 },
+    });
     expect(github.installationTokenById).toHaveBeenCalledWith("10");
     const [reference, review, token] = (github.postReview as ReturnType<typeof vi.fn>).mock
       .calls[0]!;
@@ -413,6 +417,44 @@ describe("recordResult", () => {
       armedPrId: "armed-1",
       headSha: "a".repeat(40),
       githubReviewId: "9",
+    });
+  });
+
+  it("records the findings of an ok result and reports the counts", async () => {
+    const withFindings: ReviewResult = {
+      ...reviewResult,
+      verdict: "revise",
+      findings: [
+        { path: "a.txt", line: 2, severity: "should_fix", claim: "Leaks a handle", detail: "d" },
+        { severity: "must_fix", claim: "Missing tests", detail: "d" },
+      ],
+    };
+    const runId = await claimedRunId();
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: withFindings,
+      }),
+      { db, github },
+      runId,
+    );
+
+    expect(await response.json()).toEqual({
+      ok: true,
+      posted: "posted",
+      findings: { created: 2, updated: 0, resolved: 0 },
+    });
+    const rows = await db.select().from(schema.finding);
+    expect(rows).toHaveLength(2);
+    expect(rows.find((row) => row.path === "a.txt")).toMatchObject({
+      armedPrId: "armed-1",
+      stableId: findingId("a.txt", "Leaks a handle"),
+      severity: "should_fix",
+      line: 2,
+      firstSeenSha: "a".repeat(40),
+      resolvedSha: null,
     });
   });
 
@@ -439,7 +481,11 @@ describe("recordResult", () => {
       secondRunId,
     );
 
-    expect(await response.json()).toEqual({ ok: true, posted: "already-posted" });
+    expect(await response.json()).toEqual({
+      ok: true,
+      posted: "already-posted",
+      findings: { created: 0, updated: 0, resolved: 0 },
+    });
     expect(github.postReview).toHaveBeenCalledTimes(1);
     expect(await db.select().from(schema.reviewPosted)).toHaveLength(1);
   });
@@ -461,7 +507,11 @@ describe("recordResult", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, posted: "failed" });
+    expect(await response.json()).toEqual({
+      ok: true,
+      posted: "failed",
+      findings: { created: 0, updated: 0, resolved: 0 },
+    });
     const [row] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
     expect(row).toMatchObject({
       status: "ok",

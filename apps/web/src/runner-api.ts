@@ -9,6 +9,7 @@ import {
 } from "@hawkeye/core";
 import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
+import { recordFindings } from "./findings";
 import {
   armedPr,
   DEFAULT_MAX_TURNS,
@@ -259,6 +260,11 @@ export async function recordResult(
     .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
     .where(eq(job.id, completed.jobId));
   if (!target) throw new Error(`run ${runId} has no armed pull request`);
+  const findings = await recordFindings(deps.db, {
+    armedPrId: target.armedPr.id,
+    headSha: target.headSha,
+    findings: result.findings,
+  });
   const posted = await postReviewForRun(deps, {
     runId,
     armedPr: target.armedPr,
@@ -266,5 +272,5 @@ export async function recordResult(
     result,
     commentable: report.commentable ?? {},
   });
-  return Response.json({ ok: true, posted }, { status: 200 });
+  return Response.json({ ok: true, posted, findings }, { status: 200 });
 }
