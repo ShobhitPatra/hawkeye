@@ -213,7 +213,7 @@ describe("heartbeat", () => {
 
     const response = await heartbeat(
       request(`/api/runner/jobs/${queued.id}/heartbeat`, { method: "POST" }),
-      { db, github },
+      { db },
       queued.id,
     );
 
@@ -227,7 +227,7 @@ describe("heartbeat", () => {
 
     const response = await heartbeat(
       request(`/api/runner/jobs/${queued.id}/heartbeat`, { method: "POST" }),
-      { db, github },
+      { db },
       queued.id,
     );
 
@@ -248,7 +248,7 @@ describe("heartbeat", () => {
 
     const response = await heartbeat(
       request(`/api/runner/jobs/${queued.id}/heartbeat`, { method: "POST" }),
-      { db, github },
+      { db },
       queued.id,
     );
 
@@ -258,7 +258,7 @@ describe("heartbeat", () => {
   it("404s for a job that does not exist", async () => {
     const response = await heartbeat(
       request("/api/runner/jobs/missing/heartbeat", { method: "POST" }),
-      { db, github },
+      { db },
       "missing",
     );
 
@@ -268,7 +268,7 @@ describe("heartbeat", () => {
   it("401s without a token", async () => {
     const response = await heartbeat(
       request("/api/runner/jobs/x/heartbeat", { method: "POST", bearer: null }),
-      { db, github },
+      { db },
       "x",
     );
 
@@ -302,7 +302,7 @@ describe("recordEvents", () => {
 
     const response = await recordEvents(
       jsonRequest(`/api/runner/runs/${runId}/events`, events),
-      { db, github },
+      { db },
       runId,
     );
 
@@ -315,7 +315,7 @@ describe("recordEvents", () => {
 
     const response = await recordEvents(
       jsonRequest(`/api/runner/runs/${runId}/events`, { type: "turn" }),
-      { db, github },
+      { db },
       runId,
     );
 
@@ -327,7 +327,7 @@ describe("recordEvents", () => {
 
     const response = await recordEvents(
       jsonRequest(`/api/runner/runs/${runId}/events`, [{ at: now.toISOString() }]),
-      { db, github },
+      { db },
       runId,
     );
 
@@ -337,7 +337,7 @@ describe("recordEvents", () => {
   it("404s for a run the runner does not own", async () => {
     const response = await recordEvents(
       jsonRequest("/api/runner/runs/missing/events", []),
-      { db, github },
+      { db },
       "missing",
     );
 
@@ -354,7 +354,7 @@ describe("recordEvents", () => {
 
     const response = await recordEvents(
       jsonRequest(`/api/runner/runs/${runId}/events`, [{ type: "turn", at: now.toISOString() }]),
-      { db, github },
+      { db },
       runId,
     );
 

@@ -108,6 +108,26 @@ describe("postReviewForRun", () => {
     expect(github.postReview).not.toHaveBeenCalled();
   });
 
+  it("skips a head another arm of the same pull request already posted", async () => {
+    await db.insert(schema.armedPr).values({
+      id: "armed-0",
+      userId: "user-1",
+      installationId: armedPr.installationId,
+      owner: armedPr.owner,
+      repo: armedPr.repo,
+      number: armedPr.number,
+      disarmedAt: new Date(),
+    });
+    await db.insert(schema.reviewPosted).values({
+      runId,
+      armedPrId: "armed-0",
+      headSha,
+      githubReviewId: "1",
+    });
+
+    await expect(post()).resolves.toBe("already-posted");
+    expect(github.postReview).not.toHaveBeenCalled();
+  });
   it("treats a lost insert race as already posted", async () => {
     github.postReview = vi.fn(async () => {
       await db.insert(schema.reviewPosted).values({

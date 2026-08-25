@@ -40,7 +40,11 @@ export type ClaimDeps = {
   poll?: { intervalMs: number; totalMs: number };
 };
 
-export type RunnerApiDeps = { db: Db; github: GitHubClient; log?: (line: string) => void };
+export type RunnerApiDeps = { db: Db };
+export type RecordResultDeps = RunnerApiDeps & {
+  github: GitHubClient;
+  log?: (line: string) => void;
+};
 
 function claimLost(): Response {
   return Response.json({ error: "job is no longer claimed by this runner" }, { status: 409 });
@@ -220,7 +224,7 @@ function parseCommentable(payload: unknown): Record<string, number[]> {
 
 export async function recordResult(
   request: Request,
-  deps: RunnerApiDeps,
+  deps: RecordResultDeps,
   runId: string,
 ): Promise<Response> {
   const runner = await requireRunner(request, deps.db);

@@ -8,7 +8,7 @@ import {
 } from "@hawkeye/core";
 import { and, eq } from "drizzle-orm";
 import type { Db } from "./db/client";
-import { reviewPosted, run } from "./db/schema";
+import { armedPr as armedPrTable, reviewPosted, run } from "./db/schema";
 
 export type ReviewPostingDeps = { db: Db; github: GitHubClient; log?: (line: string) => void };
 export type ReviewPostingInput = {
@@ -34,7 +34,15 @@ export async function postReviewForRun(
   const [existing] = await db
     .select({ id: reviewPosted.id })
     .from(reviewPosted)
-    .where(and(eq(reviewPosted.armedPrId, armedPr.id), eq(reviewPosted.headSha, headSha)));
+    .innerJoin(armedPrTable, eq(armedPrTable.id, reviewPosted.armedPrId))
+    .where(
+      and(
+        eq(armedPrTable.owner, armedPr.owner),
+        eq(armedPrTable.repo, armedPr.repo),
+        eq(armedPrTable.number, armedPr.number),
+        eq(reviewPosted.headSha, headSha),
+      ),
+    );
   if (existing) return "already-posted";
 
   try {
