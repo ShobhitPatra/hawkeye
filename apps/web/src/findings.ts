@@ -19,33 +19,36 @@ export async function recordFindings(
 
   return db.transaction(async (tx) => {
     const counts: RecordedFindings = { created: 0, updated: 0, resolved: 0 };
-    for (const [stableId, entry] of byStableId) {
-      const [row] = await tx
+    if (byStableId.size > 0) {
+      const rows = await tx
         .insert(finding)
-        .values({
-          armedPrId,
-          stableId,
-          severity: entry.severity,
-          claim: entry.claim,
-          path: entry.path ?? null,
-          line: entry.line ?? null,
-          firstSeenSha: headSha,
-        })
-        .onConflictDoUpdate({
-          target: [finding.armedPrId, finding.stableId],
-          set: {
+        .values(
+          [...byStableId].map(([stableId, entry]) => ({
+            armedPrId,
+            stableId,
             severity: entry.severity,
             claim: entry.claim,
             path: entry.path ?? null,
             line: entry.line ?? null,
+            firstSeenSha: headSha,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [finding.armedPrId, finding.stableId],
+          set: {
+            severity: sql`excluded.severity`,
+            claim: sql`excluded.claim`,
+            path: sql`excluded.path`,
+            line: sql`excluded.line`,
             resolvedSha: null,
           },
         })
         .returning({ inserted: sql<boolean>`(xmax = 0)` });
       // Postgres leaves xmax at 0 on a freshly inserted row and sets it on one the conflict clause updated.
-      if (!row) throw new Error(`failed to record finding ${stableId} for ${armedPrId}`);
-      if (row.inserted) counts.created += 1;
-      else counts.updated += 1;
+      for (const row of rows) {
+        if (row.inserted) counts.created += 1;
+        else counts.updated += 1;
+      }
     }
 
     const stableIds = [...byStableId.keys()];

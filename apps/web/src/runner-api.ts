@@ -273,6 +273,7 @@ export async function recordResult(
     .where(
       and(
         eq(job.armedPrId, target.armedPr.id),
+        eq(job.state, "done"),
         sql`(${job.createdAt}, ${job.id}) > (${target.createdAt}, ${completed.jobId})`,
       ),
     )

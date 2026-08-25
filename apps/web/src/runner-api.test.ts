@@ -521,14 +521,15 @@ describe("recordResult", () => {
     expect(await db.select().from(schema.reviewPosted)).toHaveLength(0);
   });
 
-  it("does not record findings from a result whose head a newer job superseded", async () => {
+  it("does not record findings from a result whose head a newer done job superseded", async () => {
     const runId = await claimedRunId();
-    await enqueueJob(db, {
+    const newer = await enqueueJob(db, {
       armedPrId: "armed-1",
       headSha: "c".repeat(40),
       baseSha: "b".repeat(40),
       notBefore: now,
     });
+    await db.update(schema.job).set({ state: "done" }).where(eq(schema.job.id, newer.id));
 
     const response = await recordResult(
       jsonRequest(`/api/runner/runs/${runId}/result`, {
