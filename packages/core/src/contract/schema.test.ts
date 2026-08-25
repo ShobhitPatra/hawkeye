@@ -65,6 +65,13 @@ describe("parseReviewResult", () => {
     expect(parsed.verdict).toBe("blocked");
     expect(parsed.reportedVerdict).toBe("ship");
   });
+  it("is idempotent, so the control plane re-parsing the runner's payload keeps the report", () => {
+    const r = valid();
+    r.verdict = "ship";
+    const once = parseReviewResult(r);
+    expect(parseReviewResult(JSON.parse(JSON.stringify(once)))).toEqual(once);
+    expect(once.reportedVerdict).toBe("ship");
+  });
   it("still accepts the legacy verdicts on the wire and maps them", () => {
     const r = valid();
     r.findings = [];

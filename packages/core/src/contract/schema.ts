@@ -39,6 +39,7 @@ export const ReviewResultSchema = z.object({
     (value) => (typeof value === "string" ? (LEGACY_VERDICTS[value] ?? value) : value),
     z.enum(VERDICTS),
   ),
+  reportedVerdict: z.enum(VERDICTS).optional(),
   summary: z.string().min(1),
   lenses: z
     .array(z.object({ name: z.enum(LENSES), assessment: z.string().min(1) }))
@@ -50,7 +51,7 @@ export const ReviewResultSchema = z.object({
 });
 
 export type Finding = z.infer<typeof FindingSchema>;
-export type ReviewResult = z.infer<typeof ReviewResultSchema> & { reportedVerdict?: Verdict };
+export type ReviewResult = z.infer<typeof ReviewResultSchema>;
 
 export function verdictFor(findings: readonly Finding[]): Verdict {
   const severities = new Set(findings.map((finding) => finding.severity));
@@ -69,6 +70,6 @@ export function parseReviewResult(raw: unknown): ReviewResult {
   return {
     ...parsed.data,
     verdict: verdictFor(parsed.data.findings),
-    reportedVerdict: parsed.data.verdict,
+    reportedVerdict: parsed.data.reportedVerdict ?? parsed.data.verdict,
   };
 }
