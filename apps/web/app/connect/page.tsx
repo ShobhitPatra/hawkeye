@@ -16,9 +16,9 @@ export default async function ConnectPage({
   const session = await requireSession(
     code ? `/connect?code=${encodeURIComponent(code)}` : "/connect",
   );
+  const pending = code ? await findRunnerLogin(getDb(), { code }) : undefined;
   await sweepRunnerLogins(getDb());
   const status = await runnerStatus(getDb(), session.user.id);
-  const pending = code ? await findRunnerLogin(getDb(), { code }) : undefined;
 
   return (
     <main>

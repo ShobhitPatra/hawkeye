@@ -44,6 +44,11 @@ describe("startRunnerLogin", () => {
     });
   });
 
+  it("rejects a name with other characters", async () => {
+    for (const runnerName of ["lap\ntop", "-x", "x".repeat(65)])
+      await expect(startRunnerLogin(db, { runnerName })).rejects.toThrow();
+  });
+
   it("rejects a blank name", async () => {
     await expect(startRunnerLogin(db, { runnerName: "  " })).rejects.toThrow(
       "a runner needs a name",

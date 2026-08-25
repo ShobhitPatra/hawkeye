@@ -10,6 +10,18 @@ const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 8;
 const DEVICE_SECRET_PREFIX = "hkd_";
 const DEVICE_SECRET_BYTES = 32;
+const RUNNER_NAME_MAX_LENGTH = 64;
+const RUNNER_NAME = /^[A-Za-z0-9][A-Za-z0-9 ._-]*$/;
+
+export function normalizeRunnerName(input: string): string {
+  const name = input.trim();
+  if (!name) throw new Error("a runner needs a name");
+  if (name.length > RUNNER_NAME_MAX_LENGTH)
+    throw new Error(`a runner name is at most ${RUNNER_NAME_MAX_LENGTH} characters`);
+  if (!RUNNER_NAME.test(name))
+    throw new Error("a runner name uses letters, digits, spaces, dots, underscores and dashes");
+  return name;
+}
 
 export type CollectRunnerLoginResult =
   | { status: "pending" }
@@ -50,8 +62,7 @@ export async function startRunnerLogin(
   db: Db,
   input: { runnerName: string; now?: Date },
 ): Promise<{ code: string; deviceSecret: string; expiresAt: Date }> {
-  const runnerName = input.runnerName.trim();
-  if (!runnerName) throw new Error("a runner needs a name");
+  const runnerName = normalizeRunnerName(input.runnerName);
   const now = input.now ?? new Date();
   const code = mintCode();
   const deviceSecret = mintDeviceSecret();
