@@ -102,7 +102,12 @@ describe("runReviewJob", () => {
     const d = deps();
     const i = await input();
     const outcome = await runReviewJob(i, d);
-    expect(outcome).toEqual({ status: "ok", turns: 2, result, commentable: { "a.txt": [1, 2] } });
+    expect(outcome).toEqual({
+      status: "ok",
+      turns: 2,
+      result: { ...result, reportedVerdict: result.verdict },
+      commentable: { "a.txt": [1, 2] },
+    });
     expect(d.createWorktree.mock.calls[0]![0]).toEqual({
       cloneUrl: "https://github.com/o/r.git",
       token: "ghs_t",

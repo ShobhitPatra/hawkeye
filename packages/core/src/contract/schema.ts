@@ -50,7 +50,7 @@ export const ReviewResultSchema = z.object({
 });
 
 export type Finding = z.infer<typeof FindingSchema>;
-export type ReviewResult = z.infer<typeof ReviewResultSchema>;
+export type ReviewResult = z.infer<typeof ReviewResultSchema> & { reportedVerdict?: Verdict };
 
 export function verdictFor(findings: readonly Finding[]): Verdict {
   const severities = new Set(findings.map((finding) => finding.severity));
@@ -66,5 +66,9 @@ export function parseReviewResult(raw: unknown): ReviewResult {
     throw new Error(
       `Invalid review result: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
     );
-  return { ...parsed.data, verdict: verdictFor(parsed.data.findings) };
+  return {
+    ...parsed.data,
+    verdict: verdictFor(parsed.data.findings),
+    reportedVerdict: parsed.data.verdict,
+  };
 }

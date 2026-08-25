@@ -58,13 +58,23 @@ describe("parseReviewResult", () => {
     expect(verdictFor([finding("optional"), finding("should_fix")])).toBe("changes_needed");
     expect(verdictFor([finding("should_fix"), finding("must_fix")])).toBe("blocked");
   });
-  it("still accepts the legacy verdicts on the wire", () => {
-    for (const legacy of ["revise", "hold"]) {
-      const r = valid();
-      r.verdict = legacy;
-      r.findings = [];
-      expect(parseReviewResult(r).verdict).toBe("ship");
-    }
+  it("keeps what the model reported beside the derived verdict", () => {
+    const r = valid();
+    r.verdict = "ship";
+    const parsed = parseReviewResult(r);
+    expect(parsed.verdict).toBe("blocked");
+    expect(parsed.reportedVerdict).toBe("ship");
+  });
+  it("still accepts the legacy verdicts on the wire and maps them", () => {
+    const r = valid();
+    r.findings = [];
+    r.verdict = "revise";
+    expect(parseReviewResult(r)).toMatchObject({
+      verdict: "ship",
+      reportedVerdict: "changes_needed",
+    });
+    r.verdict = "hold";
+    expect(parseReviewResult(r)).toMatchObject({ verdict: "ship", reportedVerdict: "blocked" });
   });
   it("rejects an unknown verdict", () => {
     const r = valid();
