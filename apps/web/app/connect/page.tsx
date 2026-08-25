@@ -27,13 +27,15 @@ export default async function ConnectPage({
         <code>npx hawkeye runner login --url {siteUrl()}</code>
       </pre>
       <p>Then enter the code it shows and approve it.</p>
-      {pending && (
-        <p>
-          {pending.state === "pending"
-            ? `This code was requested ${formatUpdated(pending.createdAt.toISOString(), Date.now())} by a runner named "${pending.runnerName}". Approve it only if that is your machine.`
-            : `This code is ${pending.state}.`}
-        </p>
-      )}
+      {pending &&
+        (pending.state === "pending" ? (
+          <p>
+            Requested {formatUpdated(pending.createdAt.toISOString(), Date.now())} by a runner named{" "}
+            <code>{pending.runnerName}</code>. Approve it only if that is your machine.
+          </p>
+        ) : (
+          <p>This code is {pending.state}.</p>
+        ))}
       <ApproveLoginForm code={code} />
       <h2>Runner status</h2>
       <p>

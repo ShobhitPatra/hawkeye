@@ -43,7 +43,15 @@ describe("startLogin", () => {
   });
 
   it("rejects a bad name", async () => {
-    for (const body of [{}, { name: " " }, { name: 7 }, { name: "x".repeat(65) }, "laptop"]) {
+    for (const body of [
+      {},
+      { name: " " },
+      { name: 7 },
+      { name: "x".repeat(65) },
+      { name: "lap\ntop" },
+      { name: "-x" },
+      "laptop",
+    ]) {
       const response = await startLogin(post(body), deps());
       expect(response.status).toBe(400);
       expect(await response.json()).toHaveProperty("error");

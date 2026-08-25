@@ -4,8 +4,10 @@ import { collectRunnerLogin, formatRunnerLoginCode, startRunnerLogin } from "./r
 export const RUNNER_LOGIN_POLL_INTERVAL_SECONDS = 5;
 
 const RUNNER_NAME_MAX_LENGTH = 64;
+const RUNNER_NAME = /^[A-Za-z0-9][A-Za-z0-9 ._-]*$/;
 
-export type RunnerLoginApiDeps = { db: Db; siteUrl: string; now?: () => Date };
+export type CollectLoginDeps = { db: Db; now?: () => Date };
+export type RunnerLoginApiDeps = CollectLoginDeps & { siteUrl: string };
 
 function parseRunnerName(payload: unknown): string {
   if (typeof payload !== "object" || payload === null) throw new Error("a login must be an object");
@@ -15,6 +17,8 @@ function parseRunnerName(payload: unknown): string {
   if (!trimmed) throw new Error("a runner needs a name");
   if (trimmed.length > RUNNER_NAME_MAX_LENGTH)
     throw new Error(`a runner name is at most ${RUNNER_NAME_MAX_LENGTH} characters`);
+  if (!RUNNER_NAME.test(trimmed))
+    throw new Error("a runner name uses letters, digits, spaces, dots, underscores and dashes");
   return trimmed;
 }
 
@@ -52,7 +56,7 @@ function parseDeviceSecret(payload: unknown): string {
   return deviceSecret;
 }
 
-export async function collectLogin(request: Request, deps: RunnerLoginApiDeps): Promise<Response> {
+export async function collectLogin(request: Request, deps: CollectLoginDeps): Promise<Response> {
   let deviceSecret: string;
   try {
     deviceSecret = parseDeviceSecret(await request.json());
