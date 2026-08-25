@@ -255,7 +255,7 @@ export async function recordResult(
   if (report.status !== "ok" || !result) return Response.json({ ok: true }, { status: 200 });
 
   const [target] = await deps.db
-    .select({ headSha: job.headSha, createdAt: job.createdAt, armedPr })
+    .select({ headSha: job.headSha, armedPr })
     .from(job)
     .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
     .where(eq(job.id, completed.jobId));
@@ -267,23 +267,14 @@ export async function recordResult(
     result,
     commentable: report.commentable ?? {},
   });
-  const [newer] = await deps.db
-    .select({ id: job.id })
-    .from(job)
-    .where(
-      and(
-        eq(job.armedPrId, target.armedPr.id),
-        eq(job.state, "done"),
-        sql`(${job.createdAt}, ${job.id}) > (${target.createdAt}, ${completed.jobId})`,
-      ),
-    )
-    .limit(1);
-  const findings = newer
-    ? "superseded"
-    : await recordFindings(deps.db, {
-        armedPrId: target.armedPr.id,
-        headSha: target.headSha,
-        findings: result.findings,
-      });
+  const findings = await recordFindings(deps.db, {
+    armedPrId: target.armedPr.id,
+    headSha: target.headSha,
+    findings: result.findings,
+    jobId: completed.jobId,
+  }).catch((error: unknown) => {
+    deps.log?.(`findings not recorded for run ${runId}: ${(error as Error).message}`);
+    return "failed" as const;
+  });
   return Response.json({ ok: true, posted, findings }, { status: 200 });
 }

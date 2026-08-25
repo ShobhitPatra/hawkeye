@@ -1,15 +1,21 @@
 import { type Finding, findingId } from "@hawkeye/core";
 import { and, eq, isNull, notInArray, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
-import { finding } from "./db/schema";
+import { armedPr, finding, job } from "./db/schema";
 
-export type RecordFindingsInput = { armedPrId: string; headSha: string; findings: Finding[] };
+export type RecordFindingsInput = {
+  armedPrId: string;
+  headSha: string;
+  findings: Finding[];
+  jobId?: string;
+};
+type Transaction = Parameters<Parameters<Db["transaction"]>[0]>[0];
 export type RecordedFindings = { created: number; updated: number; resolved: number };
 
 export async function recordFindings(
   db: Db,
   input: RecordFindingsInput,
-): Promise<RecordedFindings> {
+): Promise<RecordedFindings | "superseded"> {
   const { armedPrId, headSha } = input;
   const byStableId = new Map<string, Finding>();
   for (const entry of input.findings) {
@@ -18,6 +24,9 @@ export async function recordFindings(
   }
 
   return db.transaction(async (tx) => {
+    await tx.execute(sql`select 1 from ${armedPr} where ${armedPr.id} = ${armedPrId} for update`);
+    if (input.jobId !== undefined && (await supersededBy(tx, armedPrId, input.jobId)))
+      return "superseded";
     const counts: RecordedFindings = { created: 0, updated: 0, resolved: 0 };
     if (byStableId.size > 0) {
       const rows = await tx
@@ -66,4 +75,19 @@ export async function recordFindings(
     counts.resolved = resolved.length;
     return counts;
   });
+}
+
+async function supersededBy(tx: Transaction, armedPrId: string, jobId: string): Promise<boolean> {
+  const [newer] = await tx
+    .select({ id: job.id })
+    .from(job)
+    .where(
+      and(
+        eq(job.armedPrId, armedPrId),
+        eq(job.state, "done"),
+        sql`(${job.createdAt}, ${job.id}) > (select created_at, id from ${job} own where own.id = ${jobId})`,
+      ),
+    )
+    .limit(1);
+  return newer !== undefined;
 }

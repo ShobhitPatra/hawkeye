@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
 import { recordFindings } from "./findings";
+import { enqueueJob } from "./jobs";
 import { createTestDb, seedArmedPullRequest } from "./test/pglite";
 
 const firstHead = "a".repeat(40);
@@ -120,5 +121,39 @@ describe("recordFindings", () => {
     });
 
     for (const row of await rows()) expect(row.resolvedSha).toBe(secondHead);
+  });
+  it("reports superseded when a newer job for the pull request is done", async () => {
+    const older = await enqueueJob(db, {
+      armedPrId: "armed-1",
+      headSha: firstHead,
+      baseSha: "b".repeat(40),
+      notBefore: new Date(),
+    });
+    await db.update(schema.job).set({ state: "done" }).where(eq(schema.job.id, older.id));
+    const newer = await enqueueJob(db, {
+      armedPrId: "armed-1",
+      headSha: secondHead,
+      baseSha: "b".repeat(40),
+      notBefore: new Date(),
+    });
+    await expect(
+      recordFindings(db, {
+        armedPrId: "armed-1",
+        headSha: firstHead,
+        findings: [anchored],
+        jobId: older.id,
+      }),
+    ).resolves.toEqual({ created: 1, updated: 0, resolved: 0 });
+
+    await db.update(schema.job).set({ state: "done" }).where(eq(schema.job.id, newer.id));
+    await expect(
+      recordFindings(db, {
+        armedPrId: "armed-1",
+        headSha: firstHead,
+        findings: [],
+        jobId: older.id,
+      }),
+    ).resolves.toBe("superseded");
+    expect((await rows())[0]?.resolvedSha).toBeNull();
   });
 });
