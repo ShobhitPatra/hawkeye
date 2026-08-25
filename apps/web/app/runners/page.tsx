@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getDb } from "@/db";
 import { formatUpdated } from "@/format-updated";
 import { listRunners } from "@/runner-tokens";
@@ -18,6 +19,9 @@ export default async function RunnersPage() {
     <main>
       <h1>Runners</h1>
       <p>A runner polls for review jobs with its own token. The token is shown once.</p>
+      <p>
+        <Link href="/connect">Connect a runner</Link> from the command line instead.
+      </p>
       <CreateRunnerForm />
       {runners.length === 0 ? (
         <p>No runners yet</p>

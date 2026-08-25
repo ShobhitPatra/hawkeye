@@ -1,0 +1,53 @@
+import type { Db } from "./db/client";
+import { collectRunnerLogin, formatRunnerLoginCode, startRunnerLogin } from "./runner-login";
+
+export const RUNNER_LOGIN_POLL_INTERVAL_SECONDS = 5;
+
+const RUNNER_NAME_MAX_LENGTH = 64;
+
+export type RunnerLoginApiDeps = { db: Db; siteUrl: string; now?: () => Date };
+
+function parseRunnerName(payload: unknown): string {
+  if (typeof payload !== "object" || payload === null) throw new Error("a login must be an object");
+  const { name } = payload as Record<string, unknown>;
+  if (typeof name !== "string") throw new Error("a runner needs a name");
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("a runner needs a name");
+  if (trimmed.length > RUNNER_NAME_MAX_LENGTH)
+    throw new Error(`a runner name is at most ${RUNNER_NAME_MAX_LENGTH} characters`);
+  return trimmed;
+}
+
+export async function startLogin(request: Request, deps: RunnerLoginApiDeps): Promise<Response> {
+  let runnerName: string;
+  try {
+    runnerName = parseRunnerName(await request.json());
+  } catch (error) {
+    return Response.json(
+      { error: error instanceof Error ? error.message : "invalid login" },
+      { status: 400 },
+    );
+  }
+  const now = deps.now?.() ?? new Date();
+  const { code, deviceSecret, expiresAt } = await startRunnerLogin(deps.db, { runnerName, now });
+  const verifyUrl = `${deps.siteUrl}/connect?code=${formatRunnerLoginCode(code)}`;
+  return Response.json(
+    {
+      code: formatRunnerLoginCode(code),
+      deviceSecret,
+      verifyUrl,
+      expiresAt: expiresAt.toISOString(),
+      intervalSeconds: RUNNER_LOGIN_POLL_INTERVAL_SECONDS,
+    },
+    { status: 201 },
+  );
+}
+
+export async function collectLogin(
+  deps: RunnerLoginApiDeps,
+  deviceSecret: string,
+): Promise<Response> {
+  const now = deps.now?.() ?? new Date();
+  const result = await collectRunnerLogin(deps.db, { deviceSecret, now });
+  return Response.json(result, { status: result.status === "expired" ? 410 : 200 });
+}

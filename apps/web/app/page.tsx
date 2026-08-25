@@ -13,6 +13,7 @@ export default async function HomePage() {
         <>
           <Link href="/prs">Pull requests</Link>
           <Link href="/runners">Runners</Link>
+          <Link href="/connect">Connect a runner</Link>
           <SignOutButton />
         </>
       ) : (
