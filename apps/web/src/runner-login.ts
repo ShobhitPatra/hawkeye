@@ -1,7 +1,7 @@
 import { randomBytes, randomInt } from "node:crypto";
-import { and, eq, gt, isNull, lte } from "drizzle-orm";
+import { and, eq, gt, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import type { Db } from "./db/client";
-import { runnerLogin } from "./db/schema";
+import { runner, runnerLogin } from "./db/schema";
 import { createRunnerToken, hashRunnerToken } from "./runner-tokens";
 
 export const RUNNER_LOGIN_TTL_MS = 10 * 60 * 1000;
@@ -28,6 +28,19 @@ function mintDeviceSecret(): string {
   return `${DEVICE_SECRET_PREFIX}${randomBytes(DEVICE_SECRET_BYTES).toString("base64url")}`;
 }
 
+async function sweepRunnerLogins(db: Db, now: Date): Promise<void> {
+  await db.transaction(async (tx) => {
+    const lapsed = await tx
+      .select({ runnerId: runnerLogin.runnerId })
+      .from(runnerLogin)
+      .where(and(lte(runnerLogin.expiresAt, now), isNotNull(runnerLogin.token)));
+    const orphaned = lapsed.flatMap((row) => (row.runnerId ? [row.runnerId] : []));
+    if (orphaned.length > 0)
+      await tx.update(runner).set({ revokedAt: now }).where(inArray(runner.id, orphaned));
+    await tx.delete(runnerLogin).where(lte(runnerLogin.expiresAt, now));
+  });
+}
+
 export function formatRunnerLoginCode(code: string): string {
   return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
@@ -52,9 +65,7 @@ export async function startRunnerLogin(
   const code = mintCode();
   const deviceSecret = mintDeviceSecret();
   const expiresAt = new Date(now.getTime() + RUNNER_LOGIN_TTL_MS);
-  await db
-    .delete(runnerLogin)
-    .where(and(lte(runnerLogin.expiresAt, now), isNull(runnerLogin.token)));
+  await sweepRunnerLogins(db, now);
   await db.insert(runnerLogin).values({
     code,
     deviceSecretHash: hashRunnerToken(deviceSecret),
@@ -65,14 +76,25 @@ export async function startRunnerLogin(
   return { code, deviceSecret, expiresAt };
 }
 
+export type RunnerLoginSummary = {
+  runnerName: string;
+  createdAt: Date;
+  state: "pending" | "approved" | "expired";
+};
+
 export async function findRunnerLogin(
   db: Db,
   input: { code: string; now?: Date },
-): Promise<{ runnerName: string; createdAt: Date; state: "pending" | "approved" | "expired" }> {
+): Promise<RunnerLoginSummary | undefined> {
   const now = input.now ?? new Date();
-  const code = normalizeRunnerLoginCode(input.code);
+  let code: string;
+  try {
+    code = normalizeRunnerLoginCode(input.code);
+  } catch {
+    return undefined;
+  }
   const [login] = await db.select().from(runnerLogin).where(eq(runnerLogin.code, code));
-  if (!login) throw new Error("unknown login code");
+  if (!login) return undefined;
   const state = login.approvedAt
     ? "approved"
     : login.expiresAt.getTime() <= now.getTime()
@@ -129,7 +151,7 @@ export async function collectRunnerLogin(
       .from(runnerLogin)
       .where(eq(runnerLogin.deviceSecretHash, secretHash))
       .for("update");
-    if (!login) return { status: "expired" };
+    if (!login || login.expiresAt.getTime() <= now.getTime()) return { status: "expired" };
     if (login.token) {
       await tx
         .update(runnerLogin)
@@ -137,8 +159,6 @@ export async function collectRunnerLogin(
         .where(eq(runnerLogin.id, login.id));
       return { status: "approved", token: login.token };
     }
-    if (login.approvedAt || login.expiresAt.getTime() <= now.getTime())
-      return { status: "expired" };
-    return { status: "pending" };
+    return login.approvedAt ? { status: "expired" } : { status: "pending" };
   });
 }
