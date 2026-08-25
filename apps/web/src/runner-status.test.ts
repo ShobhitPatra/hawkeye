@@ -41,6 +41,12 @@ describe("runnerStatus", () => {
       waitingJobs: 0,
     });
     expect(await runnerStatus(db, "user-2", now)).toEqual({ online: false, waitingJobs: 0 });
+
+    await createRunnerToken(db, { userId: "user-1", name: "desk" });
+    expect(await runnerStatus(db, "user-1", now)).toMatchObject({
+      online: true,
+      lastSeenAt: recent,
+    });
   });
 
   it("is offline when the last sighting is stale or the runner is revoked", async () => {

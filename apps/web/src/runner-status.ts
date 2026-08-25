@@ -1,4 +1,4 @@
-import { and, count, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { armedPr, job, runner } from "./db/schema";
 
@@ -14,7 +14,7 @@ export async function runnerStatus(
   const [latest] = await db
     .select({ lastSeenAt: runner.lastSeenAt })
     .from(runner)
-    .where(and(eq(runner.userId, userId), isNull(runner.revokedAt)))
+    .where(and(eq(runner.userId, userId), isNull(runner.revokedAt), isNotNull(runner.lastSeenAt)))
     .orderBy(desc(runner.lastSeenAt))
     .limit(1);
   const [waiting] = await db
