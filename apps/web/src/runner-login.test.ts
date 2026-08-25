@@ -10,6 +10,7 @@ import {
   normalizeRunnerLoginCode,
   RUNNER_LOGIN_TTL_MS,
   startRunnerLogin,
+  sweepRunnerLogins,
 } from "./runner-login";
 import { authenticateRunner, hashRunnerToken } from "./runner-tokens";
 import { createTestDb } from "./test/pglite";
@@ -150,7 +151,7 @@ describe("findRunnerLogin", () => {
 });
 
 describe("sweep", () => {
-  it("deletes expired logins when a new one starts and revokes an uncollected runner", async () => {
+  it("deletes expired logins on start, collect and sweep and revokes an uncollected runner", async () => {
     const { code } = await startRunnerLogin(db, { runnerName: "old", now });
     await startRunnerLogin(db, { runnerName: "new", now: later });
     const rows = await db.select().from(schema.runnerLogin);
@@ -163,11 +164,21 @@ describe("sweep", () => {
     expect(
       await collectRunnerLogin(db, { deviceSecret: parked.deviceSecret, now: afterLater }),
     ).toEqual({ status: "expired" });
-    await startRunnerLogin(db, { runnerName: "newer", now: afterLater });
     expect((await db.select().from(schema.runnerLogin)).map((row) => row.runnerName)).toEqual([
-      "newer",
+      "new",
     ]);
     const [orphan] = await db.select().from(schema.runner).where(eq(schema.runner.name, "parked"));
     expect(orphan?.revokedAt).toEqual(afterLater);
+
+    const idle = await startRunnerLogin(db, { runnerName: "idle", now: afterLater });
+    await approveRunnerLogin(db, { userId: "user-1", code: idle.code, now: afterLater });
+    const muchLater = new Date(afterLater.getTime() + RUNNER_LOGIN_TTL_MS);
+    await sweepRunnerLogins(db, muchLater);
+    expect(await db.select().from(schema.runnerLogin)).toEqual([]);
+    const [idleRunner] = await db
+      .select()
+      .from(schema.runner)
+      .where(eq(schema.runner.name, "idle"));
+    expect(idleRunner?.revokedAt).toEqual(muchLater);
   });
 });

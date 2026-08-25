@@ -28,7 +28,7 @@ function mintDeviceSecret(): string {
   return `${DEVICE_SECRET_PREFIX}${randomBytes(DEVICE_SECRET_BYTES).toString("base64url")}`;
 }
 
-async function sweepRunnerLogins(db: Db, now: Date): Promise<void> {
+export async function sweepRunnerLogins(db: Db, now = new Date()): Promise<void> {
   await db.transaction(async (tx) => {
     const lapsed = await tx
       .select({ runnerId: runnerLogin.runnerId })
@@ -151,7 +151,13 @@ export async function collectRunnerLogin(
       .from(runnerLogin)
       .where(eq(runnerLogin.deviceSecretHash, secretHash))
       .for("update");
-    if (!login || login.expiresAt.getTime() <= now.getTime()) return { status: "expired" };
+    if (!login) return { status: "expired" };
+    if (login.expiresAt.getTime() <= now.getTime()) {
+      if (login.token && login.runnerId)
+        await tx.update(runner).set({ revokedAt: now }).where(eq(runner.id, login.runnerId));
+      await tx.delete(runnerLogin).where(eq(runnerLogin.id, login.id));
+      return { status: "expired" };
+    }
     if (login.token) {
       await tx
         .update(runnerLogin)
