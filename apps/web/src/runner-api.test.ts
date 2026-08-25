@@ -423,7 +423,7 @@ describe("recordResult", () => {
   it("records the findings of an ok result and reports the counts", async () => {
     const withFindings: ReviewResult = {
       ...reviewResult,
-      verdict: "revise",
+      verdict: "changes_needed",
       findings: [
         { path: "a.txt", line: 2, severity: "should_fix", claim: "Leaks a handle", detail: "d" },
         { severity: "must_fix", claim: "Missing tests", detail: "d" },

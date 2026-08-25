@@ -12,7 +12,7 @@ import { createTestDb, seedArmedPullRequest } from "./test/pglite";
 const headSha = "a".repeat(40);
 const armedPr = { id: "armed-1", installationId: "10", owner: "octo", repo: "repo", number: 7 };
 const result: ReviewResult = {
-  verdict: "revise",
+  verdict: "changes_needed",
   summary: "needs work",
   lenses: ["intent", "behavior", "blast_radius", "verification", "fit", "hygiene"].map((name) => ({
     name,
