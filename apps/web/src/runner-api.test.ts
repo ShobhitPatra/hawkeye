@@ -484,7 +484,7 @@ describe("recordResult", () => {
     expect(await response.json()).toEqual({
       ok: true,
       posted: "already-posted",
-      findings: { created: 0, updated: 0, resolved: 0 },
+      findings: "already-posted",
     });
     expect(github.postReview).toHaveBeenCalledTimes(1);
     expect(await db.select().from(schema.reviewPosted)).toHaveLength(1);
@@ -548,6 +548,43 @@ describe("recordResult", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, posted: "posted", findings: "failed" });
     expect(log).toHaveBeenCalledWith(`findings not recorded for run ${runId}: db gone`);
+  });
+
+  it("leaves the rows alone when the head was already posted", async () => {
+    const first = await claimedRunId();
+    const withFinding = {
+      ...reviewResult,
+      findings: [{ severity: "should_fix", claim: "first", detail: "d", path: "a.ts", line: 1 }],
+    };
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${first}/result`, {
+        status: "ok",
+        turns: 1,
+        result: withFinding,
+      }),
+      { db, github },
+      first,
+    );
+    const second = await claimedRunId();
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${second}/result`, {
+        status: "ok",
+        turns: 1,
+        result: reviewResult,
+      }),
+      { db, github },
+      second,
+    );
+
+    expect(await response.json()).toEqual({
+      ok: true,
+      posted: "already-posted",
+      findings: "already-posted",
+    });
+    const stored = await db.select().from(schema.finding);
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.resolvedSha).toBeNull();
   });
 
   it("does not record findings from a result whose head a newer done job superseded", async () => {

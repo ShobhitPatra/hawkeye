@@ -267,6 +267,8 @@ export async function recordResult(
     result,
     commentable: report.commentable ?? {},
   });
+  if (posted === "already-posted")
+    return Response.json({ ok: true, posted, findings: "already-posted" }, { status: 200 });
   const findings = await recordFindings(deps.db, {
     armedPrId: target.armedPr.id,
     headSha: target.headSha,
