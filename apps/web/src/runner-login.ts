@@ -1,5 +1,5 @@
 import { randomBytes, randomInt } from "node:crypto";
-import { and, count, eq, gt, isNull, lte } from "drizzle-orm";
+import { and, asc, count, eq, gt, inArray, isNull, lte } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { runnerLogin } from "./db/schema";
 import { createRunnerToken, hashRunnerToken, normalizeRunnerName } from "./runner-tokens";
@@ -11,10 +11,10 @@ const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 8;
 const DEVICE_SECRET_PREFIX = "hkd_";
 const DEVICE_SECRET_BYTES = 32;
-export class TooManyRunnerLoginsError extends Error {
-  constructor() {
-    super("too many logins are waiting for approval; try again in a few minutes");
-    this.name = "TooManyRunnerLoginsError";
+export class RunnerLoginError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RunnerLoginError";
   }
 }
 
@@ -39,6 +39,23 @@ export async function sweepRunnerLogins(db: Db, now = new Date()): Promise<void>
   await db.delete(runnerLogin).where(lte(runnerLogin.expiresAt, now));
 }
 
+async function evictOldestRunnerLogins(db: Db): Promise<void> {
+  const [open] = await db.select({ open: count() }).from(runnerLogin);
+  const excess = (open?.open ?? 0) - (MAX_OPEN_RUNNER_LOGINS - 1);
+  if (excess <= 0) return;
+  const oldest = await db
+    .select({ id: runnerLogin.id })
+    .from(runnerLogin)
+    .orderBy(asc(runnerLogin.createdAt), asc(runnerLogin.id))
+    .limit(excess);
+  await db.delete(runnerLogin).where(
+    inArray(
+      runnerLogin.id,
+      oldest.map((row) => row.id),
+    ),
+  );
+}
+
 export function formatRunnerLoginCode(code: string): string {
   return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
@@ -49,7 +66,7 @@ export function normalizeRunnerLoginCode(input: string): string {
     .toUpperCase()
     .replace(/^([^-]{4})-/, "$1");
   if (code.length !== CODE_LENGTH || [...code].some((char) => !CODE_ALPHABET.includes(char)))
-    throw new Error("a login code looks like XXXX-XXXX");
+    throw new RunnerLoginError("a login code looks like XXXX-XXXX");
   return code;
 }
 
@@ -63,8 +80,7 @@ export async function startRunnerLogin(
   const deviceSecret = mintDeviceSecret();
   const expiresAt = new Date(now.getTime() + RUNNER_LOGIN_TTL_MS);
   await sweepRunnerLogins(db, now);
-  const [open] = await db.select({ open: count() }).from(runnerLogin);
-  if ((open?.open ?? 0) >= MAX_OPEN_RUNNER_LOGINS) throw new TooManyRunnerLoginsError();
+  await evictOldestRunnerLogins(db);
   await db.insert(runnerLogin).values({
     code,
     deviceSecretHash: hashRunnerToken(deviceSecret),
@@ -121,9 +137,9 @@ export async function approveRunnerLogin(
     .returning({ runnerName: runnerLogin.runnerName });
   if (claimed) return claimed;
   const [login] = await db.select().from(runnerLogin).where(eq(runnerLogin.code, code));
-  if (!login) throw new Error("unknown login code");
-  if (login.approvedAt) throw new Error("this login code was already approved");
-  throw new Error("this login code has expired");
+  if (!login) throw new RunnerLoginError("unknown login code");
+  if (login.approvedAt) throw new RunnerLoginError("this login code was already approved");
+  throw new RunnerLoginError("this login code has expired");
 }
 
 export async function collectRunnerLogin(
@@ -138,20 +154,17 @@ export async function collectRunnerLogin(
       .from(runnerLogin)
       .where(eq(runnerLogin.deviceSecretHash, secretHash))
       .for("update");
-    if (!login || login.collectedAt) return { status: "expired" };
+    if (!login) return { status: "expired" };
     if (login.expiresAt.getTime() <= now.getTime()) {
       await tx.delete(runnerLogin).where(eq(runnerLogin.id, login.id));
       return { status: "expired" };
     }
     if (!login.approvedAt || !login.userId) return { status: "pending" };
-    const { runner, token } = await createRunnerToken(tx, {
+    const { token } = await createRunnerToken(tx, {
       userId: login.userId,
       name: login.runnerName,
     });
-    await tx
-      .update(runnerLogin)
-      .set({ runnerId: runner.id, collectedAt: now })
-      .where(eq(runnerLogin.id, login.id));
+    await tx.delete(runnerLogin).where(eq(runnerLogin.id, login.id));
     return { status: "approved", token };
   });
 }

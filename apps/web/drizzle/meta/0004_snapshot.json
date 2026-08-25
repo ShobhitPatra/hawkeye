@@ -1,5 +1,5 @@
 {
-  "id": "e42f5170-6185-4a36-90c0-4dd9db6f8c03",
+  "id": "0c4679a6-71ad-4c15-81a4-54dd9637c82c",
   "prevId": "955c8e6c-ef1b-4fba-bba2-b6e8316518ee",
   "version": "7",
   "dialect": "postgresql",
@@ -744,12 +744,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "runner_id": {
-          "name": "runner_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "expires_at": {
           "name": "expires_at",
           "type": "timestamp with time zone",
@@ -758,12 +752,6 @@
         },
         "approved_at": {
           "name": "approved_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "collected_at": {
-          "name": "collected_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -783,15 +771,6 @@
           "tableFrom": "runner_login",
           "tableTo": "user",
           "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "runner_login_runner_id_runner_id_fk": {
-          "name": "runner_login_runner_id_runner_id_fk",
-          "tableFrom": "runner_login",
-          "tableTo": "runner",
-          "columnsFrom": ["runner_id"],
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"

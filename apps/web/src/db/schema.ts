@@ -202,9 +202,7 @@ export const runnerLogin = pgTable("runner_login", {
   deviceSecretHash: text("device_secret_hash").notNull().unique(),
   runnerName: text("runner_name").notNull(),
   userId: text("user_id").references(() => user.id),
-  runnerId: text("runner_id").references(() => runner.id),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   approvedAt: timestamp("approved_at", { withTimezone: true }),
-  collectedAt: timestamp("collected_at", { withTimezone: true }),
   ...timestamps,
 });

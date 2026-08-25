@@ -40,7 +40,6 @@ describe("startRunnerLogin", () => {
       runnerName: "laptop",
       deviceSecretHash: hashRunnerToken(login.deviceSecret),
       userId: null,
-      runnerId: null,
       approvedAt: null,
     });
   });
@@ -50,18 +49,21 @@ describe("startRunnerLogin", () => {
       await expect(startRunnerLogin(db, { runnerName })).rejects.toThrow();
   });
 
-  it("refuses a new login once too many are open", async () => {
+  it("evicts the oldest open logins once too many are open", async () => {
     await db.insert(schema.runnerLogin).values(
       Array.from({ length: MAX_OPEN_RUNNER_LOGINS }, (_, index) => ({
         code: index.toString(36).padStart(8, "0").toUpperCase(),
         deviceSecretHash: `hash-${index}`,
         runnerName: "flood",
         expiresAt: later,
+        createdAt: new Date(now.getTime() + index),
       })),
     );
-    await expect(startRunnerLogin(db, { runnerName: "laptop", now })).rejects.toThrow(
-      "too many logins",
-    );
+    await startRunnerLogin(db, { runnerName: "laptop", now });
+    const rows = await db.select().from(schema.runnerLogin);
+    expect(rows).toHaveLength(MAX_OPEN_RUNNER_LOGINS);
+    expect(rows.some((row) => row.deviceSecretHash === "hash-0")).toBe(false);
+    expect(rows.some((row) => row.runnerName === "laptop")).toBe(true);
   });
 
   it("rejects a blank name", async () => {
@@ -98,7 +100,7 @@ describe("approveRunnerLogin", () => {
     expect(approved).toEqual({ runnerName: "laptop" });
     expect(await db.select().from(schema.runner)).toHaveLength(0);
     const [row] = await db.select().from(schema.runnerLogin);
-    expect(row).toMatchObject({ userId: "user-1", runnerId: null, approvedAt: now });
+    expect(row).toMatchObject({ userId: "user-1", approvedAt: now });
   });
 
   it("throws on an unknown, approved or expired code", async () => {
@@ -135,8 +137,7 @@ describe("collectRunnerLogin", () => {
       .select()
       .from(schema.runnerLogin)
       .where(eq(schema.runnerLogin.code, code));
-    const [runner] = await db.select().from(schema.runner);
-    expect(row).toMatchObject({ runnerId: runner?.id, collectedAt: now });
+    expect(row).toBeUndefined();
     expect(await collectRunnerLogin(db, { deviceSecret, now })).toEqual({ status: "expired" });
     expect(await db.select().from(schema.runner)).toHaveLength(1);
   });
