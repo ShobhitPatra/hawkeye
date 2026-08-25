@@ -57,11 +57,12 @@ describe("createControlPlaneClient", () => {
       posted: "already-posted",
     });
   });
-  it("rejects an unknown posting outcome", async () => {
-    const { client: c } = client(() => Response.json({ ok: true, posted: "maybe" }));
-    await expect(c.sendResult("r1", { status: "ok", turns: 1 })).rejects.toThrow(
-      "invalid result acknowledgement: posted maybe",
-    );
+  it("passes an unknown posting outcome through", async () => {
+    const { client: c } = client(() => Response.json({ ok: true, posted: "deferred" }));
+    await expect(c.sendResult("r1", { status: "ok", turns: 1 })).resolves.toEqual({
+      ok: true,
+      posted: "deferred",
+    });
   });
   it("posts heartbeats, events and results as JSON", async () => {
     const { fetch, client: c } = client(() => Response.json({ ok: true }));

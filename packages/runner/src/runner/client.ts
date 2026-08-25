@@ -1,11 +1,6 @@
-import {
-  type ClaimedJob,
-  REVIEW_POSTING_OUTCOMES,
-  type ReviewPostingOutcome,
-  type RunEvent,
-  type RunResultAcknowledgement,
-  type RunResultReport,
-} from "@hawkeye/core";
+import type { ClaimedJob, RunEvent, RunResultReport } from "@hawkeye/core";
+
+export type ResultAcknowledgement = { ok: true; posted?: string };
 
 export class ControlPlaneRequestError extends Error {
   constructor(
@@ -21,18 +16,15 @@ export type ControlPlaneClient = {
   claimJob(options?: { signal?: AbortSignal }): Promise<ClaimedJob | undefined>;
   heartbeat(jobId: string): Promise<void>;
   sendEvents(runId: string, events: RunEvent[]): Promise<void>;
-  sendResult(runId: string, report: RunResultReport): Promise<RunResultAcknowledgement>;
+  sendResult(runId: string, report: RunResultReport): Promise<ResultAcknowledgement>;
 };
 
-function acknowledgement(payload: unknown): RunResultAcknowledgement {
+function acknowledgement(payload: unknown): ResultAcknowledgement {
   const posted =
     typeof payload === "object" && payload !== null
       ? (payload as { posted?: unknown }).posted
       : undefined;
-  if (posted === undefined) return { ok: true };
-  if (!REVIEW_POSTING_OUTCOMES.includes(posted as ReviewPostingOutcome))
-    throw new Error(`invalid result acknowledgement: posted ${String(posted)}`);
-  return { ok: true, posted: posted as ReviewPostingOutcome };
+  return typeof posted === "string" ? { ok: true, posted } : { ok: true };
 }
 
 function invalid(field: string): never {
