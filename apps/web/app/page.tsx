@@ -1,11 +1,8 @@
 import Link from "next/link";
+import { localPath } from "@/local-path";
 import { getSession } from "@/session";
 import { SignInButton } from "./sign-in-button";
 import { SignOutButton } from "./sign-out-button";
-
-function localPath(value: string | undefined): string | undefined {
-  return value !== undefined && /^\/(?!\/)/.test(value) ? value : undefined;
-}
 
 export default async function HomePage({
   searchParams,
