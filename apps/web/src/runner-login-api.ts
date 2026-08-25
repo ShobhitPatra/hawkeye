@@ -43,10 +43,25 @@ export async function startLogin(request: Request, deps: RunnerLoginApiDeps): Pr
   );
 }
 
-export async function collectLogin(
-  deps: RunnerLoginApiDeps,
-  deviceSecret: string,
-): Promise<Response> {
+function parseDeviceSecret(payload: unknown): string {
+  if (typeof payload !== "object" || payload === null)
+    throw new Error("a collect request must be an object");
+  const { deviceSecret } = payload as Record<string, unknown>;
+  if (typeof deviceSecret !== "string" || !deviceSecret)
+    throw new Error("a collect request needs a device secret");
+  return deviceSecret;
+}
+
+export async function collectLogin(request: Request, deps: RunnerLoginApiDeps): Promise<Response> {
+  let deviceSecret: string;
+  try {
+    deviceSecret = parseDeviceSecret(await request.json());
+  } catch (error) {
+    return Response.json(
+      { error: error instanceof Error ? error.message : "invalid collect request" },
+      { status: 400 },
+    );
+  }
   const now = deps.now?.() ?? new Date();
   const result = await collectRunnerLogin(deps.db, { deviceSecret, now });
   return Response.json(result, { status: result.status === "expired" ? 410 : 200 });

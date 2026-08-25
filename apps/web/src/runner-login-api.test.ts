@@ -51,25 +51,33 @@ describe("startLogin", () => {
   });
 });
 
+function collect(deviceSecret: string) {
+  return new Request("http://localhost/api/runner/login/collect", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ deviceSecret }),
+  });
+}
+
 describe("collectLogin", () => {
   it("reports pending, then approved once, then expired", async () => {
     const { code, deviceSecret } = await (
       await startLogin(post({ name: "laptop" }), deps())
     ).json();
 
-    const pending = await collectLogin(deps(), deviceSecret);
+    const pending = await collectLogin(collect(deviceSecret), deps());
     expect(pending.status).toBe(200);
     expect(await pending.json()).toEqual({ status: "pending" });
 
     await approveRunnerLogin(db, { userId: "user-1", code, now });
-    const approved = await collectLogin(deps(), deviceSecret);
+    const approved = await collectLogin(collect(deviceSecret), deps());
     expect(approved.status).toBe(200);
     expect(await approved.json()).toEqual({
       status: "approved",
       token: expect.stringMatching(/^hk_/),
     });
 
-    const again = await collectLogin(deps(), deviceSecret);
+    const again = await collectLogin(collect(deviceSecret), deps());
     expect(again.status).toBe(410);
     expect(await again.json()).toEqual({ status: "expired" });
   });
@@ -77,11 +85,12 @@ describe("collectLogin", () => {
   it("expires an unknown secret and a stale login", async () => {
     const { deviceSecret } = await (await startLogin(post({ name: "laptop" }), deps())).json();
 
-    expect((await collectLogin(deps(), "hkd_nope")).status).toBe(410);
+    expect((await collectLogin(collect("hkd_nope"), deps())).status).toBe(410);
     const stale = await collectLogin(
+      collect(deviceSecret),
       deps(new Date(now.getTime() + RUNNER_LOGIN_TTL_MS)),
-      deviceSecret,
     );
     expect(stale.status).toBe(410);
+    expect((await collectLogin(collect(""), deps())).status).toBe(400);
   });
 });
