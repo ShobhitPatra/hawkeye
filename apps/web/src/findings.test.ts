@@ -20,14 +20,23 @@ const anchored: Finding = {
 const unanchored: Finding = { severity: "must_fix", claim: "Unanchored claim", detail: "d" };
 
 let db: Db;
+let jobId: string;
 
 beforeEach(async () => {
   db = await createTestDb();
   await seedArmedPullRequest(db);
+  const own = await enqueueJob(db, {
+    armedPrId: "armed-1",
+    headSha: firstHead,
+    baseSha: "b".repeat(40),
+    notBefore: new Date(),
+  });
+  await db.update(schema.job).set({ state: "done" }).where(eq(schema.job.id, own.id));
+  jobId = own.id;
 });
 
 const record = (headSha: string, findings: Finding[]) =>
-  recordFindings(db, { armedPrId: "armed-1", headSha, findings });
+  recordFindings(db, { armedPrId: "armed-1", headSha, findings, jobId });
 
 const rows = () => db.select().from(schema.finding).where(eq(schema.finding.armedPrId, "armed-1"));
 

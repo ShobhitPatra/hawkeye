@@ -521,6 +521,35 @@ describe("recordResult", () => {
     expect(await db.select().from(schema.reviewPosted)).toHaveLength(0);
   });
 
+  it("reports failed findings and keeps the posted review when recording throws", async () => {
+    const runId = await claimedRunId();
+    const log = vi.fn();
+    let transactions = 0;
+    const broken = Object.create(db, {
+      transaction: {
+        value: (...args: Parameters<typeof db.transaction>) => {
+          transactions += 1;
+          if (transactions > 1) throw new Error("db gone");
+          return db.transaction(...args);
+        },
+      },
+    }) as typeof db;
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: reviewResult,
+      }),
+      { db: broken, github, log },
+      runId,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, posted: "posted", findings: "failed" });
+    expect(log).toHaveBeenCalledWith(`findings not recorded for run ${runId}: db gone`);
+  });
+
   it("does not record findings from a result whose head a newer done job superseded", async () => {
     const runId = await claimedRunId();
     const newer = await enqueueJob(db, {

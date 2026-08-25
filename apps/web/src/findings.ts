@@ -7,7 +7,7 @@ export type RecordFindingsInput = {
   armedPrId: string;
   headSha: string;
   findings: Finding[];
-  jobId?: string;
+  jobId: string;
 };
 type Transaction = Parameters<Parameters<Db["transaction"]>[0]>[0];
 export type RecordedFindings = { created: number; updated: number; resolved: number };
@@ -25,8 +25,7 @@ export async function recordFindings(
 
   return db.transaction(async (tx) => {
     await tx.execute(sql`select 1 from ${armedPr} where ${armedPr.id} = ${armedPrId} for update`);
-    if (input.jobId !== undefined && (await supersededBy(tx, armedPrId, input.jobId)))
-      return "superseded";
+    if (await supersededBy(tx, armedPrId, input.jobId)) return "superseded";
     const counts: RecordedFindings = { created: 0, updated: 0, resolved: 0 };
     if (byStableId.size > 0) {
       const rows = await tx

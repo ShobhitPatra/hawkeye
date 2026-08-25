@@ -273,7 +273,8 @@ export async function recordResult(
     findings: result.findings,
     jobId: completed.jobId,
   }).catch((error: unknown) => {
-    deps.log?.(`findings not recorded for run ${runId}: ${(error as Error).message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    deps.log?.(`findings not recorded for run ${runId}: ${message}`);
     return "failed" as const;
   });
   return Response.json({ ok: true, posted, findings }, { status: 200 });
