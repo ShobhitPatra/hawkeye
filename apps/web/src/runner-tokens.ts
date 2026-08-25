@@ -24,13 +24,24 @@ export function parseRunnerToken(authorization: string | null | undefined): stri
   return token.startsWith(TOKEN_PREFIX) ? token : undefined;
 }
 
+const RUNNER_NAME_MAX_LENGTH = 64;
+const RUNNER_NAME = /^[\p{L}\p{N}][\p{L}\p{N} ._-]*$/u;
+
+export function normalizeRunnerName(input: string): string {
+  const name = input.trim();
+  if (!name) throw new Error("a runner needs a name");
+  if (name.length > RUNNER_NAME_MAX_LENGTH)
+    throw new Error(`a runner name is at most ${RUNNER_NAME_MAX_LENGTH} characters`);
+  if (!RUNNER_NAME.test(name))
+    throw new Error("a runner name uses letters, digits, spaces, dots, underscores and dashes");
+  return name;
+}
+
 export async function createRunnerToken(
   db: Db,
   input: { userId: string; name: string },
 ): Promise<{ runner: Runner; token: string }> {
-  const name = input.name.trim();
-  if (!name) throw new Error("a runner needs a name");
-
+  const name = normalizeRunnerName(input.name);
   const token = mintToken();
   const [row] = await db
     .insert(runner)

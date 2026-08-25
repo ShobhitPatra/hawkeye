@@ -2,11 +2,11 @@
 
 import { authClient } from "@/auth-client";
 
-export function SignInButton() {
+export function SignInButton({ callbackURL = "/prs" }: { callbackURL?: string }) {
   return (
     <button
       type="button"
-      onClick={() => authClient.signIn.social({ provider: "github", callbackURL: "/prs" })}
+      onClick={() => authClient.signIn.social({ provider: "github", callbackURL })}
     >
       Sign in with GitHub
     </button>

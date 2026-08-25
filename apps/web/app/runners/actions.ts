@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
-import { createRunnerToken, revokeRunnerToken } from "@/runner-tokens";
+import { createRunnerToken, normalizeRunnerName, revokeRunnerToken } from "@/runner-tokens";
 import { requireSession } from "@/session";
 
 export type CreateRunnerState = { token?: string; error?: string };
@@ -12,9 +12,12 @@ export async function createRunnerAction(
   formData: FormData,
 ): Promise<CreateRunnerState> {
   const session = await requireSession();
-  const name = String(formData.get("name") ?? "").trim();
-  if (!name) return { error: "A runner needs a name." };
-
+  let name: string;
+  try {
+    name = normalizeRunnerName(String(formData.get("name") ?? ""));
+  } catch (error) {
+    return { error: (error as Error).message };
+  }
   const { token } = await createRunnerToken(getDb(), { userId: session.user.id, name });
   revalidatePath("/runners");
   return { token };

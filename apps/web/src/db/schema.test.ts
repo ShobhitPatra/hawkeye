@@ -42,6 +42,7 @@ describe("schema migrations", () => {
       "review_posted",
       "run",
       "runner",
+      "runner_login",
       "session",
       "user",
       "user_settings",

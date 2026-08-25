@@ -193,3 +193,16 @@ export const userSettings = pgTable("user_settings", {
   quietWindowSeconds: integer("quiet_window_s").notNull().default(DEFAULT_QUIET_WINDOW_SECONDS),
   reviewDrafts: boolean("review_drafts").notNull().default(false),
 });
+
+export const runnerLogin = pgTable("runner_login", {
+  id: text("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  deviceSecretHash: text("device_secret_hash").notNull().unique(),
+  runnerName: text("runner_name").notNull(),
+  userId: text("user_id").references(() => user.id),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  ...timestamps,
+});
