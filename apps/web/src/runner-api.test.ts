@@ -287,7 +287,7 @@ function jsonRequest(path: string, body: unknown, bearer?: string | null) {
     method: "POST",
     body: JSON.stringify(body),
     headers: { "content-type": "application/json" },
-    ...(bearer === null ? { bearer: null } : {}),
+    ...(bearer === undefined ? {} : { bearer }),
   });
 }
 
@@ -585,6 +585,60 @@ describe("recordResult", () => {
     const stored = await db.select().from(schema.finding);
     expect(stored).toHaveLength(1);
     expect(stored[0]?.resolvedSha).toBeNull();
+  });
+
+  it("records findings for a second user armed on a pull request another user already posted", async () => {
+    const first = await claimedRunId();
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${first}/result`, {
+        status: "ok",
+        turns: 1,
+        result: reviewResult,
+      }),
+      { db, github },
+      first,
+    );
+    await db.insert(schema.user).values({ id: "user-2", name: "other", email: "x@example.com" });
+    await seedArmedPullRequest(db, {
+      armedPrId: "armed-2",
+      userId: "user-2",
+      repo: "a",
+      number: 1,
+    });
+    const other = await createRunnerToken(db, { userId: "user-2", name: "desk" });
+    await enqueueJob(db, {
+      armedPrId: "armed-2",
+      headSha: "a".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: new Date(now.getTime() - 60_000),
+    });
+    const claim = await claimJob(request("/api/runner/jobs", { bearer: other.token }), claimDeps());
+    const second = (await claim.json()).job.runId as string;
+
+    const response = await recordResult(
+      jsonRequest(
+        `/api/runner/runs/${second}/result`,
+        {
+          status: "ok",
+          turns: 1,
+          result: {
+            ...reviewResult,
+            findings: [
+              { severity: "should_fix", claim: "theirs", detail: "d", path: "a.ts", line: 1 },
+            ],
+          },
+        },
+        other.token,
+      ),
+      { db, github },
+      second,
+    );
+
+    expect(await response.json()).toEqual({
+      ok: true,
+      posted: "already-posted",
+      findings: { created: 1, updated: 0, resolved: 0 },
+    });
   });
 
   it("does not record findings from a result whose head a newer done job superseded", async () => {

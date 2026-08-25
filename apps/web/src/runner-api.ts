@@ -7,13 +7,14 @@ import {
   type RunResultReport,
   type RunResultStatus,
 } from "@hawkeye/core";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
 import {
   armedPr,
   DEFAULT_MAX_TURNS,
   DEFAULT_WALL_CLOCK_MINUTES,
   job,
+  reviewPosted,
   run,
   userSettings,
 } from "./db/schema";
@@ -267,7 +268,18 @@ export async function recordResult(
     result,
     commentable: report.commentable ?? {},
   });
-  if (posted === "already-posted")
+  const [recordedBefore] = await deps.db
+    .select({ id: reviewPosted.id })
+    .from(reviewPosted)
+    .where(
+      and(
+        eq(reviewPosted.armedPrId, target.armedPr.id),
+        eq(reviewPosted.headSha, target.headSha),
+        ne(reviewPosted.runId, runId),
+      ),
+    )
+    .limit(1);
+  if (recordedBefore)
     return Response.json({ ok: true, posted, findings: "already-posted" }, { status: 200 });
   const findings = await recordFindings(deps.db, {
     armedPrId: target.armedPr.id,
