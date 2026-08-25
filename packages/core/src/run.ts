@@ -1,10 +1,11 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { GitHubRequestError, type GitHubClient } from "./github/client.js";
+import type { GitHubClient } from "./github/client.js";
 import type { PullRequestReference } from "./github/pull-request-reference.js";
 import type { HarnessSpec } from "./harness/harness.js";
 import { commentableLines } from "./review/diff-lines.js";
 import { alreadyReviewed } from "./review/idempotency.js";
+import { postRenderedReview } from "./review/post.js";
 import { renderReview, type RenderedReview } from "./review/render.js";
 import { runReviewPipeline } from "./review-pipeline.js";
 import type { createWorktree, readRepositoryRules } from "./worktree/worktree.js";
@@ -103,17 +104,15 @@ export async function runReview(
   await writeFile(reviewPath, JSON.stringify(review, null, 2));
 
   if (input.dryRun) return { kind: "dry-run", review, headSha: pullRequest.headSha };
-  const posted = await deps.github.postReview(reference, review, token).catch(async (error) => {
-    if (
-      !(error instanceof GitHubRequestError && error.status === 422) ||
-      review.comments.length === 0
-    )
-      throw error;
-    deps.log("inline anchors rejected (422); posting body only");
-    const bodyOnly = render(new Map());
-    await writeFile(reviewPath, JSON.stringify(bodyOnly, null, 2));
-    return deps.github.postReview(reference, bodyOnly, token);
+  const { review: sent, posted } = await postRenderedReview({
+    github: deps.github,
+    reference,
+    token,
+    review,
+    renderBodyOnly: () => render(new Map()),
+    log: deps.log,
   });
+  if (sent !== review) await writeFile(reviewPath, JSON.stringify(sent, null, 2));
   return {
     kind: "posted",
     url: posted.url,

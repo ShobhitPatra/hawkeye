@@ -73,7 +73,7 @@ function scripted(claims: (ClaimedJob | undefined)[], resultStatuses: number[] =
     }
     if (received.url.endsWith("/result")) {
       const status = resultStatuses[Math.min(resultIndex++, resultStatuses.length - 1)]!;
-      return json(response, status, { ok: true });
+      return json(response, status, { ok: true, posted: "posted" });
     }
     return json(response, 200, { ok: true });
   };
@@ -105,7 +105,11 @@ async function deps(
     harness,
     createWorktree: (async (i: { directory: string }) => {
       await mkdir(i.directory, { recursive: true });
-      return { path: i.directory, diff: "diff", remove: async () => {} };
+      return {
+        path: i.directory,
+        diff: "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1,1 +1,2 @@\n one\n+two\n",
+        remove: async () => {},
+      };
     }) as never,
     readRepositoryRules: async () => [],
     createRunDirectory: async (reference) => {
@@ -153,12 +157,13 @@ describe("runRunnerLoop", () => {
     expect(result).toMatchObject({
       method: "POST",
       authorization: "Bearer hk_1",
-      body: { status: "ok", turns: 1, result: review },
+      body: { status: "ok", turns: 1, result: review, commentable: { "a.txt": [1, 2] } },
     });
     expect(plane.received.some((r) => r.url === "/api/runner/runs/run-1/events")).toBe(true);
     expect(d.logged).toContain("job claimed: o/r#7 head aaaaaaa");
     expect(d.logged).toContain("turn 1");
     expect(d.logged).toContain("result ok after 1 turn(s)");
+    expect(d.logged).toContain("review posted");
     const harnessInput = (d.harness.run as ReturnType<typeof vi.fn>).mock.calls[0]![0];
     expect(harnessInput).toMatchObject({ maxTurns: 3, wallClockMs: 60_000 });
   });
@@ -309,7 +314,7 @@ describe("runRunnerLoop", () => {
       },
       heartbeat: async () => {},
       sendEvents: async () => {},
-      sendResult: async () => {},
+      sendResult: async () => ({ ok: true }),
     };
     const started = Date.now();
     await runRunnerLoop(d);

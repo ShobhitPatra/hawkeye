@@ -44,7 +44,10 @@ function deps(
     mergeBase: vi.fn(async () => "m".repeat(40)),
     linkedIssue: vi.fn(async () => ({ number: 2, title: "I", body: "ib" })),
     reviews: vi.fn(async () => overrides.reviews ?? []),
-    postReview: vi.fn(async () => ({ url: "https://github.com/o/r/pull/1#pullrequestreview-9" })),
+    postReview: vi.fn(async () => ({
+      url: "https://github.com/o/r/pull/1#pullrequestreview-9",
+      id: "9",
+    })),
   };
   const harness: HarnessSpec = {
     name: "fake",
@@ -187,7 +190,7 @@ describe("runReview", () => {
           "GitHub POST /repos/o/r/pulls/1/reviews failed: 422 Unprocessable Entity",
         ),
       )
-      .mockResolvedValueOnce({ url: "https://github.com/o/r/pull/1#pullrequestreview-9" });
+      .mockResolvedValueOnce({ url: "https://github.com/o/r/pull/1#pullrequestreview-9", id: "9" });
     const i = await input();
     const outcome = await runReview(i, d);
     expect(outcome.kind).toBe("posted");

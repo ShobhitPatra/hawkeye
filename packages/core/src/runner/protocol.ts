@@ -35,6 +35,7 @@ export type RunResultReport = {
   turns: number;
   result?: ReviewResult;
   error?: string;
+  commentable?: Record<string, number[]>;
 };
 
 export type RunEvent = { type: string; at: string; data?: unknown };

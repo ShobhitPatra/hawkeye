@@ -65,7 +65,7 @@ export interface GitHubClient {
     reference: PullRequestReference,
     review: RenderedReview,
     token: string,
-  ): Promise<{ url: string }>;
+  ): Promise<{ url: string; id: string }>;
   listInstallationRepositories(token: string): Promise<InstallationRepository[]>;
   listOpenPullRequestsByAuthor(
     token: string,
@@ -306,10 +306,17 @@ export function createGitHubClient(input: {
     },
     async postReview(reference, review, token) {
       const path = `${pulls(reference)}/reviews`;
-      const posted = await request<{ html_url?: unknown }>("POST", path, bearer(token), review);
+      const posted = await request<{ html_url?: unknown; id?: unknown }>(
+        "POST",
+        path,
+        bearer(token),
+        review,
+      );
       if (typeof posted.html_url !== "string")
         throw new Error(`GitHub POST ${path} returned no review url`);
-      return { url: posted.html_url };
+      if (typeof posted.id !== "number")
+        throw new Error(`GitHub POST ${path} returned no review id`);
+      return { url: posted.html_url, id: String(posted.id) };
     },
     async listInstallationRepositories(token) {
       return paginate("/installation/repositories", token, (payload) =>

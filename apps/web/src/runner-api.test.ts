@@ -24,7 +24,10 @@ function createGitHub(): GitHubClient {
     mergeBase: unsupported(),
     linkedIssue: unsupported(),
     reviews: unsupported(),
-    postReview: unsupported(),
+    postReview: vi.fn(async () => ({
+      url: "https://github.com/octo/a/pull/1#pullrequestreview-9",
+      id: "9",
+    })),
     listInstallationRepositories: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
   };
@@ -371,7 +374,7 @@ describe("recordResult", () => {
         turns: 12,
         result: reviewResult,
       }),
-      { db },
+      { db, github },
       runId,
     );
 
@@ -383,6 +386,127 @@ describe("recordResult", () => {
     expect(jobRow?.state).toBe("done");
   });
 
+  it("posts the rendered review for an ok result and records it", async () => {
+    const runId = await claimedRunId();
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: reviewResult,
+        commentable: { "a.txt": [1, 2] },
+      }),
+      { db, github },
+      runId,
+    );
+
+    expect(await response.json()).toEqual({ ok: true, posted: "posted" });
+    expect(github.installationTokenById).toHaveBeenCalledWith("10");
+    const [reference, review, token] = (github.postReview as ReturnType<typeof vi.fn>).mock
+      .calls[0]!;
+    expect(reference).toEqual({ owner: "octo", repo: "a", number: 1 });
+    expect(token).toBe("ghs_token");
+    expect(review.body).toContain(`<!-- hawkeye: head=${"a".repeat(40)} -->`);
+    const [row] = await db.select().from(schema.reviewPosted);
+    expect(row).toMatchObject({
+      runId,
+      armedPrId: "armed-1",
+      headSha: "a".repeat(40),
+      githubReviewId: "9",
+    });
+  });
+
+  it("does not post twice for the same head", async () => {
+    const firstRunId = await claimedRunId();
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${firstRunId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: reviewResult,
+      }),
+      { db, github },
+      firstRunId,
+    );
+    const secondRunId = await claimedRunId();
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${secondRunId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: reviewResult,
+      }),
+      { db, github },
+      secondRunId,
+    );
+
+    expect(await response.json()).toEqual({ ok: true, posted: "already-posted" });
+    expect(github.postReview).toHaveBeenCalledTimes(1);
+    expect(await db.select().from(schema.reviewPosted)).toHaveLength(1);
+  });
+
+  it("keeps the ok result and records the failure when posting throws", async () => {
+    const runId = await claimedRunId();
+    github.postReview = vi.fn(async () => {
+      throw new Error("GitHub POST failed: 500");
+    });
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: reviewResult,
+      }),
+      { db, github },
+      runId,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, posted: "failed" });
+    const [row] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
+    expect(row).toMatchObject({
+      status: "ok",
+      result: reviewResult,
+      error: "post: GitHub POST failed: 500",
+    });
+    expect(await db.select().from(schema.reviewPosted)).toHaveLength(0);
+  });
+
+  it("rejects malformed commentable lines", async () => {
+    const runId = await claimedRunId();
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: reviewResult,
+        commentable: { "a.txt": [1, -2] },
+      }),
+      { db, github },
+      runId,
+    );
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toContain("commentable");
+    expect(github.postReview).not.toHaveBeenCalled();
+  });
+
+  it("does not post for a non-ok status", async () => {
+    const runId = await claimedRunId();
+
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, {
+        status: "error",
+        turns: 1,
+        error: "boom",
+      }),
+      { db, github },
+      runId,
+    );
+
+    expect(github.postReview).not.toHaveBeenCalled();
+    expect(await db.select().from(schema.reviewPosted)).toHaveLength(0);
+  });
+
   it("fails the job for a non-ok status", async () => {
     const runId = await claimedRunId();
 
@@ -392,7 +516,7 @@ describe("recordResult", () => {
         turns: 3,
         error: "wall clock",
       }),
-      { db },
+      { db, github },
       runId,
     );
 
@@ -408,7 +532,7 @@ describe("recordResult", () => {
 
     const response = await recordResult(
       jsonRequest(`/api/runner/runs/${runId}/result`, { status: "weird", turns: 1 }),
-      { db },
+      { db, github },
       runId,
     );
 
@@ -420,7 +544,7 @@ describe("recordResult", () => {
 
     const response = await recordResult(
       jsonRequest(`/api/runner/runs/${runId}/result`, { status: "error", turns: 1.5 }),
-      { db },
+      { db, github },
       runId,
     );
 
@@ -432,7 +556,7 @@ describe("recordResult", () => {
 
     const response = await recordResult(
       jsonRequest(`/api/runner/runs/${runId}/result`, { status: "ok", turns: 1 }),
-      { db },
+      { db, github },
       runId,
     );
 
@@ -442,11 +566,15 @@ describe("recordResult", () => {
   it("409s when the run is already complete", async () => {
     const runId = await claimedRunId();
     const body = { status: "error", turns: 1, error: "boom" };
-    await recordResult(jsonRequest(`/api/runner/runs/${runId}/result`, body), { db }, runId);
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, body),
+      { db, github },
+      runId,
+    );
 
     const response = await recordResult(
       jsonRequest(`/api/runner/runs/${runId}/result`, body),
-      { db },
+      { db, github },
       runId,
     );
 
@@ -456,7 +584,7 @@ describe("recordResult", () => {
   it("404s for a run the runner does not own", async () => {
     const response = await recordResult(
       jsonRequest("/api/runner/runs/missing/result", { status: "error", turns: 0 }),
-      { db },
+      { db, github },
       "missing",
     );
 
@@ -472,7 +600,7 @@ describe("recordResult", () => {
         turns: 2,
         result: { verdict: "maybe", summary: "", lenses: [], findings: [] },
       }),
-      { db },
+      { db, github },
       runId,
     );
 
@@ -507,7 +635,7 @@ describe("recordResult", () => {
         turns: 5,
         result: reviewResult,
       }),
-      { db },
+      { db, github },
       staleRunId,
     );
 
