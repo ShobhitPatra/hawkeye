@@ -46,4 +46,11 @@ describe("showRound", () => {
       `${join(directory, "meta.json")} is not a round meta file`,
     );
   });
+  it("says the session has not written a result yet", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "hawkeye-round-"));
+    await writeFile(join(directory, "meta.json"), JSON.stringify(meta));
+    await expect(showRound(directory)).rejects.toThrow(
+      `no review yet: the session has not written ${join(directory, "result.json")}`,
+    );
+  });
 });
