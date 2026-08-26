@@ -30,7 +30,7 @@ describe("showRound", () => {
       findings: [{ severity: "optional", claim: "Nit", detail: "small" }],
     });
     const text = await showRound(directory);
-    expect(text.startsWith("Verdict: mergeable\n\n- fine\n\noptional:\n")).toBe(true);
+    expect(text.startsWith("Verdict: MERGEABLE\n\n- fine\n\noptional:\n")).toBe(true);
     expect(text.endsWith("Round 3 · head ccccccc · mergeable")).toBe(true);
   });
   it("throws the validation message for an invalid result", async () => {
