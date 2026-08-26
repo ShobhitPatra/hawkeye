@@ -79,7 +79,7 @@ export function renderReview({
   const lines: string[] = [
     encodeMarker(headSha),
     "",
-    `## <small>Verdict:</small> ${result.verdict.replaceAll("_", " ")}`,
+    `# <small>Verdict:</small> **${result.verdict.replaceAll("_", " ").toUpperCase()}**`,
     "",
     result.summary,
   ];

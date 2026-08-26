@@ -42,8 +42,8 @@ describe("renderReview", () => {
   });
   it("renders the verdict as a heading above the summary", () => {
     const r = renderReview(input());
-    expect(r.body).toContain("## <small>Verdict:</small> changes needed");
-    expect(r.body.indexOf("## <small>Verdict:</small> changes needed")).toBeLessThan(
+    expect(r.body).toContain("# <small>Verdict:</small> **CHANGES NEEDED**");
+    expect(r.body.indexOf("# <small>Verdict:</small> **CHANGES NEEDED**")).toBeLessThan(
       r.body.indexOf("Mostly fine."),
     );
   });
@@ -51,14 +51,14 @@ describe("renderReview", () => {
     for (const verdict of VERDICTS) {
       const i = input();
       i.result.verdict = verdict;
-      const heading = /^## <small>Verdict:<\/small> (.+)$/m.exec(renderReview(i).body)?.[1];
-      expect(heading).toBe(verdict.replaceAll("_", " "));
+      const heading = /^# <small>Verdict:<\/small> \*\*(.+)\*\*$/m.exec(renderReview(i).body)?.[1];
+      expect(heading).toBe(verdict.replaceAll("_", " ").toUpperCase());
     }
   });
   it("orders marker, verdict, findings, lens details and footer", () => {
     const r = renderReview(input());
     const marker = r.body.indexOf("<!-- hawkeye:");
-    const verdict = r.body.indexOf("## <small>Verdict:</small>");
+    const verdict = r.body.indexOf("# <small>Verdict:</small>");
     const findings = r.body.indexOf("## Findings");
     const details = r.body.indexOf("<details>\n<summary>Review lenses</summary>");
     const footer = r.body.indexOf("Reviewed by [Hawkeye]");
