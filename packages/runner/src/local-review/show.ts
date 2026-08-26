@@ -10,7 +10,8 @@ export async function showRound(directory: string): Promise<string> {
   const pullRequestDir = dirname(directory);
   const rounds: RoundSummary[] = [];
   for (const name of await listRounds(pullRequestDir)) {
-    const round = await readRound(join(pullRequestDir, name));
+    const round = await readRound(join(pullRequestDir, name)).catch(() => undefined);
+    if (round === undefined) continue;
     rounds.push({
       round: round.meta.round,
       headSha: round.meta.headSha,

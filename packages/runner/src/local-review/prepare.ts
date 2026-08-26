@@ -7,6 +7,7 @@ import {
   fetchMergeBase,
   fetchPullRequestDetails,
   findingId,
+  type Finding,
   type PreviousRound,
   type readRepositoryRules,
   removeTrustedConfig,
@@ -70,28 +71,8 @@ export async function prepareRound(
     directory: join(directory, "checkout"),
     ...(previous === undefined ? {} : { previousHeadSha: previous.meta.headSha }),
   });
-  const previousRound: PreviousRound | undefined =
-    previous === undefined
-      ? undefined
-      : await (async () => {
-          const dismissals = await readDismissals(previous.directory);
-          return {
-            headSha: previous.meta.headSha,
-            interdiff: worktree.interdiff ?? "",
-            findings: previous.result.findings.map((finding) => {
-              const id = findingId(finding.path, finding.claim);
-              const note = dismissals[id];
-              return {
-                id,
-                severity: finding.severity,
-                claim: finding.claim,
-                ...(finding.path === undefined ? {} : { path: finding.path }),
-                ...(finding.line === undefined ? {} : { line: finding.line }),
-                ...(note === undefined ? {} : { status: "dismissed" as const, note }),
-              };
-            }),
-          };
-        })();
+  const previousRound =
+    previous === undefined ? undefined : await describePreviousRound(previous, worktree.interdiff);
   const repositoryRules = await deps.readRepositoryRules(worktree.path);
   await removeTrustedConfig(worktree.path);
   const resultPath = join(directory, "result.json");
@@ -151,4 +132,27 @@ export function describePreparedRound(prepared: PreparedRound): string[] {
     prepared.checkoutPath,
     prepared.resultPath,
   ];
+}
+
+async function describePreviousRound(
+  previous: { directory: string; meta: { headSha: string }; result: { findings: Finding[] } },
+  interdiff: string | undefined,
+): Promise<PreviousRound> {
+  const dismissals = await readDismissals(previous.directory);
+  return {
+    headSha: previous.meta.headSha,
+    ...(interdiff === undefined ? {} : { interdiff }),
+    findings: previous.result.findings.map((finding) => {
+      const id = findingId(finding.path, finding.claim);
+      const note = dismissals[id];
+      return {
+        id,
+        severity: finding.severity,
+        claim: finding.claim,
+        ...(finding.path === undefined ? {} : { path: finding.path }),
+        ...(finding.line === undefined ? {} : { line: finding.line }),
+        ...(note === undefined ? {} : { status: "dismissed" as const, note }),
+      };
+    }),
+  };
 }
