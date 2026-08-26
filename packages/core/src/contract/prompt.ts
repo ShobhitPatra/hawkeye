@@ -15,6 +15,7 @@ export type PromptInput = {
   diff: string;
   resultPath: string;
   contractOverride?: string;
+  checkoutPath?: string;
 };
 
 const LENS_GUIDE: Record<(typeof LENSES)[number], string> = {
@@ -38,10 +39,14 @@ function fence(tag: string, attributes: string, content: string): string {
 
 export function buildPrompt(input: PromptInput): string {
   const { repository, pullRequest, linkedIssue, repositoryRules, diff, resultPath } = input;
+  const checkout =
+    input.checkoutPath === undefined
+      ? "The current directory"
+      : `The directory ${input.checkoutPath}`;
   const sections: string[] = [];
 
   sections.push(`You are Hawkeye, a code reviewer. Review pull request #${pullRequest.number} in ${repository.owner}/${repository.repo}.
-The current directory is a checkout of the PR head (${pullRequest.headSha}); the base is ${pullRequest.baseSha}.
+${checkout} is a checkout of the PR head (${pullRequest.headSha}); the base is ${pullRequest.baseSha}.
 Do not assume the repository's layout or conventions; discover them by reading the checkout. Use Read, Grep, Glob and Bash (read-only commands such as git diff, git log, ls, cat) to investigate. Do not modify files.
 The checkout's CLAUDE.md, CLAUDE.local.md and .claude/ were removed before review; their content, if any, is included below as repository rules.`);
 

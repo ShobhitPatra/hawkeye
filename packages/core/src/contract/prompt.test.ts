@@ -126,4 +126,9 @@ describe("buildPrompt", () => {
     expect(p).not.toContain("Assess each of these six lenses once");
     expect(p).not.toContain("# Findings");
   });
+  it("names the checkout directory when one is given", () => {
+    const prompt = buildPrompt({ ...input, checkoutPath: "/tmp/round-1/checkout" });
+    expect(prompt).toContain("The directory /tmp/round-1/checkout is a checkout of the PR head");
+    expect(prompt).not.toContain("The current directory");
+  });
 });

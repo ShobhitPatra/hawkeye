@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { beforeAll, describe, expect, it } from "vitest";
-import { createWorktree, readRepositoryRules } from "./worktree.js";
+import { createWorktree, gitAuthorization, readRepositoryRules } from "./worktree.js";
 
 const run = promisify(execFile);
 const git = (cwd: string, ...args: string[]) =>
@@ -71,6 +71,31 @@ describe("createWorktree", () => {
     expect(wt.diff).toContain("+two");
     expect(wt.diff).not.toContain("pnpm-lock.yaml");
     await wt.remove();
+  });
+  it("passes the credential through the environment, not argv or the config", async () => {
+    expect(gitAuthorization("https://github.com/o/r.git", "ghs_secrettoken")).toEqual({
+      args: ["--config-env", "http.https://github.com/.extraheader=HAWKEYE_GIT_AUTHORIZATION"],
+      env: {
+        HAWKEYE_GIT_AUTHORIZATION: `Authorization: Basic ${Buffer.from("x-access-token:ghs_secrettoken").toString("base64")}`,
+      },
+    });
+    expect(gitAuthorization("/local/path", "ghs_secrettoken")).toEqual({ args: [], env: {} });
+    expect(gitAuthorization("https://github.com/o/r.git", undefined)).toEqual({
+      args: [],
+      env: {},
+    });
+
+    const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
+    const failing = createWorktree({
+      cloneUrl: "https://127.0.0.1:9/o/r.git",
+      token: "ghs_secrettoken",
+      pullRequestNumber: 1,
+      headSha,
+      baseSha,
+      directory,
+    });
+    await expect(failing).rejects.toThrow(/git fetch failed/);
+    await expect(failing).rejects.not.toThrow(/ghs_secrettoken/);
   });
   it("leaves no origin remote or token behind", async () => {
     const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");

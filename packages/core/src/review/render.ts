@@ -1,5 +1,6 @@
-import { type Finding, type ReviewResult, SEVERITIES, type Severity } from "../contract/schema.js";
+import { type Finding, type ReviewResult, SEVERITIES } from "../contract/schema.js";
 import { findingId } from "./finding-id.js";
+import { indentLines, SEVERITY_BADGE } from "./format.js";
 import { encodeMarker } from "./marker.js";
 
 export type ReviewComment = { path: string; line: number; side: "RIGHT" | "LEFT"; body: string };
@@ -16,23 +17,12 @@ export type RenderInput = {
   repositoryUrl: string;
 };
 
-const SEVERITY_BADGE: Record<Severity, string> = {
-  must_fix: "must-fix",
-  should_fix: "should-fix",
-  optional: "optional",
-  inherited: "inherited",
-};
-
 function oneLine(text: string): string {
   return text.replace(/\r?\n/g, " ");
 }
 
 function tableCell(text: string): string {
   return oneLine(text).replaceAll("|", "\\|");
-}
-
-function indentLines(text: string, indent: string): string[] {
-  return text.split("\n").map((line) => (line === "" ? "" : `${indent}${line}`));
 }
 
 function collapsible(summary: string, content: string, indent: string): string[] {

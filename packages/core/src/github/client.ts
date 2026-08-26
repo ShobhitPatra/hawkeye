@@ -181,6 +181,25 @@ export async function fetchLinkedIssue(
   return { number: payload.number, title: payload.title, body: payload.body ?? "" };
 }
 
+export async function fetchMergeBase(
+  deps: { fetch: typeof fetch; apiBase?: string },
+  reference: PullRequestReference,
+  baseSha: string,
+  headSha: string,
+  token: string,
+): Promise<string> {
+  const path = `/repos/${reference.owner}/${reference.repo}/compare/${baseSha}...${headSha}`;
+  const { payload } = await sendGitHubRequest(
+    deps.fetch,
+    "GET",
+    `${deps.apiBase ?? DEFAULT_API_BASE}${path}`,
+    bearer(token),
+  );
+  const sha = (payload as { merge_base_commit?: { sha?: unknown } }).merge_base_commit?.sha;
+  if (typeof sha !== "string") throw new Error(`GitHub GET ${path} returned no merge base sha`);
+  return sha;
+}
+
 export function createGitHubClient(input: {
   appId: string;
   privateKeyPem: string;
@@ -282,16 +301,8 @@ export function createGitHubClient(input: {
     pullRequest(reference, token) {
       return fetchPullRequestDetails({ fetch: input.fetch, apiBase }, reference, token);
     },
-    async mergeBase(reference, baseSha, headSha, token) {
-      const path = `/repos/${reference.owner}/${reference.repo}/compare/${baseSha}...${headSha}`;
-      const comparison = await request<{ merge_base_commit?: { sha?: unknown } }>(
-        "GET",
-        path,
-        bearer(token),
-      );
-      const sha = comparison.merge_base_commit?.sha;
-      if (typeof sha !== "string") throw new Error(`GitHub GET ${path} returned no merge base sha`);
-      return sha;
+    mergeBase(reference, baseSha, headSha, token) {
+      return fetchMergeBase({ fetch: input.fetch, apiBase }, reference, baseSha, headSha, token);
     },
     linkedIssue(reference, body, token) {
       return fetchLinkedIssue({ fetch: input.fetch, apiBase }, reference, body, token);
