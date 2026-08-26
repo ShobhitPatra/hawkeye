@@ -43,7 +43,7 @@ export function renderReviewText({ result, meta, rounds }: RenderTextInput): str
   }
   lines.push("", "Lenses:");
   for (const lens of result.lenses) lines.push(`- ${lens.name}: ${lens.assessment}`);
-  if (rounds === undefined) {
+  if (rounds === undefined || rounds.length === 0) {
     lines.push("", `Round ${meta.round} · head ${meta.headSha.slice(0, 7)} · ${verdict}`);
   } else {
     lines.push("", "Rounds:");
