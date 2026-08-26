@@ -1,18 +1,8 @@
-import { type Finding, type ReviewResult, SEVERITIES, type Severity } from "../contract/schema.js";
+import { type Finding, type ReviewResult, SEVERITIES } from "../contract/schema.js";
 import { findingId } from "./finding-id.js";
+import { indentLines, SEVERITY_BADGE } from "./format.js";
 
 export type RenderTextInput = { result: ReviewResult; meta: { round: number; headSha: string } };
-
-const SEVERITY_BADGE: Record<Severity, string> = {
-  must_fix: "must-fix",
-  should_fix: "should-fix",
-  optional: "optional",
-  inherited: "inherited",
-};
-
-function indentLines(text: string, indent: string): string[] {
-  return text.split("\n").map((line) => (line === "" ? "" : `${indent}${line}`));
-}
 
 function headline(finding: Finding): string {
   const location =
