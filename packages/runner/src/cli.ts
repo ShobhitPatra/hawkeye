@@ -1,7 +1,9 @@
+import { execFile } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { Command } from "commander";
 import {
   createClaudeCodeHarness,
@@ -13,6 +15,9 @@ import {
   runReview,
 } from "@hawkeye/core";
 import { expandHome, loadConfig } from "./config.js";
+import { describePreparedRound, prepareRound } from "./local-review/prepare.js";
+import { showRound } from "./local-review/show.js";
+import { resolveGitHubToken } from "./local-review/token.js";
 import { createRunDirectory } from "./run-directory.js";
 import { createControlPlaneClient } from "./runner/client.js";
 import { loadRunnerConfig, writeRunnerConfig } from "./runner/config.js";
@@ -22,6 +27,21 @@ const CONFIG_PATH = join(homedir(), ".config", "hawkeye", "config.json");
 const RUNNER_CONFIG_PATH = join(homedir(), ".config", "hawkeye", "runner.json");
 const DEFAULT_CONTRACT_PATH = join(homedir(), ".config", "hawkeye", "contract.md");
 const RUNS_ROOT = join(homedir(), ".cache", "hawkeye", "runs");
+const REVIEWS_ROOT = join(homedir(), ".cache", "hawkeye", "reviews");
+
+const execFileAsync = promisify(execFile);
+const exec = async (command: string, args: string[]) => {
+  try {
+    const { stdout } = await execFileAsync(command, args);
+    return { exitCode: 0, stdout };
+  } catch (error) {
+    const failure = error as { code?: number | string; stdout?: string };
+    return {
+      exitCode: typeof failure.code === "number" ? failure.code : null,
+      stdout: failure.stdout ?? "",
+    };
+  }
+};
 
 function positiveInteger(flag: string, value: string): number {
   if (!/^\d+$/.test(value) || Number(value) <= 0) {
@@ -228,6 +248,66 @@ export function createProgram(io: {
           token: options.token,
         });
         io.stdout(`saved ${RUNNER_CONFIG_PATH}`);
+      } catch (error) {
+        io.stderr(`error: ${(error as Error).message}`);
+        process.exitCode = 1;
+      }
+    });
+
+  program
+    .command("prepare")
+    .description("check out a pull request and write the review prompt for any agent session")
+    .argument("<pull-request>", "https://github.com/owner/repo/pull/N or owner/repo#N")
+    .option("--github-token <token>", "GitHub token; else GITHUB_TOKEN, else gh auth token")
+    .option(
+      "--contract <path>",
+      "review contract that replaces the built-in lens and finding rules",
+    )
+    .option("--root <dir>", "where review rounds are kept", REVIEWS_ROOT)
+    .action(
+      async (
+        pullRequest: string,
+        options: { githubToken?: string; contract?: string; root: string },
+      ) => {
+        try {
+          const reference = parsePullRequestReference(pullRequest);
+          const token = await resolveGitHubToken({
+            ...(options.githubToken === undefined ? {} : { option: options.githubToken }),
+            env: process.env,
+            exec,
+          });
+          const contract = await loadContractOverride({
+            ...(options.contract === undefined ? {} : { explicitPath: options.contract }),
+            env: process.env,
+            home: homedir(),
+            defaultPath: DEFAULT_CONTRACT_PATH,
+            readFile: (p) => readFile(p, "utf8"),
+          });
+          if (contract) io.stderr(`using contract override: ${contract.path}`);
+          const prepared = await prepareRound(
+            {
+              reference,
+              token,
+              root: expandHome(options.root, homedir()),
+              ...(contract ? { contractOverride: contract.content } : {}),
+            },
+            { fetch, createWorktree, readRepositoryRules, now: () => new Date() },
+          );
+          for (const line of describePreparedRound(prepared)) io.stdout(line);
+        } catch (error) {
+          io.stderr(`error: ${(error as Error).message}`);
+          process.exitCode = 1;
+        }
+      },
+    );
+
+  program
+    .command("show")
+    .description("print the review written into a prepared round")
+    .argument("<round-dir>", "round directory printed by prepare")
+    .action(async (roundDirectory: string) => {
+      try {
+        io.stdout(await showRound(expandHome(roundDirectory, homedir())));
       } catch (error) {
         io.stderr(`error: ${(error as Error).message}`);
         process.exitCode = 1;
