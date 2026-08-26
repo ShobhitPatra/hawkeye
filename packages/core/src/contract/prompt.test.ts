@@ -153,6 +153,7 @@ describe("buildPrompt", () => {
     expect(p).toContain("- [id1] must_fix · Null deref (src/a.ts:3)");
     expect(p).toContain("- [id2] optional · Rename\n  dismissed by the author: name is fine");
     expect(p).toContain('<untrusted_data source="interdiff">\ndiff --git a/g b/g\n+2\n');
+    expect(p).toContain('<untrusted_data source="prior_findings">');
     expect(p).toContain("Report every prior finding in priorFindings");
     expect(p).toContain(
       '"priorFindings"?: [{ "id": string, "status": "addressed" | "open" | "withdrawn", "note": string }]',
@@ -174,5 +175,13 @@ describe("buildPrompt", () => {
     const p = buildPrompt(input);
     expect(p).not.toContain("# Previous round");
     expect(p).not.toContain("interdiff");
+  });
+  it("explains a missing interdiff when the previous head was rewritten", () => {
+    const p = buildPrompt({
+      ...input,
+      previousRound: { headSha: "a".repeat(40), findings: [] },
+    });
+    expect(p).toContain("The previous head is no longer on the server");
+    expect(p).not.toContain('source="interdiff"');
   });
 });

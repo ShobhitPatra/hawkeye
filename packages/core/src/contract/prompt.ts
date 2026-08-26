@@ -9,7 +9,7 @@ export type PriorFinding = {
   status?: "dismissed";
   note?: string;
 };
-export type PreviousRound = { headSha: string; interdiff: string; findings: PriorFinding[] };
+export type PreviousRound = { headSha: string; interdiff?: string; findings: PriorFinding[] };
 
 export type PromptInput = {
   repository: { owner: string; repo: string };
@@ -105,21 +105,27 @@ ${fence("untrusted_data", 'source="diff"', diff)}`);
 
   if (input.previousRound !== undefined) {
     const { headSha, interdiff, findings } = input.previousRound;
+    const since =
+      interdiff === undefined
+        ? "The previous head is no longer on the server (the branch was rewritten), so there is no interdiff; review the full diff above and use the prior findings as context."
+        : interdiff === ""
+          ? "The head is unchanged since the previous round; this is a re-review of the same head."
+          : `Changes on this branch since the previous round (when the branch merged from its base in between, those upstream commits can appear here; they are not the author's changes). Lockfiles and build output are excluded.\n${fence("untrusted_data", 'source="interdiff"', interdiff)}`;
     sections.push(`# Previous round
 The previous round reviewed head ${headSha} and reported these findings; each id is stable for the same path and claim.
-${findings.length === 0 ? "(no findings)" : findings.map(priorFindingLine).join("\n")}
+${fence(
+  "untrusted_data",
+  'source="prior_findings"',
+  findings.length === 0 ? "(no findings)" : findings.map(priorFindingLine).join("\n"),
+)}
 
 # Changes since the previous round (interdiff)
-${
-  interdiff === ""
-    ? "The head is unchanged since the previous round; this is a re-review of the same head."
-    : `Lockfiles and build output are excluded from this diff.\n${fence("untrusted_data", 'source="interdiff"', interdiff)}`
-}
+${since}
 
 Rules for this round:
-- Report every prior finding in priorFindings with its id and a status: addressed when the new changes resolve it, open when it still stands, withdrawn when it no longer holds or was wrong. A finding dismissed by the author is withdrawn with the author's note unless the interdiff proves the note wrong.
+- Report every prior finding in priorFindings with its id and a status: addressed when the new changes resolve it, open when it still stands, withdrawn when it no longer holds or was wrong. A finding dismissed by the author is withdrawn with the author's note unless the new changes prove the note wrong.
 - Repeat every still-open finding in findings with the same path and claim so its id stays stable.
-- Raise new findings only about the changes in the interdiff or about what the interdiff newly exposes; the full diff above remains the context for understanding the pull request.`);
+- Raise new findings only about the changes since the previous round or about what they newly expose; the full diff above remains the context for understanding the pull request.`);
   }
 
   if (input.contractOverride === undefined) {

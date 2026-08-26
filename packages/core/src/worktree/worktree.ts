@@ -49,6 +49,18 @@ export function gitAuthorization(
   };
 }
 
+async function interdiffBase(
+  git: (cwd: string | undefined, ...args: string[]) => Promise<string>,
+  directory: string,
+  previousHeadSha: string,
+): Promise<string> {
+  const mergeBase = await git(directory, "merge-base", previousHeadSha, "HEAD").then(
+    (output) => output.trim(),
+    () => "",
+  );
+  return mergeBase === "" ? previousHeadSha : mergeBase;
+}
+
 export async function createWorktree(input: CreateWorktreeInput): Promise<Worktree> {
   const redact = (text: string) =>
     input.token === undefined
@@ -99,8 +111,9 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
       "origin",
       input.baseSha,
     );
-    if (input.previousHeadSha !== undefined)
-      await git(
+    const previousHeadFetched =
+      input.previousHeadSha !== undefined &&
+      (await git(
         input.directory,
         ...auth.args,
         "fetch",
@@ -109,7 +122,10 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
         "1",
         "origin",
         input.previousHeadSha,
-      );
+      ).then(
+        () => true,
+        () => false,
+      ));
     await git(input.directory, "remote", "remove", "origin");
     await git(input.directory, "checkout", "--quiet", "--detach", fetchedHead);
     if (fetchedHead !== input.headSha)
@@ -121,16 +137,15 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
       "--",
       ...GENERATED_PATHSPECS,
     );
-    const interdiff =
-      input.previousHeadSha === undefined
-        ? undefined
-        : await git(
-            input.directory,
-            "diff",
-            `${input.previousHeadSha}..HEAD`,
-            "--",
-            ...GENERATED_PATHSPECS,
-          );
+    const interdiff = previousHeadFetched
+      ? await git(
+          input.directory,
+          "diff",
+          `${await interdiffBase(git, input.directory, input.previousHeadSha as string)}..HEAD`,
+          "--",
+          ...GENERATED_PATHSPECS,
+        )
+      : undefined;
 
     return {
       path: input.directory,

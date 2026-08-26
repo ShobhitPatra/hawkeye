@@ -118,6 +118,20 @@ describe("createWorktree", () => {
     expect(wt.interdiff).toBeUndefined();
     await wt.remove();
   });
+  it("omits the interdiff when the previous head is no longer on the server", async () => {
+    const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
+    const wt = await createWorktree({
+      cloneUrl: origin,
+      pullRequestNumber: 1,
+      headSha,
+      baseSha,
+      previousHeadSha: "f".repeat(40),
+      directory,
+    });
+    expect(wt.interdiff).toBeUndefined();
+    expect(wt.diff).toContain("+two");
+    await wt.remove();
+  });
   it("passes the credential through the environment, not argv or the config", async () => {
     expect(gitAuthorization("https://github.com/o/r.git", "ghs_secrettoken")).toEqual({
       args: ["--config-env", "http.https://github.com/.extraheader=HAWKEYE_GIT_AUTHORIZATION"],
