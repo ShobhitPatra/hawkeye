@@ -16,6 +16,7 @@ import {
 } from "@hawkeye/core";
 import { expandHome, loadConfig } from "./config.js";
 import { describePreparedRound, prepareRound } from "./local-review/prepare.js";
+import { dismissFinding } from "./local-review/rounds.js";
 import { showRound } from "./local-review/show.js";
 import { resolveGitHubToken } from "./local-review/token.js";
 import { createRunDirectory } from "./run-directory.js";
@@ -291,7 +292,13 @@ export function createProgram(io: {
               root: expandHome(options.root, homedir()),
               ...(contract ? { contractOverride: contract.content } : {}),
             },
-            { fetch, createWorktree, readRepositoryRules, now: () => new Date() },
+            {
+              fetch,
+              createWorktree,
+              readRepositoryRules,
+              now: () => new Date(),
+              warn: (line) => io.stderr(`warning: ${line}`),
+            },
           );
           for (const line of describePreparedRound(prepared)) io.stdout(line);
         } catch (error) {
@@ -308,6 +315,22 @@ export function createProgram(io: {
     .action(async (roundDirectory: string) => {
       try {
         io.stdout(await showRound(expandHome(roundDirectory, homedir())));
+      } catch (error) {
+        io.stderr(`error: ${(error as Error).message}`);
+        process.exitCode = 1;
+      }
+    });
+
+  program
+    .command("dismiss")
+    .description("record why a finding of a round is not going to be acted on")
+    .argument("<round-dir>", "round directory printed by prepare")
+    .argument("<finding-id>", "finding id shown by show")
+    .argument("<reason>", "why the finding does not apply; carried into the next round")
+    .action(async (roundDirectory: string, id: string, reason: string) => {
+      try {
+        await dismissFinding(expandHome(roundDirectory, homedir()), id, reason);
+        io.stdout(`dismissed ${id}`);
       } catch (error) {
         io.stderr(`error: ${(error as Error).message}`);
         process.exitCode = 1;

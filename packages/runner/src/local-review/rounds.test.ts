@@ -1,8 +1,41 @@
-import { mkdir, mkdtemp, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createRound, listRounds, pruneOlderCheckouts, pullRequestDirectory } from "./rounds.js";
+import { findingId } from "@hawkeye/core";
+import {
+  createRound,
+  dismissFinding,
+  latestCompletedRound,
+  listRounds,
+  pruneOlderCheckouts,
+  pullRequestDirectory,
+  readDismissals,
+  readRound,
+} from "./rounds.js";
+
+const LENSES = ["intent", "behavior", "blast_radius", "verification", "fit", "hygiene"];
+const metaFor = (round: number) => ({
+  round,
+  headSha: String(round).repeat(40),
+  baseSha: "b".repeat(40),
+  mergeBaseSha: "m".repeat(40),
+  startedAt: "2026-08-26T10:00:00.000Z",
+  pullRequest: { owner: "o", repo: "r", number: 7, title: "Add thing", author: "alice" },
+});
+const resultWith = (claim: string) => ({
+  verdict: "ship",
+  summary: "- fine",
+  lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
+  findings: [{ path: "src/a.ts", severity: "optional", claim, detail: "small" }],
+});
+async function roundDir(pullRequestDir: string, round: number, result?: unknown): Promise<string> {
+  const directory = join(pullRequestDir, `round-${round}`);
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, "meta.json"), JSON.stringify(metaFor(round)));
+  if (result !== undefined) await writeFile(join(directory, "result.json"), JSON.stringify(result));
+  return directory;
+}
 
 const exists = (path: string) =>
   stat(path).then(
@@ -47,5 +80,47 @@ describe("rounds", () => {
     const next = await createRound(pullRequestDir);
     expect(next).toEqual({ round: 4, directory: join(pullRequestDir, "round-4") });
     expect(await exists(join(pullRequestDir, "round-3", "result.json"))).toBe(true);
+  });
+
+  it("reads a round with or without its result", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hawkeye-reviews-"));
+    const withResult = await roundDir(root, 1, resultWith("Nit"));
+    const pending = await roundDir(root, 2);
+    expect((await readRound(withResult)).result?.verdict).toBe("mergeable");
+    expect(await readRound(pending)).toEqual({ directory: pending, meta: metaFor(2) });
+  });
+  it("picks the highest round with a parsed result and warns about a broken one", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hawkeye-reviews-"));
+    expect(await latestCompletedRound(root)).toBeUndefined();
+    await roundDir(root, 1, resultWith("First"));
+    await roundDir(root, 2, resultWith("Second"));
+    await roundDir(root, 3);
+    const broken = await roundDir(root, 4, { verdict: "ship" });
+    await writeFile(join(root, "round-3", "result.json"), "not json");
+    const warnings: string[] = [];
+    const latest = await latestCompletedRound(root, (line) => warnings.push(line));
+    expect(latest?.meta.round).toBe(2);
+    expect(latest?.result.findings[0]?.claim).toBe("Second");
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain(`skipping ${broken}: Invalid review result`);
+    expect(warnings[1]).toContain(`skipping ${join(root, "round-3")}`);
+  });
+  it("records a dismissal for a finding of the round and rejects unknown ids", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hawkeye-reviews-"));
+    const directory = await roundDir(root, 1, resultWith("Nit"));
+    const id = findingId("src/a.ts", "Nit");
+    expect(await readDismissals(directory)).toEqual({});
+    await dismissFinding(directory, id, "by design");
+    expect(await readDismissals(directory)).toEqual({ [id]: "by design" });
+    await dismissFinding(directory, id, "still by design");
+    expect(JSON.parse(await readFile(join(directory, "dismissed.json"), "utf8"))).toEqual({
+      [id]: "still by design",
+    });
+    await expect(dismissFinding(directory, "000000000000", "no")).rejects.toThrow(
+      `no finding 000000000000 in ${join(directory, "result.json")}`,
+    );
+    await expect(dismissFinding(directory, id, " ")).rejects.toThrow("a dismissal needs a reason");
+    const pending = await roundDir(root, 2);
+    await expect(dismissFinding(pending, id, "no")).rejects.toThrow(`no review yet in ${pending}`);
   });
 });

@@ -1,7 +1,94 @@
-import { mkdir, readdir, rm } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { findingId, parseReviewResult, type ReviewResult } from "@hawkeye/core";
 
 const ROUND_PREFIX = "round-";
+
+export type RoundMeta = {
+  round: number;
+  headSha: string;
+  baseSha: string;
+  mergeBaseSha: string;
+  startedAt: string;
+  pullRequest: { owner: string; repo: string; number: number; title: string; author: string };
+  previousRound?: number;
+  previousHeadSha?: string;
+};
+export type Round = { directory: string; meta: RoundMeta; result?: ReviewResult };
+export type Dismissals = Record<string, string>;
+
+export function parseRoundMeta(raw: unknown, path: string): RoundMeta {
+  const meta = raw as Partial<RoundMeta> | null;
+  if (
+    typeof meta !== "object" ||
+    meta === null ||
+    !Number.isInteger(meta.round) ||
+    typeof meta.headSha !== "string" ||
+    meta.headSha === ""
+  )
+    throw new Error(`${path} is not a round meta file: round and headSha are required`);
+  return meta as RoundMeta;
+}
+
+async function readOptionalFile(path: string): Promise<string | undefined> {
+  return readFile(path, "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined;
+    throw error;
+  });
+}
+
+export async function readRoundMeta(directory: string): Promise<RoundMeta> {
+  const metaPath = join(directory, "meta.json");
+  return parseRoundMeta(JSON.parse(await readFile(metaPath, "utf8")), metaPath);
+}
+
+export async function readRoundResult(directory: string): Promise<ReviewResult | undefined> {
+  const raw = await readOptionalFile(join(directory, "result.json"));
+  return raw === undefined ? undefined : parseReviewResult(JSON.parse(raw));
+}
+
+export async function readRound(directory: string): Promise<Round> {
+  const meta = await readRoundMeta(directory);
+  const result = await readRoundResult(directory);
+  return { directory, meta, ...(result === undefined ? {} : { result }) };
+}
+
+export async function latestCompletedRound(
+  pullRequestDir: string,
+  warn: (line: string) => void = () => {},
+): Promise<Required<Round> | undefined> {
+  const rounds = await listRounds(pullRequestDir);
+  for (const name of rounds.reverse()) {
+    const directory = join(pullRequestDir, name);
+    try {
+      const round = await readRound(directory);
+      if (round.result !== undefined) return { ...round, result: round.result };
+    } catch (error) {
+      warn(`skipping ${directory}: ${(error as Error).message}`);
+    }
+  }
+  return undefined;
+}
+
+export async function readDismissals(directory: string): Promise<Dismissals> {
+  const raw = await readOptionalFile(join(directory, "dismissed.json"));
+  return raw === undefined ? {} : (JSON.parse(raw) as Dismissals);
+}
+
+export async function dismissFinding(
+  directory: string,
+  id: string,
+  reason: string,
+): Promise<Dismissals> {
+  if (reason.trim() === "") throw new Error("a dismissal needs a reason");
+  const result = await readRoundResult(directory);
+  if (result === undefined) throw new Error(`no review yet in ${directory}`);
+  if (!result.findings.some((finding) => findingId(finding.path, finding.claim) === id))
+    throw new Error(`no finding ${id} in ${join(directory, "result.json")}`);
+  const dismissals = { ...(await readDismissals(directory)), [id]: reason };
+  await writeFile(join(directory, "dismissed.json"), JSON.stringify(dismissals, null, 2));
+  return dismissals;
+}
 
 export function pullRequestDirectory(
   root: string,

@@ -1,30 +1,22 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-import { parseReviewResult, renderReviewText } from "@hawkeye/core";
-import type { RoundMeta } from "./prepare.js";
-
-function parseRoundMeta(raw: unknown, path: string): RoundMeta {
-  const meta = raw as Partial<RoundMeta> | null;
-  if (
-    typeof meta !== "object" ||
-    meta === null ||
-    !Number.isInteger(meta.round) ||
-    typeof meta.headSha !== "string" ||
-    meta.headSha === ""
-  )
-    throw new Error(`${path} is not a round meta file: round and headSha are required`);
-  return meta as RoundMeta;
-}
+import { dirname, join } from "node:path";
+import { renderReviewText, type RoundSummary } from "@hawkeye/core";
+import { listRounds, readRound, readRoundMeta, readRoundResult } from "./rounds.js";
 
 export async function showRound(directory: string): Promise<string> {
-  const metaPath = join(directory, "meta.json");
-  const meta = parseRoundMeta(JSON.parse(await readFile(metaPath, "utf8")), metaPath);
-  const resultPath = join(directory, "result.json");
-  const raw = await readFile(resultPath, "utf8").catch((error: NodeJS.ErrnoException) => {
-    if (error.code === "ENOENT")
-      throw new Error(`no review yet: the session has not written ${resultPath}`);
-    throw error;
-  });
-  const result = parseReviewResult(JSON.parse(raw));
-  return renderReviewText({ result, meta });
+  const meta = await readRoundMeta(directory);
+  const result = await readRoundResult(directory);
+  if (result === undefined)
+    throw new Error(`no review yet: the session has not written ${join(directory, "result.json")}`);
+  const pullRequestDir = dirname(directory);
+  const rounds: RoundSummary[] = [];
+  for (const name of await listRounds(pullRequestDir)) {
+    const round = await readRound(join(pullRequestDir, name));
+    rounds.push({
+      round: round.meta.round,
+      headSha: round.meta.headSha,
+      verdict: round.result?.verdict ?? "pending",
+      startedAt: round.meta.startedAt,
+    });
+  }
+  return renderReviewText({ result, meta, rounds });
 }

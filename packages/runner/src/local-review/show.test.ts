@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -15,7 +15,8 @@ const meta = {
 };
 
 async function roundWith(result: unknown): Promise<string> {
-  const directory = await mkdtemp(join(tmpdir(), "hawkeye-round-"));
+  const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-pr-")), "round-3");
+  await mkdir(directory);
   await writeFile(join(directory, "meta.json"), JSON.stringify(meta));
   await writeFile(join(directory, "result.json"), JSON.stringify(result));
   return directory;
@@ -31,7 +32,55 @@ describe("showRound", () => {
     });
     const text = await showRound(directory);
     expect(text.startsWith("Verdict: MERGEABLE\n\n- fine\n\noptional:\n")).toBe(true);
-    expect(text.endsWith("Round 3 · head ccccccc · mergeable")).toBe(true);
+    expect(
+      text.endsWith("Rounds:\n- round 3 · ccccccc · mergeable · 2026-08-26T10:00:00.000Z"),
+    ).toBe(true);
+  });
+  it("lists every round of the pull request, pending ones without a verdict", async () => {
+    const directory = await roundWith({
+      verdict: "ship",
+      summary: "- fine",
+      lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
+      findings: [],
+      priorFindings: [{ id: "id1", status: "addressed", note: "guarded now" }],
+    });
+    const pullRequestDir = join(directory, "..");
+    await mkdir(join(pullRequestDir, "round-1"));
+    await writeFile(
+      join(pullRequestDir, "round-1", "meta.json"),
+      JSON.stringify({
+        ...meta,
+        round: 1,
+        headSha: "1".repeat(40),
+        startedAt: "2026-08-25T10:00:00.000Z",
+      }),
+    );
+    await writeFile(
+      join(pullRequestDir, "round-1", "result.json"),
+      JSON.stringify({
+        verdict: "ship",
+        summary: "- bug",
+        lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
+        findings: [{ severity: "must_fix", claim: "Crash", detail: "boom" }],
+      }),
+    );
+    await mkdir(join(pullRequestDir, "round-2"));
+    await writeFile(
+      join(pullRequestDir, "round-2", "meta.json"),
+      JSON.stringify({ ...meta, round: 2, headSha: "2".repeat(40) }),
+    );
+    const text = await showRound(directory);
+    expect(text).toContain("Prior findings:\n- [id1] addressed · guarded now");
+    expect(
+      text.endsWith(
+        [
+          "Rounds:",
+          "- round 1 · 1111111 · blocked · 2026-08-25T10:00:00.000Z",
+          "- round 2 · 2222222 · pending · 2026-08-26T10:00:00.000Z",
+          "- round 3 · ccccccc · ship · 2026-08-26T10:00:00.000Z",
+        ].join("\n"),
+      ),
+    ).toBe(true);
   });
   it("throws the validation message for an invalid result", async () => {
     const directory = await roundWith({ verdict: "ship", summary: "", lenses: [], findings: [] });
