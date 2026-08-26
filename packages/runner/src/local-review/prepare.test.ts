@@ -72,8 +72,12 @@ describe("prepareRound", () => {
     expect(describePreparedRound(prepared)).toEqual([
       "round 1 for o/r#7 at aaaaaaa",
       directory,
+      join(directory, "checkout"),
       join(directory, "result.json"),
     ]);
+    expect(await readFile(join(directory, "prompt.md"), "utf8")).toContain(
+      `The directory ${join(directory, "checkout")} is a checkout`,
+    );
   });
   it("passes the contract override and the merge base to the worktree", async () => {
     const root = await mkdtemp(join(tmpdir(), "hawkeye-reviews-"));

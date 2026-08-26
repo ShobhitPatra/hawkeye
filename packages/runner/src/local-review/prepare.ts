@@ -10,7 +10,7 @@ import {
   removeTrustedConfig,
   type PullRequestReference,
 } from "@hawkeye/core";
-import { createRound, pullRequestDirectory } from "./rounds.js";
+import { createRound, pruneOlderCheckouts, pullRequestDirectory } from "./rounds.js";
 
 export type RoundMeta = {
   round: number;
@@ -33,7 +33,12 @@ export type PrepareDependencies = {
   readRepositoryRules: typeof readRepositoryRules;
   now(): Date;
 };
-export type PreparedRound = { meta: RoundMeta; directory: string; resultPath: string };
+export type PreparedRound = {
+  meta: RoundMeta;
+  directory: string;
+  resultPath: string;
+  checkoutPath: string;
+};
 
 export async function prepareRound(
   input: PrepareInput,
@@ -50,7 +55,8 @@ export async function prepareRound(
     token,
   );
   const linkedIssue = await fetchLinkedIssue(github, reference, pullRequest.body, token);
-  const { round, directory } = await createRound(pullRequestDirectory(input.root, reference));
+  const pullRequestDir = pullRequestDirectory(input.root, reference);
+  const { round, directory } = await createRound(pullRequestDir);
   const worktree = await deps.createWorktree({
     cloneUrl: pullRequest.cloneUrl,
     token,
@@ -78,6 +84,7 @@ export async function prepareRound(
       repositoryRules,
       diff: worktree.diff,
       resultPath,
+      checkoutPath: worktree.path,
       ...(input.contractOverride === undefined ? {} : { contractOverride: input.contractOverride }),
     }),
   );
@@ -96,7 +103,8 @@ export async function prepareRound(
     },
   };
   await writeFile(join(directory, "meta.json"), JSON.stringify(meta, null, 2));
-  return { meta, directory, resultPath };
+  await pruneOlderCheckouts(pullRequestDir, round);
+  return { meta, directory, resultPath, checkoutPath: worktree.path };
 }
 
 export function describePreparedRound(prepared: PreparedRound): string[] {
@@ -105,6 +113,7 @@ export function describePreparedRound(prepared: PreparedRound): string[] {
   return [
     `round ${meta.round} for ${owner}/${repo}#${number} at ${meta.headSha.slice(0, 7)}`,
     prepared.directory,
+    prepared.checkoutPath,
     prepared.resultPath,
   ];
 }
