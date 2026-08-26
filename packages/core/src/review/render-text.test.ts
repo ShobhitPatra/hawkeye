@@ -32,7 +32,7 @@ describe("renderReviewText", () => {
     const result = { ...base(), verdict: "ship" as const, findings: [] };
     expect(renderReviewText({ result, meta })).toBe(
       [
-        "Verdict: ship",
+        "Verdict: SHIP",
         "",
         "- Mostly fine.",
         "",
@@ -73,7 +73,7 @@ describe("renderReviewText", () => {
     for (const verdict of VERDICTS) {
       const text = renderReviewText({ result: { ...base(), verdict }, meta });
       const label = verdict.replaceAll("_", " ");
-      expect(text.startsWith(`Verdict: ${label}\n`)).toBe(true);
+      expect(text.startsWith(`Verdict: ${label.toUpperCase()}\n`)).toBe(true);
       expect(text.endsWith(`· ${label}`)).toBe(true);
     }
   });

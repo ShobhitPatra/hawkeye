@@ -14,7 +14,7 @@ function headline(finding: Finding): string {
 
 export function renderReviewText({ result, meta }: RenderTextInput): string {
   const verdict = result.verdict.replaceAll("_", " ");
-  const lines = [`Verdict: ${verdict}`, "", result.summary];
+  const lines = [`Verdict: ${verdict.toUpperCase()}`, "", result.summary];
   for (const severity of SEVERITIES) {
     const group = result.findings.filter((finding) => finding.severity === severity);
     if (group.length === 0) continue;
