@@ -33,6 +33,7 @@ export function renderReviewText({ result, meta }: RenderTextInput): string {
       lines.push(headline(finding), ...indentLines(finding.detail, "  "));
       if (finding.rationale !== undefined)
         lines.push(`  why: ${indentLines(finding.rationale, "  ").join("\n").trimStart()}`);
+      if (finding.suggestion !== undefined) lines.push(`  suggestion: ${finding.suggestion}`);
     }
   }
   lines.push("", "Lenses:");

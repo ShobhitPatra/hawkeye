@@ -62,6 +62,13 @@ describe("renderReviewText", () => {
     const text = renderReviewText({ result: base(), meta });
     expect(text).toContain("  cover the empty case\n  why: See the\n  spec.\n");
   });
+  it("prints a suggestion under the finding", () => {
+    const result = base();
+    result.findings[0]!.suggestion = "const y = x ?? 0;";
+    expect(renderReviewText({ result, meta })).toContain(
+      "  x may be undefined\n  suggestion: const y = x ?? 0;",
+    );
+  });
   it("labels every verdict without underscores", () => {
     for (const verdict of VERDICTS) {
       const text = renderReviewText({ result: { ...base(), verdict }, meta });
