@@ -18,7 +18,7 @@ export async function listRounds(pullRequestDir: string): Promise<string[]> {
     },
   );
   return entries
-    .filter((entry) => entry.isDirectory() && entry.name.startsWith(ROUND_PREFIX))
+    .filter((entry) => entry.isDirectory() && /^round-[1-9]\d*$/.test(entry.name))
     .map((entry) => entry.name);
 }
 
@@ -31,7 +31,11 @@ export async function createRound(
       rm(join(pullRequestDir, name, "checkout"), { recursive: true, force: true }),
     ),
   );
-  const round = rounds.length + 1;
+  const round =
+    rounds.reduce(
+      (highest, name) => Math.max(highest, Number(name.slice(ROUND_PREFIX.length))),
+      0,
+    ) + 1;
   const directory = join(pullRequestDir, `${ROUND_PREFIX}${round}`);
   await mkdir(directory, { recursive: true });
   return { round, directory };

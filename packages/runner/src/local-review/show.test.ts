@@ -37,4 +37,13 @@ describe("showRound", () => {
     const directory = await roundWith({ verdict: "ship", summary: "", lenses: [], findings: [] });
     await expect(showRound(directory)).rejects.toThrow(/^Invalid review result: summary:/);
   });
+
+  it("names the meta file when it is not a round meta", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "hawkeye-round-"));
+    await writeFile(join(directory, "meta.json"), JSON.stringify({ round: "3" }));
+    await writeFile(join(directory, "result.json"), "{}");
+    await expect(showRound(directory)).rejects.toThrow(
+      `${join(directory, "meta.json")} is not a round meta file`,
+    );
+  });
 });

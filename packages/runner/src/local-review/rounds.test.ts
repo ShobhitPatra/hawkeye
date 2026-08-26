@@ -34,4 +34,16 @@ describe("rounds", () => {
     expect(await exists(join(first.directory, "result.json"))).toBe(true);
     expect(await listRounds(pullRequestDir)).toEqual(["round-1", "round-2"]);
   });
+
+  it("numbers after the highest round, so a pruned round is never overwritten", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hawkeye-reviews-"));
+    const pullRequestDir = pullRequestDirectory(root, { owner: "o", repo: "r", number: 7 });
+    await mkdir(join(pullRequestDir, "round-3"), { recursive: true });
+    await mkdir(join(pullRequestDir, "round-x"), { recursive: true });
+    await writeFile(join(pullRequestDir, "round-3", "result.json"), "{}");
+
+    const next = await createRound(pullRequestDir);
+    expect(next).toEqual({ round: 4, directory: join(pullRequestDir, "round-4") });
+    expect(await exists(join(pullRequestDir, "round-3", "result.json"))).toBe(true);
+  });
 });
