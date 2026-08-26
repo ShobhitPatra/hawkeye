@@ -1,6 +1,11 @@
 import { generateKeyPairSync } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { createGitHubClient, GitHubRequestError, linkedIssueNumber } from "./client.js";
+import {
+  createGitHubClient,
+  fetchMergeBase,
+  GitHubRequestError,
+  linkedIssueNumber,
+} from "./client.js";
 
 const pem = generateKeyPairSync("rsa", { modulusLength: 2048 })
   .privateKey.export({ type: "pkcs1", format: "pem" })
@@ -389,6 +394,29 @@ describe("createGitHubClient", () => {
       },
     ]);
     expect(calls[0]!.url).toContain("state=open");
+  });
+});
+
+describe("fetchMergeBase", () => {
+  it("resolves the merge base with a plain token", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      "GET /repos/o/r/compare/base...head": () => ({
+        json: { merge_base_commit: { sha: "m".repeat(40) } },
+      }),
+    });
+    await expect(fetchMergeBase({ fetch: fetchImpl }, ref, "base", "head", "t")).resolves.toBe(
+      "m".repeat(40),
+    );
+    expect(calls[0]!.url).toBe("https://api.github.com/repos/o/r/compare/base...head");
+    expect(new Headers(calls[0]!.init.headers).get("Authorization")).toBe("Bearer t");
+  });
+  it("rejects a comparison without a merge base sha", async () => {
+    const { fetchImpl } = fakeFetch({
+      "GET /repos/o/r/compare/base...head": () => ({ json: {} }),
+    });
+    await expect(fetchMergeBase({ fetch: fetchImpl }, ref, "base", "head", "t")).rejects.toThrow(
+      /merge base/,
+    );
   });
 });
 

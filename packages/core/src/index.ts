@@ -43,3 +43,8 @@ export {
   type RunReviewJobOutcome,
 } from "./run-job.js";
 export { findingId } from "./review/finding-id.js";
+export { buildPrompt, type PromptInput } from "./contract/prompt.js";
+export { fetchMergeBase } from "./github/client.js";
+export { renderReviewText, type RenderTextInput } from "./review/render-text.js";
+export { removeTrustedConfig } from "./worktree/trusted-files.js";
+export { commentableLines } from "./review/diff-lines.js";
