@@ -26,12 +26,21 @@ export type CreateWorktreeInput = {
   directory: string;
 };
 
-function authorization(cloneUrl: string, token: string | undefined): string[] {
-  if (token === undefined) return [];
+const AUTHORIZATION_ENV = "HAWKEYE_GIT_AUTHORIZATION";
+
+export function gitAuthorization(
+  cloneUrl: string,
+  token: string | undefined,
+): { args: string[]; env: Record<string, string> } {
+  if (token === undefined) return { args: [], env: {} };
   const url = URL.parse(cloneUrl);
-  if (url === null || (url.protocol !== "http:" && url.protocol !== "https:")) return [];
+  if (url === null || (url.protocol !== "http:" && url.protocol !== "https:"))
+    return { args: [], env: {} };
   const basic = Buffer.from(`x-access-token:${token}`).toString("base64");
-  return ["-c", `http.${url.origin}/.extraheader=Authorization: Basic ${basic}`];
+  return {
+    args: ["--config-env", `http.${url.origin}/.extraheader=${AUTHORIZATION_ENV}`],
+    env: { [AUTHORIZATION_ENV]: `Authorization: Basic ${basic}` },
+  };
 }
 
 export async function createWorktree(input: CreateWorktreeInput): Promise<Worktree> {
@@ -41,30 +50,31 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
       : text
           .replaceAll(input.token, "***")
           .replaceAll(Buffer.from(`x-access-token:${input.token}`).toString("base64"), "***");
+  const auth = gitAuthorization(input.cloneUrl, input.token);
   const git = async (cwd: string | undefined, ...args: string[]) => {
     try {
       return (
         await run("git", args, {
           cwd,
-          env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+          env: { ...process.env, ...auth.env, GIT_TERMINAL_PROMPT: "0" },
           maxBuffer: 64 * 1024 * 1024,
         })
       ).stdout;
     } catch (error) {
       const verb = args.find(
-        (argument, index) => argument !== "-c" && (index === 0 || args[index - 1] !== "-c"),
+        (argument, index) =>
+          argument !== "--config-env" && (index === 0 || args[index - 1] !== "--config-env"),
       );
       throw new Error(redact(`git ${verb} failed: ${(error as Error).message}`));
     }
   };
 
-  const auth = authorization(input.cloneUrl, input.token);
   await git(undefined, "init", "--quiet", input.directory);
   try {
     await git(input.directory, "remote", "add", "origin", input.cloneUrl);
     await git(
       input.directory,
-      ...auth,
+      ...auth.args,
       "fetch",
       "--quiet",
       "--depth",
@@ -75,7 +85,7 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
     const fetchedHead = (await git(input.directory, "rev-parse", "FETCH_HEAD")).trim();
     await git(
       input.directory,
-      ...auth,
+      ...auth.args,
       "fetch",
       "--quiet",
       "--depth",
