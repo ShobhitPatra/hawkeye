@@ -2,11 +2,11 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   buildPrompt,
-  createWorktree,
+  type createWorktree,
   fetchLinkedIssue,
   fetchMergeBase,
   fetchPullRequestDetails,
-  readRepositoryRules,
+  type readRepositoryRules,
   removeTrustedConfig,
   type PullRequestReference,
 } from "@hawkeye/core";
