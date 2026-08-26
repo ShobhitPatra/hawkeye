@@ -34,6 +34,15 @@ const FindingSchema = z
     message: "suggestion requires line",
   });
 
+export const PRIOR_FINDING_STATUSES = ["addressed", "open", "withdrawn"] as const;
+export type PriorFindingStatus = (typeof PRIOR_FINDING_STATUSES)[number];
+
+const PriorFindingReportSchema = z.object({
+  id: z.string().min(1),
+  status: z.enum(PRIOR_FINDING_STATUSES),
+  note: z.string().min(1),
+});
+
 export const ReviewResultSchema = z.object({
   verdict: z.preprocess(
     (value) => (typeof value === "string" ? (LEGACY_VERDICTS[value] ?? value) : value),
@@ -48,9 +57,11 @@ export const ReviewResultSchema = z.object({
       { message: "lenses must list each of the six lenses exactly once" },
     ),
   findings: z.array(FindingSchema),
+  priorFindings: z.array(PriorFindingReportSchema).optional(),
 });
 
 export type Finding = z.infer<typeof FindingSchema>;
+export type PriorFindingReport = z.infer<typeof PriorFindingReportSchema>;
 export type ReviewResult = z.infer<typeof ReviewResultSchema>;
 
 export function verdictFor(findings: readonly Finding[]): Verdict {

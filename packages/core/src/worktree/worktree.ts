@@ -16,7 +16,12 @@ const GENERATED_PATHSPECS = [
   ":(exclude,glob)**/*.min.css",
 ];
 
-export type Worktree = { path: string; diff: string; remove(): Promise<void> };
+export type Worktree = {
+  path: string;
+  diff: string;
+  interdiff?: string;
+  remove(): Promise<void>;
+};
 export type CreateWorktreeInput = {
   cloneUrl: string;
   token?: string;
@@ -24,6 +29,7 @@ export type CreateWorktreeInput = {
   headSha: string;
   baseSha: string;
   directory: string;
+  previousHeadSha?: string;
 };
 
 const AUTHORIZATION_ENV = "HAWKEYE_GIT_AUTHORIZATION";
@@ -93,6 +99,17 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
       "origin",
       input.baseSha,
     );
+    if (input.previousHeadSha !== undefined)
+      await git(
+        input.directory,
+        ...auth.args,
+        "fetch",
+        "--quiet",
+        "--depth",
+        "1",
+        "origin",
+        input.previousHeadSha,
+      );
     await git(input.directory, "remote", "remove", "origin");
     await git(input.directory, "checkout", "--quiet", "--detach", fetchedHead);
     if (fetchedHead !== input.headSha)
@@ -104,10 +121,21 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
       "--",
       ...GENERATED_PATHSPECS,
     );
+    const interdiff =
+      input.previousHeadSha === undefined
+        ? undefined
+        : await git(
+            input.directory,
+            "diff",
+            `${input.previousHeadSha}..HEAD`,
+            "--",
+            ...GENERATED_PATHSPECS,
+          );
 
     return {
       path: input.directory,
       diff,
+      ...(interdiff === undefined ? {} : { interdiff }),
       remove: () => rm(input.directory, { recursive: true, force: true }),
     };
   } catch (error) {

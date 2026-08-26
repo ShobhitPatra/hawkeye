@@ -131,4 +131,48 @@ describe("buildPrompt", () => {
     expect(prompt).toContain("The directory /tmp/round-1/checkout is a checkout of the PR head");
     expect(prompt).not.toContain("The current directory");
   });
+  it("carries the previous round's findings, dismissals and interdiff", () => {
+    const p = buildPrompt({
+      ...input,
+      previousRound: {
+        headSha: "c".repeat(40),
+        interdiff: "diff --git a/g b/g\n+2\n",
+        findings: [
+          { id: "id1", severity: "must_fix", claim: "Null deref", path: "src/a.ts", line: 3 },
+          {
+            id: "id2",
+            severity: "optional",
+            claim: "Rename",
+            status: "dismissed",
+            note: "name is fine",
+          },
+        ],
+      },
+    });
+    expect(p).toContain(`# Previous round\nThe previous round reviewed head ${"c".repeat(40)}`);
+    expect(p).toContain("- [id1] must_fix · Null deref (src/a.ts:3)");
+    expect(p).toContain("- [id2] optional · Rename\n  dismissed by the author: name is fine");
+    expect(p).toContain('<untrusted_data source="interdiff">\ndiff --git a/g b/g\n+2\n');
+    expect(p).toContain("Report every prior finding in priorFindings");
+    expect(p).toContain(
+      '"priorFindings"?: [{ "id": string, "status": "addressed" | "open" | "withdrawn", "note": string }]',
+    );
+    expect(p.indexOf('source="diff"')).toBeLessThan(p.indexOf("# Previous round"));
+  });
+  it("says the head is unchanged when the interdiff is empty", () => {
+    const p = buildPrompt({
+      ...input,
+      previousRound: { headSha: "a".repeat(40), interdiff: "", findings: [] },
+    });
+    expect(p).toContain(
+      "The head is unchanged since the previous round; this is a re-review of the same head.",
+    );
+    expect(p).toContain("(no findings)");
+    expect(p).not.toContain('source="interdiff"');
+  });
+  it("omits the previous round section when there is none", () => {
+    const p = buildPrompt(input);
+    expect(p).not.toContain("# Previous round");
+    expect(p).not.toContain("interdiff");
+  });
 });

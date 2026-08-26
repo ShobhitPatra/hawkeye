@@ -1,8 +1,18 @@
-import { type Finding, type ReviewResult, SEVERITIES } from "../contract/schema.js";
+import { type Finding, type ReviewResult, SEVERITIES, type Verdict } from "../contract/schema.js";
 import { findingId } from "./finding-id.js";
 import { indentLines, SEVERITY_BADGE } from "./format.js";
 
-export type RenderTextInput = { result: ReviewResult; meta: { round: number; headSha: string } };
+export type RoundSummary = {
+  round: number;
+  headSha: string;
+  verdict: Verdict | "pending";
+  startedAt: string;
+};
+export type RenderTextInput = {
+  result: ReviewResult;
+  meta: { round: number; headSha: string };
+  rounds?: RoundSummary[];
+};
 
 function headline(finding: Finding): string {
   const location =
@@ -12,7 +22,7 @@ function headline(finding: Finding): string {
   return `- [${findingId(finding.path, finding.claim)}] ${finding.claim.replace(/\r?\n/g, " ")}${location}`;
 }
 
-export function renderReviewText({ result, meta }: RenderTextInput): string {
+export function renderReviewText({ result, meta, rounds }: RenderTextInput): string {
   const verdict = result.verdict.replaceAll("_", " ");
   const lines = [`Verdict: ${verdict.toUpperCase()}`, "", result.summary];
   for (const severity of SEVERITIES) {
@@ -26,8 +36,21 @@ export function renderReviewText({ result, meta }: RenderTextInput): string {
       if (finding.suggestion !== undefined) lines.push(`  suggestion: ${finding.suggestion}`);
     }
   }
+  if (result.priorFindings !== undefined) {
+    lines.push("", "Prior findings:");
+    for (const prior of result.priorFindings)
+      lines.push(`- [${prior.id}] ${prior.status} · ${prior.note.replace(/\r?\n/g, " ")}`);
+  }
   lines.push("", "Lenses:");
   for (const lens of result.lenses) lines.push(`- ${lens.name}: ${lens.assessment}`);
-  lines.push("", `Round ${meta.round} · head ${meta.headSha.slice(0, 7)} · ${verdict}`);
+  if (rounds === undefined) {
+    lines.push("", `Round ${meta.round} · head ${meta.headSha.slice(0, 7)} · ${verdict}`);
+  } else {
+    lines.push("", "Rounds:");
+    for (const round of rounds)
+      lines.push(
+        `- round ${round.round} · ${round.headSha.slice(0, 7)} · ${round.verdict.replaceAll("_", " ")} · ${round.startedAt}`,
+      );
+  }
   return lines.join("\n");
 }

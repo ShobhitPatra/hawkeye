@@ -1,4 +1,15 @@
-import { LENSES } from "./schema.js";
+import { LENSES, type Severity } from "./schema.js";
+
+export type PriorFinding = {
+  id: string;
+  severity: Severity;
+  claim: string;
+  path?: string;
+  line?: number;
+  status?: "dismissed";
+  note?: string;
+};
+export type PreviousRound = { headSha: string; interdiff: string; findings: PriorFinding[] };
 
 export type PromptInput = {
   repository: { owner: string; repo: string };
@@ -16,6 +27,7 @@ export type PromptInput = {
   resultPath: string;
   contractOverride?: string;
   checkoutPath?: string;
+  previousRound?: PreviousRound;
 };
 
 const LENS_GUIDE: Record<(typeof LENSES)[number], string> = {
@@ -31,6 +43,17 @@ const LENS_GUIDE: Record<(typeof LENSES)[number], string> = {
   hygiene:
     "Commit quality, documentation kept in lockstep, licensing, secrets, anything a maintainer must gate on.",
 };
+
+function priorFindingLine(finding: PriorFinding): string {
+  const location =
+    finding.path === undefined
+      ? ""
+      : ` (${finding.path}${finding.line === undefined ? "" : `:${finding.line}`})`;
+  const line = `- [${finding.id}] ${finding.severity} · ${finding.claim.replace(/\r?\n/g, " ")}${location}`;
+  return finding.status === "dismissed"
+    ? `${line}\n  dismissed by the author: ${(finding.note ?? "").replace(/\r?\n/g, " ")}`
+    : line;
+}
 
 function fence(tag: string, attributes: string, content: string): string {
   const closing = new RegExp(`</${tag}`, "gi");
@@ -80,6 +103,25 @@ ${repositoryRules.map((r) => fence("repository_rules", `path="${r.path}"`, r.con
 Lockfiles and build output are excluded from this diff.
 ${fence("untrusted_data", 'source="diff"', diff)}`);
 
+  if (input.previousRound !== undefined) {
+    const { headSha, interdiff, findings } = input.previousRound;
+    sections.push(`# Previous round
+The previous round reviewed head ${headSha} and reported these findings; each id is stable for the same path and claim.
+${findings.length === 0 ? "(no findings)" : findings.map(priorFindingLine).join("\n")}
+
+# Changes since the previous round (interdiff)
+${
+  interdiff === ""
+    ? "The head is unchanged since the previous round; this is a re-review of the same head."
+    : `Lockfiles and build output are excluded from this diff.\n${fence("untrusted_data", 'source="interdiff"', interdiff)}`
+}
+
+Rules for this round:
+- Report every prior finding in priorFindings with its id and a status: addressed when the new changes resolve it, open when it still stands, withdrawn when it no longer holds or was wrong. A finding dismissed by the author is withdrawn with the author's note unless the interdiff proves the note wrong.
+- Repeat every still-open finding in findings with the same path and claim so its id stays stable.
+- Raise new findings only about the changes in the interdiff or about what the interdiff newly exposes; the full diff above remains the context for understanding the pull request.`);
+  }
+
   if (input.contractOverride === undefined) {
     sections.push(`# Lenses
 Assess each of these six lenses once:
@@ -114,8 +156,10 @@ When you are done, write the result as JSON to ${resultPath} and stop. Write not
   "verdict": "ship" | "mergeable" | "changes_needed" | "blocked",
   "summary": string,
   "lenses": [{ "name": "intent" | "behavior" | "blast_radius" | "verification" | "fit" | "hygiene", "assessment": string }],
-  "findings": [{ "path"?: string, "line"?: number, "side"?: "RIGHT" | "LEFT", "severity": "must_fix" | "should_fix" | "optional" | "inherited", "claim": string, "detail": string, "rationale"?: string, "suggestion"?: string }]
+  "findings": [{ "path"?: string, "line"?: number, "side"?: "RIGHT" | "LEFT", "severity": "must_fix" | "should_fix" | "optional" | "inherited", "claim": string, "detail": string, "rationale"?: string, "suggestion"?: string }],
+  "priorFindings"?: [{ "id": string, "status": "addressed" | "open" | "withdrawn", "note": string }]
 }
+priorFindings is required when a previous round is given above and must list every prior finding; omit it otherwise.
 lenses must list each of the six lenses exactly once. verdict is blocked if any finding is must_fix; changes_needed if any finding is should_fix; mergeable if any finding is optional or inherited; otherwise ship.`);
 
   return sections.join("\n\n");

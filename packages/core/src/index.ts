@@ -12,7 +12,12 @@ export type {
 } from "./github/client.js";
 export { createClaudeCodeHarness } from "./harness/claude-code.js";
 export type { HarnessSpec, HarnessEvent, HarnessResult } from "./harness/harness.js";
-export { createWorktree, readRepositoryRules } from "./worktree/worktree.js";
+export {
+  createWorktree,
+  readRepositoryRules,
+  type CreateWorktreeInput,
+  type Worktree,
+} from "./worktree/worktree.js";
 export {
   runReview,
   type RunReviewInput,
@@ -27,8 +32,22 @@ export {
   type PostedReview,
 } from "./review/post.js";
 export { HAWKEYE_REPOSITORY_URL } from "./repository-url.js";
-export type { ReviewResult, Finding, Severity, Verdict, Lens } from "./contract/schema.js";
-export { parseReviewResult, SEVERITIES, VERDICTS, verdictFor } from "./contract/schema.js";
+export type {
+  ReviewResult,
+  Finding,
+  Severity,
+  Verdict,
+  Lens,
+  PriorFindingReport,
+  PriorFindingStatus,
+} from "./contract/schema.js";
+export {
+  parseReviewResult,
+  PRIOR_FINDING_STATUSES,
+  SEVERITIES,
+  VERDICTS,
+  verdictFor,
+} from "./contract/schema.js";
 export {
   RUN_RESULT_STATUSES,
   type ClaimedJob,
@@ -43,7 +62,12 @@ export {
   type RunReviewJobOutcome,
 } from "./run-job.js";
 export { findingId } from "./review/finding-id.js";
-export { buildPrompt, type PromptInput } from "./contract/prompt.js";
+export {
+  buildPrompt,
+  type PromptInput,
+  type PriorFinding,
+  type PreviousRound,
+} from "./contract/prompt.js";
 export { fetchMergeBase } from "./github/client.js";
-export { renderReviewText, type RenderTextInput } from "./review/render-text.js";
+export { renderReviewText, type RenderTextInput, type RoundSummary } from "./review/render-text.js";
 export { removeTrustedConfig } from "./worktree/trusted-files.js";

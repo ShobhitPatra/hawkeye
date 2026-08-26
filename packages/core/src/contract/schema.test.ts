@@ -115,4 +115,25 @@ describe("parseReviewResult", () => {
     r.findings[0] = { line: 2, severity: "should_fix", claim: "c", detail: "d" } as never;
     expect(() => parseReviewResult(r)).toThrow(/path/);
   });
+  it("accepts prior finding reports and keeps them", () => {
+    const priorFindings = [
+      { id: "abc123abc123", status: "addressed", note: "fixed in 2nd commit" },
+    ];
+    expect(parseReviewResult({ ...valid(), priorFindings }).priorFindings).toEqual(priorFindings);
+    expect(parseReviewResult(valid()).priorFindings).toBeUndefined();
+  });
+  it("rejects a prior finding with an unknown status or an empty note", () => {
+    expect(() =>
+      parseReviewResult({
+        ...valid(),
+        priorFindings: [{ id: "abc123abc123", status: "fixed", note: "n" }],
+      }),
+    ).toThrow(/priorFindings\.0\.status/);
+    expect(() =>
+      parseReviewResult({
+        ...valid(),
+        priorFindings: [{ id: "abc123abc123", status: "open", note: "" }],
+      }),
+    ).toThrow(/priorFindings\.0\.note/);
+  });
 });

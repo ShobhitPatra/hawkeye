@@ -22,6 +22,7 @@ const git = (cwd: string, ...args: string[]) =>
 let origin: string;
 let baseSha: string;
 let headSha: string;
+let previousHeadSha: string;
 
 beforeAll(async () => {
   const root = await mkdtemp(join(tmpdir(), "hawkeye-wt-"));
@@ -37,8 +38,12 @@ beforeAll(async () => {
   baseSha = (await git(work, "rev-parse", "HEAD")).stdout.trim();
   await git(work, "switch", "-q", "-c", "feat");
   await writeFile(join(work, "a.txt"), "one\ntwo\n");
+  await git(work, "commit", "-q", "-am", "previous head");
+  previousHeadSha = (await git(work, "rev-parse", "HEAD")).stdout.trim();
+  await writeFile(join(work, "c.txt"), "three\n");
   await writeFile(join(work, "pnpm-lock.yaml"), "lockfileVersion: 9\nregenerated: true\n");
-  await git(work, "commit", "-q", "-am", "head");
+  await git(work, "add", ".");
+  await git(work, "commit", "-q", "-m", "head");
   headSha = (await git(work, "rev-parse", "HEAD")).stdout.trim();
   await git(root, "clone", "-q", "--bare", work, origin);
   await git(root, "--git-dir", origin, "update-ref", "refs/pull/1/head", headSha);
@@ -70,6 +75,47 @@ describe("createWorktree", () => {
     });
     expect(wt.diff).toContain("+two");
     expect(wt.diff).not.toContain("pnpm-lock.yaml");
+    await wt.remove();
+  });
+  it("computes the interdiff from the previous head when one is given", async () => {
+    const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
+    const wt = await createWorktree({
+      cloneUrl: origin,
+      pullRequestNumber: 1,
+      headSha,
+      baseSha,
+      directory,
+      previousHeadSha,
+    });
+    expect(wt.diff).toContain("+two");
+    expect(wt.interdiff).toContain("+three");
+    expect(wt.interdiff).not.toContain("+two");
+    expect(wt.interdiff).not.toContain("pnpm-lock.yaml");
+    await wt.remove();
+  });
+  it("returns an empty interdiff when the previous head is the head", async () => {
+    const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
+    const wt = await createWorktree({
+      cloneUrl: origin,
+      pullRequestNumber: 1,
+      headSha,
+      baseSha,
+      directory,
+      previousHeadSha: headSha,
+    });
+    expect(wt.interdiff).toBe("");
+    await wt.remove();
+  });
+  it("omits the interdiff without a previous head", async () => {
+    const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
+    const wt = await createWorktree({
+      cloneUrl: origin,
+      pullRequestNumber: 1,
+      headSha,
+      baseSha,
+      directory,
+    });
+    expect(wt.interdiff).toBeUndefined();
     await wt.remove();
   });
   it("passes the credential through the environment, not argv or the config", async () => {

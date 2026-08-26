@@ -77,4 +77,45 @@ describe("renderReviewText", () => {
       expect(text.endsWith(`· ${label}`)).toBe(true);
     }
   });
+  it("lists prior findings with their status after the findings", () => {
+    const result = {
+      ...base(),
+      priorFindings: [
+        { id: "id1", status: "addressed" as const, note: "guarded in\nthe new commit" },
+        { id: "id2", status: "open" as const, note: "still there" },
+      ],
+    };
+    const text = renderReviewText({ result, meta });
+    expect(text).toContain(
+      "\nPrior findings:\n- [id1] addressed · guarded in the new commit\n- [id2] open · still there\n\nLenses:",
+    );
+    expect(text.indexOf("inherited:")).toBeLessThan(text.indexOf("Prior findings:"));
+    expect(renderReviewText({ result: base(), meta })).not.toContain("Prior findings:");
+  });
+  it("replaces the footer with a rounds table when rounds are given", () => {
+    const text = renderReviewText({
+      result: base(),
+      meta,
+      rounds: [
+        {
+          round: 1,
+          headSha: "1".repeat(40),
+          verdict: "changes_needed",
+          startedAt: "2026-08-25T10:00:00.000Z",
+        },
+        {
+          round: 2,
+          headSha: "abcdef0123456789",
+          verdict: "pending",
+          startedAt: "2026-08-26T10:00:00.000Z",
+        },
+      ],
+    });
+    expect(
+      text.endsWith(
+        "Rounds:\n- round 1 · 1111111 · changes needed · 2026-08-25T10:00:00.000Z\n- round 2 · abcdef0 · pending · 2026-08-26T10:00:00.000Z",
+      ),
+    ).toBe(true);
+    expect(text).not.toContain("Round 2 · head");
+  });
 });
