@@ -18,8 +18,9 @@ import {
   latestCompletedRound,
   pruneOlderCheckouts,
   pullRequestDirectory,
-  readDismissals,
+  collectDismissals,
   type RoundMeta,
+  type Dismissals,
 } from "./rounds.js";
 
 export type { RoundMeta } from "./rounds.js";
@@ -72,7 +73,13 @@ export async function prepareRound(
     ...(previous === undefined ? {} : { previousHeadSha: previous.meta.headSha }),
   });
   const previousRound =
-    previous === undefined ? undefined : await describePreviousRound(previous, worktree.interdiff);
+    previous === undefined
+      ? undefined
+      : await describePreviousRound(
+          previous,
+          worktree.interdiff,
+          await collectDismissals(pullRequestDir, round, deps.warn),
+        );
   const repositoryRules = await deps.readRepositoryRules(worktree.path);
   await removeTrustedConfig(worktree.path);
   const resultPath = join(directory, "result.json");
@@ -134,11 +141,11 @@ export function describePreparedRound(prepared: PreparedRound): string[] {
   ];
 }
 
-async function describePreviousRound(
-  previous: { directory: string; meta: { headSha: string }; result: { findings: Finding[] } },
+function describePreviousRound(
+  previous: { meta: { headSha: string }; result: { findings: Finding[] } },
   interdiff: string | undefined,
-): Promise<PreviousRound> {
-  const dismissals = await readDismissals(previous.directory);
+  dismissals: Dismissals,
+): PreviousRound {
   return {
     headSha: previous.meta.headSha,
     ...(interdiff === undefined ? {} : { interdiff }),

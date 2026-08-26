@@ -2,7 +2,10 @@ import { dirname, join } from "node:path";
 import { renderReviewText, type RoundSummary } from "@hawkeye/core";
 import { listRounds, readRound, readRoundMeta, readRoundResult } from "./rounds.js";
 
-export async function showRound(directory: string): Promise<string> {
+export async function showRound(
+  directory: string,
+  warn: (line: string) => void = () => {},
+): Promise<string> {
   const meta = await readRoundMeta(directory);
   const result = await readRoundResult(directory);
   if (result === undefined)
@@ -10,7 +13,11 @@ export async function showRound(directory: string): Promise<string> {
   const pullRequestDir = dirname(directory);
   const rounds: RoundSummary[] = [];
   for (const name of await listRounds(pullRequestDir)) {
-    const round = await readRound(join(pullRequestDir, name)).catch(() => undefined);
+    const roundDir = join(pullRequestDir, name);
+    const round = await readRound(roundDir).catch((error: Error) => {
+      warn(`skipping ${roundDir}: ${error.message}`);
+      return undefined;
+    });
     if (round === undefined) continue;
     rounds.push({
       round: round.meta.round,

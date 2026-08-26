@@ -70,9 +70,37 @@ export async function latestCompletedRound(
   return undefined;
 }
 
+function parseDismissals(raw: unknown, path: string): Dismissals {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw))
+    throw new Error(`${path} is not a dismissal file: expected an object of id to reason`);
+  for (const [id, reason] of Object.entries(raw))
+    if (typeof reason !== "string" || reason.trim() === "")
+      throw new Error(`${path} is not a dismissal file: ${id} needs a reason`);
+  return raw as Dismissals;
+}
+
 export async function readDismissals(directory: string): Promise<Dismissals> {
-  const raw = await readOptionalFile(join(directory, "dismissed.json"));
-  return raw === undefined ? {} : (JSON.parse(raw) as Dismissals);
+  const path = join(directory, "dismissed.json");
+  const raw = await readOptionalFile(path);
+  return raw === undefined ? {} : parseDismissals(JSON.parse(raw), path);
+}
+
+export async function collectDismissals(
+  pullRequestDir: string,
+  before: number,
+  warn: (line: string) => void = () => {},
+): Promise<Dismissals> {
+  const merged: Dismissals = {};
+  for (const name of await listRounds(pullRequestDir)) {
+    const directory = join(pullRequestDir, name);
+    if (Number(name.slice(ROUND_PREFIX.length)) >= before) continue;
+    try {
+      Object.assign(merged, await readDismissals(directory));
+    } catch (error) {
+      warn(`skipping ${join(directory, "dismissed.json")}: ${(error as Error).message}`);
+    }
+  }
+  return merged;
 }
 
 export async function dismissFinding(

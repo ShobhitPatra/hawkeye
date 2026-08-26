@@ -10,6 +10,7 @@ import {
   listRounds,
   pruneOlderCheckouts,
   pullRequestDirectory,
+  collectDismissals,
   readDismissals,
   readRound,
 } from "./rounds.js";
@@ -122,5 +123,22 @@ describe("rounds", () => {
     await expect(dismissFinding(directory, id, " ")).rejects.toThrow("a dismissal needs a reason");
     const pending = await roundDir(root, 2);
     await expect(dismissFinding(pending, id, "no")).rejects.toThrow(`no review yet in ${pending}`);
+  });
+  it("collects dismissals from every earlier round and skips a malformed file", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hawkeye-reviews-"));
+    const first = await roundDir(root, 1, resultWith("Nit"));
+    const second = await roundDir(root, 2, resultWith("Other"));
+    const third = await roundDir(root, 3, resultWith("Third"));
+    await dismissFinding(first, findingId("src/a.ts", "Nit"), "by design");
+    await writeFile(join(second, "dismissed.json"), JSON.stringify({ x: 7 }));
+    await dismissFinding(third, findingId("src/a.ts", "Third"), "later");
+    const warnings: string[] = [];
+    expect(await collectDismissals(root, 3, (line) => warnings.push(line))).toEqual({
+      [findingId("src/a.ts", "Nit")]: "by design",
+    });
+    expect(warnings).toEqual([
+      `skipping ${join(second, "dismissed.json")}: ${join(second, "dismissed.json")} is not a dismissal file: x needs a reason`,
+    ]);
+    await expect(readDismissals(second)).rejects.toThrow("is not a dismissal file");
   });
 });
