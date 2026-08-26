@@ -36,7 +36,7 @@ export function renderReviewText({ result, meta, rounds }: RenderTextInput): str
       if (finding.suggestion !== undefined) lines.push(`  suggestion: ${finding.suggestion}`);
     }
   }
-  if (result.priorFindings !== undefined) {
+  if (result.priorFindings !== undefined && result.priorFindings.length > 0) {
     lines.push("", "Prior findings:");
     for (const prior of result.priorFindings)
       lines.push(`- [${prior.id}] ${prior.status} · ${prior.note.replace(/\r?\n/g, " ")}`);

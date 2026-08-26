@@ -182,6 +182,10 @@ describe("buildPrompt", () => {
       previousRound: { headSha: "a".repeat(40), findings: [] },
     });
     expect(p).toContain("The previous head is no longer on the server");
+    expect(p).toContain(
+      "Raise new findings about anything in the full diff that the previous round missed.",
+    );
+    expect(p).not.toContain("only about the changes since the previous round");
     expect(p).not.toContain('source="interdiff"');
   });
 });

@@ -5,6 +5,8 @@ import { promisify } from "node:util";
 
 const run = promisify(execFile);
 const RULE_FILES = ["AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md"];
+const UNADVERTISED_OBJECT =
+  /unadvertised object|not our ref|couldn't find remote ref|no such remote ref|upload-pack: not our ref|did not send all necessary objects/i;
 const GENERATED_PATHSPECS = [
   ".",
   ":(exclude,glob)**/pnpm-lock.yaml",
@@ -113,7 +115,10 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
             input.previousHeadSha,
           ).then(
             () => input.previousHeadSha,
-            () => undefined,
+            (error: Error) => {
+              if (!UNADVERTISED_OBJECT.test(error.message)) throw error;
+              return undefined;
+            },
           );
     await git(input.directory, "remote", "remove", "origin");
     await git(input.directory, "checkout", "--quiet", "--detach", fetchedHead);

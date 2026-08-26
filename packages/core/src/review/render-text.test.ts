@@ -118,4 +118,8 @@ describe("renderReviewText", () => {
     ).toBe(true);
     expect(text).not.toContain("Round 2 · head");
   });
+  it("omits the prior findings block when the list is empty", () => {
+    const result = { ...base(), priorFindings: [] };
+    expect(renderReviewText({ result, meta })).not.toContain("Prior findings:");
+  });
 });

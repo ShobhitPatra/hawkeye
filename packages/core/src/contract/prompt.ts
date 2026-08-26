@@ -111,6 +111,12 @@ ${fence("untrusted_data", 'source="diff"', diff)}`);
         : interdiff === ""
           ? "The head is unchanged since the previous round; this is a re-review of the same head."
           : `Changes on this branch since the previous round (when the branch merged from its base in between, those upstream commits can appear here; they are not the author's changes). Lockfiles and build output are excluded.\n${fence("untrusted_data", 'source="interdiff"', interdiff)}`;
+    const newFindingsRule =
+      interdiff === undefined
+        ? "- Raise new findings about anything in the full diff that the previous round missed."
+        : interdiff === ""
+          ? "- Raise new findings about anything in the full diff that the previous round missed; nothing changed, so look again rather than repeat."
+          : "- Raise new findings only about the changes since the previous round or about what they newly expose; the full diff above remains the context for understanding the pull request.";
     sections.push(`# Previous round
 The previous round reviewed head ${headSha} and reported these findings; each id is stable for the same path and claim.
 ${fence(
@@ -125,7 +131,7 @@ ${since}
 Rules for this round:
 - Report every prior finding in priorFindings with its id and a status: addressed when the new changes resolve it, open when it still stands, withdrawn when it no longer holds or was wrong. A finding dismissed by the author is withdrawn with the author's note unless the new changes prove the note wrong.
 - Repeat every still-open finding in findings with the same path and claim so its id stays stable.
-- Raise new findings only about the changes since the previous round or about what they newly expose; the full diff above remains the context for understanding the pull request.`);
+${newFindingsRule}`);
   }
 
   if (input.contractOverride === undefined) {
