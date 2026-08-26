@@ -72,6 +72,20 @@ describe("createWorktree", () => {
     expect(wt.diff).not.toContain("pnpm-lock.yaml");
     await wt.remove();
   });
+  it("never writes the token into the repository config", async () => {
+    const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
+    const failing = createWorktree({
+      cloneUrl: "https://127.0.0.1:9/o/r.git",
+      token: "ghs_secrettoken",
+      pullRequestNumber: 1,
+      headSha,
+      baseSha,
+      directory,
+    });
+    await expect(failing).rejects.toThrow(/git fetch failed/);
+    await expect(failing).rejects.not.toThrow(/ghs_secrettoken/);
+    await expect(readFile(join(directory, ".git", "config"), "utf8")).rejects.toThrow();
+  });
   it("leaves no origin remote or token behind", async () => {
     const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
     const wt = await createWorktree({

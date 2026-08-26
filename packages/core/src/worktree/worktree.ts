@@ -26,18 +26,21 @@ export type CreateWorktreeInput = {
   directory: string;
 };
 
-function authenticated(cloneUrl: string, token: string | undefined): string {
-  if (token === undefined) return cloneUrl;
+function authorization(cloneUrl: string, token: string | undefined): string[] {
+  if (token === undefined) return [];
   const url = URL.parse(cloneUrl);
-  if (url === null || (url.protocol !== "http:" && url.protocol !== "https:")) return cloneUrl;
-  url.username = "x-access-token";
-  url.password = token;
-  return url.toString();
+  if (url === null || (url.protocol !== "http:" && url.protocol !== "https:")) return [];
+  const basic = Buffer.from(`x-access-token:${token}`).toString("base64");
+  return ["-c", `http.${url.origin}/.extraheader=Authorization: Basic ${basic}`];
 }
 
 export async function createWorktree(input: CreateWorktreeInput): Promise<Worktree> {
   const redact = (text: string) =>
-    input.token === undefined ? text : text.replaceAll(input.token, "***");
+    input.token === undefined
+      ? text
+      : text
+          .replaceAll(input.token, "***")
+          .replaceAll(Buffer.from(`x-access-token:${input.token}`).toString("base64"), "***");
   const git = async (cwd: string | undefined, ...args: string[]) => {
     try {
       return (
@@ -48,21 +51,20 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
         })
       ).stdout;
     } catch (error) {
-      throw new Error(redact(`git ${args[0]} failed: ${(error as Error).message}`));
+      const verb = args.find(
+        (argument, index) => argument !== "-c" && (index === 0 || args[index - 1] !== "-c"),
+      );
+      throw new Error(redact(`git ${verb} failed: ${(error as Error).message}`));
     }
   };
 
+  const auth = authorization(input.cloneUrl, input.token);
   await git(undefined, "init", "--quiet", input.directory);
   try {
+    await git(input.directory, "remote", "add", "origin", input.cloneUrl);
     await git(
       input.directory,
-      "remote",
-      "add",
-      "origin",
-      authenticated(input.cloneUrl, input.token),
-    );
-    await git(
-      input.directory,
+      ...auth,
       "fetch",
       "--quiet",
       "--depth",
@@ -71,7 +73,16 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
       `pull/${input.pullRequestNumber}/head`,
     );
     const fetchedHead = (await git(input.directory, "rev-parse", "FETCH_HEAD")).trim();
-    await git(input.directory, "fetch", "--quiet", "--depth", "1", "origin", input.baseSha);
+    await git(
+      input.directory,
+      ...auth,
+      "fetch",
+      "--quiet",
+      "--depth",
+      "1",
+      "origin",
+      input.baseSha,
+    );
     await git(input.directory, "remote", "remove", "origin");
     await git(input.directory, "checkout", "--quiet", "--detach", fetchedHead);
     if (fetchedHead !== input.headSha)
