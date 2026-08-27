@@ -16,7 +16,7 @@ import {
 } from "@hawkeye/core";
 import { expandHome, loadConfig } from "./config.js";
 import { describePreparedRound, prepareRound } from "./local-review/prepare.js";
-import { dismissFinding } from "./local-review/rounds.js";
+import { dismissFinding, withdrawDismissal } from "./local-review/rounds.js";
 import { showRound } from "./local-review/show.js";
 import { resolveGitHubToken } from "./local-review/token.js";
 import { createRunDirectory } from "./run-directory.js";
@@ -319,6 +319,21 @@ export function createProgram(io: {
             io.stderr(`warning: ${line}`),
           ),
         );
+      } catch (error) {
+        io.stderr(`error: ${(error as Error).message}`);
+        process.exitCode = 1;
+      }
+    });
+
+  program
+    .command("undismiss")
+    .description("withdraw a dismissal so the finding is raised again")
+    .argument("<round-dir>", "round directory printed by prepare")
+    .argument("<finding-id>", "finding id shown by show")
+    .action(async (roundDirectory: string, id: string) => {
+      try {
+        const withdrawn = await withdrawDismissal(expandHome(roundDirectory, homedir()), id);
+        io.stdout(`withdrew the dismissal of ${id} in ${withdrawn.directory}`);
       } catch (error) {
         io.stderr(`error: ${(error as Error).message}`);
         process.exitCode = 1;

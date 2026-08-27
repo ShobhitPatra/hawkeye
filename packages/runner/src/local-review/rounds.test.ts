@@ -12,6 +12,7 @@ import {
   pullRequestDirectory,
   collectDismissals,
   readDismissals,
+  withdrawDismissal,
   readRound,
 } from "./rounds.js";
 
@@ -147,5 +148,17 @@ describe("rounds", () => {
       `skipping ${second}: ${join(second, "dismissed.json")} is not a dismissal file: x needs a reason`,
     ]);
     await expect(readDismissals(second)).rejects.toThrow("is not a dismissal file");
+  });
+  it("withdraws a dismissal from the round that holds it", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hawkeye-reviews-"));
+    const first = await roundDir(root, 1, resultWith("Nit"));
+    const later = await roundDir(root, 2, resultWith("Other"));
+    const id = findingId("src/a.ts", "Nit");
+    await dismissFinding(first, id, "by design");
+    expect((await withdrawDismissal(later, id)).directory).toBe(first);
+    expect(await readDismissals(first)).toEqual({});
+    await expect(withdrawDismissal(later, id)).rejects.toThrow(
+      `no dismissal of ${id} in ${later} or an earlier round`,
+    );
   });
 });

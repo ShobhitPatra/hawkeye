@@ -1,6 +1,12 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { type Finding, findingId, parseReviewResult, type ReviewResult } from "@hawkeye/core";
+import {
+  type Finding,
+  findingId,
+  parseReviewResult,
+  type PriorFinding,
+  type ReviewResult,
+} from "@hawkeye/core";
 
 const ROUND_PREFIX = "round-";
 
@@ -140,6 +146,61 @@ export async function collectOpenFindings(
     }
   }
   return Object.fromEntries([...open].filter((id) => id in known).map((id) => [id, known[id]!]));
+}
+
+export async function priorFindingsBefore(
+  pullRequestDir: string,
+  round: number,
+  previousFindings: Finding[],
+  warn: (line: string) => void = () => {},
+): Promise<PriorFinding[]> {
+  const dismissed = await collectDismissals(pullRequestDir, round, warn);
+  const open = await collectOpenFindings(pullRequestDir, round, warn);
+  const carried = new Set<string>();
+  const findings: PriorFinding[] = previousFindings.map((finding) => {
+    const id = findingId(finding.path, finding.claim);
+    carried.add(id);
+    return priorFinding(id, finding, dismissed[id]?.note);
+  });
+  for (const [id, entry] of Object.entries(dismissed))
+    if (!carried.has(id)) {
+      carried.add(id);
+      findings.push(priorFinding(id, entry.finding, entry.note));
+    }
+  for (const [id, finding] of Object.entries(open))
+    if (!carried.has(id)) findings.push(priorFinding(id, finding, undefined));
+  return findings;
+}
+
+function priorFinding(id: string, finding: Finding, note: string | undefined): PriorFinding {
+  return {
+    id,
+    severity: finding.severity,
+    claim: finding.claim,
+    detail: finding.detail,
+    ...(finding.path === undefined ? {} : { path: finding.path }),
+    ...(finding.line === undefined ? {} : { line: finding.line }),
+    ...(note === undefined ? {} : { dismissed: { note } }),
+  };
+}
+
+export async function withdrawDismissal(
+  directory: string,
+  id: string,
+): Promise<{ directory: string }> {
+  const pullRequestDir = dirname(directory);
+  const round = Number(basename(directory).slice(ROUND_PREFIX.length));
+  for (const name of (await listRounds(pullRequestDir))
+    .filter((candidate) => Number(candidate.slice(ROUND_PREFIX.length)) <= round)
+    .reverse()) {
+    const candidate = join(pullRequestDir, name);
+    const dismissals = await readDismissals(candidate);
+    if (!(id in dismissals)) continue;
+    const { [id]: _withdrawn, ...remaining } = dismissals;
+    await writeFile(join(candidate, "dismissed.json"), JSON.stringify(remaining, null, 2));
+    return { directory: candidate };
+  }
+  throw new Error(`no dismissal of ${id} in ${directory} or an earlier round`);
 }
 
 export async function dismissFinding(
