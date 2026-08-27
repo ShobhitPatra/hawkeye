@@ -5,7 +5,7 @@ import { indentLines, SEVERITY_BADGE } from "./format.js";
 export type RoundSummary = {
   round: number;
   headSha: string;
-  verdict: Verdict | "pending";
+  verdict: Verdict | "pending" | "invalid";
   startedAt: string;
 };
 export type RenderTextInput = {

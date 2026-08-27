@@ -69,7 +69,18 @@ describe("showRound", () => {
       join(pullRequestDir, "round-2", "meta.json"),
       JSON.stringify({ ...meta, round: 2, headSha: "2".repeat(40) }),
     );
-    const text = await showRound(directory);
+    await mkdir(join(pullRequestDir, "round-0"));
+    await writeFile(join(pullRequestDir, "round-0", "meta.json"), "{");
+    await mkdir(join(pullRequestDir, "round-4"));
+    await writeFile(
+      join(pullRequestDir, "round-4", "meta.json"),
+      JSON.stringify({ ...meta, round: 4, headSha: "4".repeat(40) }),
+    );
+    await writeFile(join(pullRequestDir, "round-4", "result.json"), JSON.stringify({ nope: 1 }));
+    const warnings: string[] = [];
+    const text = await showRound(directory, (line) => warnings.push(line));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain(`${join(pullRequestDir, "round-4")}: Invalid review result`);
     expect(text).toContain("Prior findings:\n- [id1] addressed · guarded now");
     expect(
       text.endsWith(
@@ -78,6 +89,7 @@ describe("showRound", () => {
           "- round 1 · 1111111 · blocked · 2026-08-25T10:00:00.000Z",
           "- round 2 · 2222222 · pending · 2026-08-26T10:00:00.000Z",
           "- round 3 · ccccccc · ship · 2026-08-26T10:00:00.000Z",
+          "- round 4 · 4444444 · invalid · 2026-08-26T10:00:00.000Z",
         ].join("\n"),
       ),
     ).toBe(true);

@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
 import { renderReviewText, type RoundSummary } from "@hawkeye/core";
-import { listRounds, readRound, readRoundMeta, readRoundResult } from "./rounds.js";
+import { listRounds, readRoundMeta, readRoundResult } from "./rounds.js";
 
 export async function showRound(
   directory: string,
@@ -14,16 +14,23 @@ export async function showRound(
   const rounds: RoundSummary[] = [];
   for (const name of await listRounds(pullRequestDir)) {
     const roundDir = join(pullRequestDir, name);
-    const round = await readRound(roundDir).catch((error: Error) => {
+    const siblingMeta = await readRoundMeta(roundDir).catch((error: Error) => {
       warn(`skipping ${roundDir}: ${error.message}`);
       return undefined;
     });
-    if (round === undefined) continue;
+    if (siblingMeta === undefined) continue;
+    const verdict: RoundSummary["verdict"] = await readRoundResult(roundDir).then(
+      (siblingResult): RoundSummary["verdict"] => siblingResult?.verdict ?? "pending",
+      (error: Error): RoundSummary["verdict"] => {
+        warn(`${roundDir}: ${error.message}`);
+        return "invalid";
+      },
+    );
     rounds.push({
-      round: round.meta.round,
-      headSha: round.meta.headSha,
-      verdict: round.result?.verdict ?? "pending",
-      startedAt: round.meta.startedAt,
+      round: siblingMeta.round,
+      headSha: siblingMeta.headSha,
+      verdict,
+      startedAt: siblingMeta.startedAt,
     });
   }
   return renderReviewText({ result, meta, rounds });
