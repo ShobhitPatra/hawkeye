@@ -126,7 +126,10 @@ describe("rounds", () => {
     expect(await readDismissals(later)).toEqual({});
     await expect(dismissFinding(directory, id, " ")).rejects.toThrow("a dismissal needs a reason");
     const pending = await roundDir(root, 2);
-    await expect(dismissFinding(pending, id, "no")).rejects.toThrow(`no review yet in ${pending}`);
+    expect((await dismissFinding(pending, id, "from a pending round")).directory).toBe(directory);
+    await expect(dismissFinding(pending, "000000000000", "no")).rejects.toThrow(
+      `no finding 000000000000 in ${pending} or an earlier round`,
+    );
   });
   it("collects dismissals from every earlier round and skips a malformed file", async () => {
     const root = await mkdtemp(join(tmpdir(), "hawkeye-reviews-"));

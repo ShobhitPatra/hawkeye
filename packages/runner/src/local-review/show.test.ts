@@ -33,7 +33,9 @@ describe("showRound", () => {
     const text = await showRound(directory);
     expect(text.startsWith("Verdict: MERGEABLE\n\n- fine\n\noptional:\n")).toBe(true);
     expect(
-      text.endsWith("Rounds:\n- round 3 · ccccccc · mergeable · 2026-08-26T10:00:00.000Z"),
+      text.endsWith(
+        "Rounds:\n- round 3 · ccccccc · mergeable · 2026-08-26T10:00:00.000Z (this review)",
+      ),
     ).toBe(true);
   });
   it("lists every round of the pull request, pending ones without a verdict", async () => {
@@ -88,7 +90,7 @@ describe("showRound", () => {
           "Rounds:",
           "- round 1 · 1111111 · blocked · 2026-08-25T10:00:00.000Z",
           "- round 2 · 2222222 · pending · 2026-08-26T10:00:00.000Z",
-          "- round 3 · ccccccc · ship · 2026-08-26T10:00:00.000Z",
+          "- round 3 · ccccccc · ship · 2026-08-26T10:00:00.000Z (this review)",
           "- round 4 · 4444444 · invalid · 2026-08-26T10:00:00.000Z",
         ].join("\n"),
       ),
@@ -127,5 +129,20 @@ describe("showRound", () => {
     expect(warnings).toEqual([
       "prior finding id1 is reported open but not repeated in findings; the verdict ignores it",
     ]);
+  });
+  it("warns when a later round reports no prior findings at all", async () => {
+    const directory = await roundWith({
+      verdict: "ship",
+      summary: "- fine",
+      lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
+      findings: [],
+    });
+    await writeFile(
+      join(directory, "meta.json"),
+      JSON.stringify({ ...meta, previousRound: 2, previousHeadSha: "b".repeat(40) }),
+    );
+    const warnings: string[] = [];
+    await showRound(directory, (line) => warnings.push(line));
+    expect(warnings).toEqual(["round 3 follows round 2 but reports no priorFindings"]);
   });
 });

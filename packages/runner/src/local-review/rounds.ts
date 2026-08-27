@@ -118,8 +118,6 @@ export async function dismissFinding(
   reason: string,
 ): Promise<{ directory: string; dismissals: Dismissals }> {
   if (reason.trim() === "") throw new Error("a dismissal needs a reason");
-  const result = await readRoundResult(directory);
-  if (result === undefined) throw new Error(`no review yet in ${directory}`);
   const raisedIn = await roundThatRaised(directory, id);
   if (raisedIn === undefined)
     throw new Error(`no finding ${id} in ${directory} or an earlier round`);

@@ -10,6 +10,8 @@ export async function showRound(
   const result = await readRoundResult(directory);
   if (result === undefined)
     throw new Error(`no review yet: the session has not written ${join(directory, "result.json")}`);
+  if (meta.previousRound !== undefined && result.priorFindings === undefined)
+    warn(`round ${meta.round} follows round ${meta.previousRound} but reports no priorFindings`);
   const repeated = new Set(
     result.findings.map((finding) => findingId(finding.path, finding.claim)),
   );
