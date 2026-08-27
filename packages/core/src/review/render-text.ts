@@ -12,6 +12,7 @@ export type RenderTextInput = {
   result: ReviewResult;
   meta: { round: number; headSha: string };
   rounds?: RoundSummary[];
+  priorClaims?: Record<string, string>;
 };
 
 function headline(finding: Finding): string {
@@ -22,7 +23,7 @@ function headline(finding: Finding): string {
   return `- [${findingId(finding.path, finding.claim)}] ${finding.claim.replace(/\r?\n/g, " ")}${location}`;
 }
 
-export function renderReviewText({ result, meta, rounds }: RenderTextInput): string {
+export function renderReviewText({ result, meta, rounds, priorClaims }: RenderTextInput): string {
   const verdict = result.verdict.replaceAll("_", " ");
   const lines = [`Verdict: ${verdict.toUpperCase()}`, "", result.summary];
   for (const severity of SEVERITIES) {
@@ -38,8 +39,12 @@ export function renderReviewText({ result, meta, rounds }: RenderTextInput): str
   }
   if (result.priorFindings !== undefined && result.priorFindings.length > 0) {
     lines.push("", "Prior findings:");
-    for (const prior of result.priorFindings)
-      lines.push(`- [${prior.id}] ${prior.status} · ${prior.note.replace(/\r?\n/g, " ")}`);
+    for (const prior of result.priorFindings) {
+      const claim = priorClaims?.[prior.id];
+      lines.push(
+        `- [${prior.id}] ${prior.status}${claim === undefined ? "" : ` · ${claim.replace(/\r?\n/g, " ")}`} · ${prior.note.replace(/\r?\n/g, " ")}`,
+      );
+    }
   }
   lines.push("", "Lenses:");
   for (const lens of result.lenses) lines.push(`- ${lens.name}: ${lens.assessment}`);

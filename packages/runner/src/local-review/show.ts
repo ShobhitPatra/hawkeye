@@ -10,11 +10,14 @@ export async function showRound(
   const result = await readRoundResult(directory);
   if (result === undefined)
     throw new Error(`no review yet: the session has not written ${join(directory, "result.json")}`);
+  const priorClaims: Record<string, string> = {};
   if (meta.previousRound !== undefined) {
     const reported = new Set((result.priorFindings ?? []).map((prior) => prior.id));
     const previous = await readRoundResult(
       join(dirname(directory), `round-${meta.previousRound}`),
     ).catch(() => undefined);
+    for (const finding of previous?.findings ?? [])
+      priorClaims[findingId(finding.path, finding.claim)] = finding.claim;
     const missing = (previous?.findings ?? [])
       .map((finding) => findingId(finding.path, finding.claim))
       .filter((id) => !reported.has(id));
@@ -56,5 +59,5 @@ export async function showRound(
       startedAt: siblingMeta.startedAt,
     });
   }
-  return renderReviewText({ result, meta, rounds });
+  return renderReviewText({ result, meta, rounds, priorClaims });
 }

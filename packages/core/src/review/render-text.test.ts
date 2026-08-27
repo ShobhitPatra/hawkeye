@@ -122,4 +122,14 @@ describe("renderReviewText", () => {
     const result = { ...base(), priorFindings: [] };
     expect(renderReviewText({ result, meta })).not.toContain("Prior findings:");
   });
+  it("prints the claim beside a prior finding id when known", () => {
+    const result = {
+      ...base(),
+      priorFindings: [{ id: "id1", status: "addressed" as const, note: "guarded now" }],
+    };
+    expect(renderReviewText({ result, meta, priorClaims: { id1: "Null deref" } })).toContain(
+      "- [id1] addressed · Null deref · guarded now",
+    );
+    expect(renderReviewText({ result, meta })).toContain("- [id1] addressed · guarded now");
+  });
 });
