@@ -114,4 +114,18 @@ describe("showRound", () => {
       `no review yet: the session has not written ${join(directory, "result.json")}`,
     );
   });
+  it("warns when an open prior finding is not repeated in the findings", async () => {
+    const directory = await roundWith({
+      verdict: "ship",
+      summary: "- fine",
+      lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
+      findings: [],
+      priorFindings: [{ id: "id1", status: "open", note: "still there" }],
+    });
+    const warnings: string[] = [];
+    await showRound(directory, (line) => warnings.push(line));
+    expect(warnings).toEqual([
+      "prior finding id1 is reported open but not repeated in findings; the verdict ignores it",
+    ]);
+  });
 });

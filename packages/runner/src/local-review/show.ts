@@ -1,5 +1,5 @@
 import { dirname, join } from "node:path";
-import { renderReviewText, type RoundSummary } from "@hawkeye/core";
+import { findingId, renderReviewText, type RoundSummary } from "@hawkeye/core";
 import { listRounds, readRoundMeta, readRoundResult } from "./rounds.js";
 
 export async function showRound(
@@ -10,6 +10,14 @@ export async function showRound(
   const result = await readRoundResult(directory);
   if (result === undefined)
     throw new Error(`no review yet: the session has not written ${join(directory, "result.json")}`);
+  const repeated = new Set(
+    result.findings.map((finding) => findingId(finding.path, finding.claim)),
+  );
+  for (const prior of result.priorFindings ?? [])
+    if (prior.status === "open" && !repeated.has(prior.id))
+      warn(
+        `prior finding ${prior.id} is reported open but not repeated in findings; the verdict ignores it`,
+      );
   const pullRequestDir = dirname(directory);
   const rounds: RoundSummary[] = [];
   for (const name of await listRounds(pullRequestDir)) {
