@@ -39,10 +39,14 @@ export function renderReviewText({ result, meta, rounds, priorClaims }: RenderTe
   }
   if (result.priorFindings !== undefined && result.priorFindings.length > 0) {
     lines.push("", "Prior findings:");
+    const repeated = new Set(
+      result.findings.map((finding) => findingId(finding.path, finding.claim)),
+    );
     for (const prior of result.priorFindings) {
       const claim = priorClaims?.[prior.id];
+      const dropped = prior.status === "open" && !repeated.has(prior.id);
       lines.push(
-        `- [${prior.id}] ${prior.status}${claim === undefined ? "" : ` · ${claim.replace(/\r?\n/g, " ")}`} · ${prior.note.replace(/\r?\n/g, " ")}`,
+        `- [${prior.id}] ${prior.status}${claim === undefined ? "" : ` · ${claim.replace(/\r?\n/g, " ")}`} · ${prior.note.replace(/\r?\n/g, " ")}${dropped ? " (not repeated in findings; the verdict ignores it)" : ""}`,
       );
     }
   }

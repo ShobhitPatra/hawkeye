@@ -111,7 +111,7 @@ ${fence("untrusted_data", 'source="diff"', diff)}`);
         : interdiff === ""
           ? headSha === pullRequest.headSha
             ? "The head is unchanged since the previous round; this is a re-review of the same head."
-            : "The head moved since the previous round, but the tree is unchanged apart from excluded files (lockfiles, build output), so there is nothing new to review; check the prior findings."
+            : "The head moved since the previous round, but nothing reviewable changed in the files this pull request touches (only excluded files, or changes merged in from the base branch), so there is nothing new to review; check the prior findings."
           : `Changes on this branch since the previous round, limited to the files this pull request touches (an upstream change merged in between can still appear in those files; it is not the author's change). Lockfiles and build output are excluded.\n${fence("untrusted_data", 'source="interdiff"', interdiff)}`;
     const newFindingsRule =
       interdiff === undefined
@@ -120,7 +120,7 @@ ${fence("untrusted_data", 'source="diff"', diff)}`);
           ? "- Raise new findings about anything in the full diff that the previous round missed; nothing reviewable changed, so look again rather than repeat."
           : "- Raise new findings only about the changes since the previous round or about what they newly expose; the full diff above remains the context for understanding the pull request.";
     sections.push(`# Previous round
-The previous round reviewed head ${headSha} and reported these findings; each id is stable for the same path and claim.
+The previous round reviewed head ${headSha}. These are its findings, together with findings carried from earlier rounds (still open, or dismissed by the author); each id is stable for the same path and claim.
 ${fence(
   "untrusted_data",
   'source="prior_findings"',

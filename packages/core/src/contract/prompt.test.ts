@@ -182,7 +182,7 @@ describe("buildPrompt", () => {
       ...input,
       previousRound: { headSha: "d".repeat(40), interdiff: "", findings: [] },
     });
-    expect(moved).toContain("unchanged apart from excluded files");
+    expect(moved).toContain("nothing reviewable changed in the files this pull request touches");
     expect(moved).not.toContain("re-review of the same head");
     expect(p).toContain("(no findings)");
     expect(p).not.toContain('source="interdiff"');

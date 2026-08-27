@@ -87,7 +87,7 @@ describe("renderReviewText", () => {
     };
     const text = renderReviewText({ result, meta });
     expect(text).toContain(
-      "\nPrior findings:\n- [id1] addressed · guarded in the new commit\n- [id2] open · still there\n\nLenses:",
+      "\nPrior findings:\n- [id1] addressed · guarded in the new commit\n- [id2] open · still there (not repeated in findings; the verdict ignores it)\n\nLenses:",
     );
     expect(text.indexOf("inherited:")).toBeLessThan(text.indexOf("Prior findings:"));
     expect(renderReviewText({ result: base(), meta })).not.toContain("Prior findings:");
@@ -131,5 +131,14 @@ describe("renderReviewText", () => {
       "- [id1] addressed · Null deref · guarded now",
     );
     expect(renderReviewText({ result, meta })).toContain("- [id1] addressed · guarded now");
+  });
+  it("flags an open prior finding that the findings do not repeat", () => {
+    const result = {
+      ...base(),
+      priorFindings: [{ id: "id9", status: "open" as const, note: "still there" }],
+    };
+    expect(renderReviewText({ result, meta })).toContain(
+      "- [id9] open · still there (not repeated in findings; the verdict ignores it)",
+    );
   });
 });
