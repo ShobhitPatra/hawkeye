@@ -51,16 +51,34 @@ export function gitAuthorization(
   };
 }
 
+async function changedPaths(
+  git: (cwd: string | undefined, ...args: string[]) => Promise<string>,
+  directory: string,
+  range: string,
+): Promise<string[]> {
+  return (await git(directory, "diff", "--name-only", "-z", range))
+    .split("\0")
+    .filter((path) => path !== "");
+}
+
 async function interdiffOf(
   git: (cwd: string | undefined, ...args: string[]) => Promise<string>,
   directory: string,
   previousHeadSha: string,
   baseSha: string,
 ): Promise<string> {
-  const touched = (await git(directory, "diff", "--name-only", `${baseSha}..HEAD`))
-    .split("\n")
-    .filter((path) => path !== "");
-  if (touched.length === 0) return "";
+  const atPrevious = new Set(
+    (await git(directory, "ls-tree", "-r", "--name-only", "-z", previousHeadSha))
+      .split("\0")
+      .filter((path) => path !== ""),
+  );
+  const touched = new Set([
+    ...(await changedPaths(git, directory, `${baseSha}..HEAD`)),
+    ...(await changedPaths(git, directory, `${previousHeadSha}..HEAD`)).filter((path) =>
+      atPrevious.has(path),
+    ),
+  ]);
+  if (touched.size === 0) return "";
   return git(
     directory,
     "diff",

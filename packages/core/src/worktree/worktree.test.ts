@@ -215,6 +215,46 @@ describe("createWorktree", () => {
     expect(wt.interdiff).not.toContain("upstream.txt");
     await wt.remove();
   });
+  it("keeps a file the author reverted or deleted since the previous round in the interdiff", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hawkeye-revert-"));
+    const work = join(root, "work");
+    const bare = join(root, "origin.git");
+    await mkdir(work);
+    await git(work, "init", "-q", "-b", "main");
+    await writeFile(join(work, "a.txt"), "one\n");
+    await git(work, "add", ".");
+    await git(work, "commit", "-q", "-m", "base");
+    const base = (await git(work, "rev-parse", "HEAD")).stdout.trim();
+    await git(work, "switch", "-q", "-c", "feat");
+    await writeFile(join(work, "a.txt"), "one\ntwo\n");
+    await writeFile(join(work, "b.txt"), "temporary\n");
+    await writeFile(join(work, "café.txt"), "accent\n");
+    await git(work, "add", ".");
+    await git(work, "commit", "-q", "-m", "previous");
+    const previous = (await git(work, "rev-parse", "HEAD")).stdout.trim();
+    await writeFile(join(work, "a.txt"), "one\n");
+    await git(work, "rm", "-q", "b.txt");
+    await writeFile(join(work, "café.txt"), "accent\nmore\n");
+    await git(work, "add", ".");
+    await git(work, "commit", "-q", "-m", "head");
+    const head = (await git(work, "rev-parse", "HEAD")).stdout.trim();
+    await git(root, "clone", "-q", "--bare", work, bare);
+    await git(root, "--git-dir", bare, "update-ref", "refs/pull/1/head", head);
+
+    const directory = join(root, "checkout");
+    const wt = await createWorktree({
+      cloneUrl: bare,
+      pullRequestNumber: 1,
+      headSha: head,
+      baseSha: base,
+      previousHeadSha: previous,
+      directory,
+    });
+    expect(wt.interdiff).toContain("-two");
+    expect(wt.interdiff).toContain("-temporary");
+    expect(wt.interdiff).toContain("+more");
+    await wt.remove();
+  });
   it("diffs against the merge base when the base branch advanced", async () => {
     const root = await mkdtemp(join(tmpdir(), "hawkeye-wt-"));
     const work = join(root, "work");
