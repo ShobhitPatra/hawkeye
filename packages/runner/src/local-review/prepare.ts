@@ -6,10 +6,6 @@ import {
   fetchLinkedIssue,
   fetchMergeBase,
   fetchPullRequestDetails,
-  findingId,
-  type Finding,
-  type PreviousRound,
-  type PriorFinding,
   type readRepositoryRules,
   removeTrustedConfig,
   type PullRequestReference,
@@ -19,10 +15,8 @@ import {
   latestCompletedRound,
   pruneOlderCheckouts,
   pullRequestDirectory,
-  collectDismissals,
-  collectOpenFindings,
+  priorFindingsBefore,
   type RoundMeta,
-  type DismissedFindings,
 } from "./rounds.js";
 
 export type { RoundMeta } from "./rounds.js";
@@ -77,12 +71,16 @@ export async function prepareRound(
   const previousRound =
     previous === undefined
       ? undefined
-      : await describePreviousRound(
-          previous,
-          worktree.interdiff,
-          await collectDismissals(pullRequestDir, round, deps.warn),
-          await collectOpenFindings(pullRequestDir, round, deps.warn),
-        );
+      : await {
+          headSha: previous.meta.headSha,
+          ...(worktree.interdiff === undefined ? {} : { interdiff: worktree.interdiff }),
+          findings: await priorFindingsBefore(
+            pullRequestDir,
+            round,
+            previous.result.findings,
+            deps.warn,
+          ),
+        };
   const repositoryRules = await deps.readRepositoryRules(worktree.path);
   await removeTrustedConfig(worktree.path);
   const resultPath = join(directory, "result.json");
@@ -142,42 +140,4 @@ export function describePreparedRound(prepared: PreparedRound): string[] {
     prepared.checkoutPath,
     prepared.resultPath,
   ];
-}
-
-function describePreviousRound(
-  previous: { meta: { headSha: string }; result: { findings: Finding[] } },
-  interdiff: string | undefined,
-  dismissed: DismissedFindings,
-  open: Record<string, Finding>,
-): PreviousRound {
-  const carried = new Set<string>();
-  const findings: PriorFinding[] = previous.result.findings.map((finding) => {
-    const id = findingId(finding.path, finding.claim);
-    carried.add(id);
-    return priorFinding(id, finding, dismissed[id]?.note);
-  });
-  for (const [id, entry] of Object.entries(dismissed))
-    if (!carried.has(id)) {
-      carried.add(id);
-      findings.push(priorFinding(id, entry.finding, entry.note));
-    }
-  for (const [id, finding] of Object.entries(open))
-    if (!carried.has(id)) findings.push(priorFinding(id, finding, undefined));
-  return {
-    headSha: previous.meta.headSha,
-    ...(interdiff === undefined ? {} : { interdiff }),
-    findings,
-  };
-}
-
-function priorFinding(id: string, finding: Finding, note: string | undefined): PriorFinding {
-  return {
-    id,
-    severity: finding.severity,
-    claim: finding.claim,
-    detail: finding.detail,
-    ...(finding.path === undefined ? {} : { path: finding.path }),
-    ...(finding.line === undefined ? {} : { line: finding.line }),
-    ...(note === undefined ? {} : { dismissed: { note } }),
-  };
 }

@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
 import { findingId, renderReviewText, type RoundSummary } from "@hawkeye/core";
-import { listRounds, readRoundMeta, readRoundResult } from "./rounds.js";
+import { listRounds, priorFindingsBefore, readRoundMeta, readRoundResult } from "./rounds.js";
 
 export async function showRound(
   directory: string,
@@ -16,16 +16,19 @@ export async function showRound(
     const previous = await readRoundResult(
       join(dirname(directory), `round-${meta.previousRound}`),
     ).catch(() => undefined);
-    for (const finding of previous?.findings ?? [])
-      priorClaims[findingId(finding.path, finding.claim)] = finding.claim;
-    const missing = (previous?.findings ?? [])
-      .map((finding) => findingId(finding.path, finding.claim))
-      .filter((id) => !reported.has(id));
+    const expected = await priorFindingsBefore(
+      dirname(directory),
+      meta.round,
+      previous?.findings ?? [],
+      warn,
+    );
+    for (const prior of expected) priorClaims[prior.id] = prior.claim;
+    const missing = expected.map((prior) => prior.id).filter((id) => !reported.has(id));
     if (result.priorFindings === undefined)
       warn(`round ${meta.round} follows round ${meta.previousRound} but reports no priorFindings`);
     else if (missing.length > 0)
       warn(
-        `round ${meta.round} does not report prior finding${missing.length === 1 ? "" : "s"} ${missing.join(", ")} from round ${meta.previousRound}`,
+        `round ${meta.round} does not report prior finding${missing.length === 1 ? "" : "s"} ${missing.join(", ")} carried from earlier rounds`,
       );
   }
   const repeated = new Set(

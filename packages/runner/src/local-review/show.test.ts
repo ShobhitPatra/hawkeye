@@ -177,7 +177,48 @@ describe("showRound", () => {
     const warnings: string[] = [];
     await showRound(directory, (line) => warnings.push(line));
     expect(warnings).toEqual([
-      `round 3 does not report prior finding ${findingId(undefined, "Crash")} from round 2`,
+      `round 3 does not report prior finding ${findingId(undefined, "Crash")} carried from earlier rounds`,
     ]);
+  });
+  it("expects a dismissed finding carried from an earlier round and prints its claim", async () => {
+    const directory = await roundWith({
+      verdict: "ship",
+      summary: "- fine",
+      lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
+      findings: [],
+      priorFindings: [{ id: findingId(undefined, "Old"), status: "withdrawn", note: "dismissed" }],
+    });
+    const pullRequestDir = join(directory, "..");
+    await writeFile(
+      join(directory, "meta.json"),
+      JSON.stringify({ ...meta, previousRound: 2, previousHeadSha: "b".repeat(40) }),
+    );
+    for (const [round, findings] of [
+      [1, [{ severity: "optional", claim: "Old", detail: "d" }]],
+      [2, []],
+    ] as const) {
+      await mkdir(join(pullRequestDir, `round-${round}`));
+      await writeFile(
+        join(pullRequestDir, `round-${round}`, "meta.json"),
+        JSON.stringify({ ...meta, round, headSha: String(round).repeat(40) }),
+      );
+      await writeFile(
+        join(pullRequestDir, `round-${round}`, "result.json"),
+        JSON.stringify({
+          verdict: "ship",
+          summary: "- s",
+          lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
+          findings,
+        }),
+      );
+    }
+    await writeFile(
+      join(pullRequestDir, "round-1", "dismissed.json"),
+      JSON.stringify({ [findingId(undefined, "Old")]: "not here" }),
+    );
+    const warnings: string[] = [];
+    const text = await showRound(directory, (line) => warnings.push(line));
+    expect(warnings).toEqual([]);
+    expect(text).toContain(`- [${findingId(undefined, "Old")}] withdrawn · Old · dismissed`);
   });
 });
