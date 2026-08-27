@@ -20,6 +20,7 @@ import {
   pruneOlderCheckouts,
   pullRequestDirectory,
   collectDismissals,
+  collectOpenFindings,
   type RoundMeta,
   type DismissedFindings,
 } from "./rounds.js";
@@ -80,6 +81,7 @@ export async function prepareRound(
           previous,
           worktree.interdiff,
           await collectDismissals(pullRequestDir, round, deps.warn),
+          await collectOpenFindings(pullRequestDir, round, deps.warn),
         );
   const repositoryRules = await deps.readRepositoryRules(worktree.path);
   await removeTrustedConfig(worktree.path);
@@ -146,6 +148,7 @@ function describePreviousRound(
   previous: { meta: { headSha: string }; result: { findings: Finding[] } },
   interdiff: string | undefined,
   dismissed: DismissedFindings,
+  open: Record<string, Finding>,
 ): PreviousRound {
   const carried = new Set<string>();
   const findings: PriorFinding[] = previous.result.findings.map((finding) => {
@@ -154,7 +157,12 @@ function describePreviousRound(
     return priorFinding(id, finding, dismissed[id]?.note);
   });
   for (const [id, entry] of Object.entries(dismissed))
-    if (!carried.has(id)) findings.push(priorFinding(id, entry.finding, entry.note));
+    if (!carried.has(id)) {
+      carried.add(id);
+      findings.push(priorFinding(id, entry.finding, entry.note));
+    }
+  for (const [id, finding] of Object.entries(open))
+    if (!carried.has(id)) findings.push(priorFinding(id, finding, undefined));
   return {
     headSha: previous.meta.headSha,
     ...(interdiff === undefined ? {} : { interdiff }),

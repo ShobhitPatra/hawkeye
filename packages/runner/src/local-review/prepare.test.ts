@@ -166,6 +166,27 @@ describe("prepareRound", () => {
     );
     expect(prompt).toContain(`- [${findingId("x.ts", "Bug")}] should_fix · Bug (x.ts:1)`);
   });
+  it("carries an open finding round two forgot to repeat into round three", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hawkeye-reviews-"));
+    const first = await prepareRound({ reference, token: "t", root }, deps);
+    await writeFile(first.resultPath, JSON.stringify(firstResult));
+    const second = await prepareRound({ reference, token: "t", root }, deps);
+    await writeFile(
+      second.resultPath,
+      JSON.stringify({
+        ...firstResult,
+        findings: [],
+        priorFindings: [
+          { id: findingId("x.ts", "Bug"), status: "open", note: "still there" },
+          { id: findingId(undefined, "Nit"), status: "addressed", note: "renamed" },
+        ],
+      }),
+    );
+    const third = await prepareRound({ reference, token: "t", root }, deps);
+    const prompt = await readFile(join(third.directory, "prompt.md"), "utf8");
+    expect(prompt).toContain(`- [${findingId("x.ts", "Bug")}] should_fix · Bug (x.ts:1)`);
+    expect(prompt).not.toContain(`- [${findingId(undefined, "Nit")}]`);
+  });
   it("starts a plain round when no earlier round has a result and warns about a broken one", async () => {
     const root = await mkdtemp(join(tmpdir(), "hawkeye-reviews-"));
     const createWorktreeSpy = vi.fn(fakeCreateWorktree);

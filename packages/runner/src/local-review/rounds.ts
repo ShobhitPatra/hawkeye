@@ -112,6 +112,36 @@ export async function collectDismissals(
   return merged;
 }
 
+export async function collectOpenFindings(
+  pullRequestDir: string,
+  before: number,
+  warn: (line: string) => void = () => {},
+): Promise<Record<string, Finding>> {
+  const known: Record<string, Finding> = {};
+  const open = new Set<string>();
+  for (const name of await listRounds(pullRequestDir)) {
+    if (Number(name.slice(ROUND_PREFIX.length)) >= before) continue;
+    const directory = join(pullRequestDir, name);
+    let result: ReviewResult | undefined;
+    try {
+      result = await readRoundResult(directory);
+    } catch (error) {
+      warn(`skipping ${directory}: ${(error as Error).message}`);
+      continue;
+    }
+    if (result === undefined) continue;
+    for (const prior of result.priorFindings ?? [])
+      if (prior.status === "open") open.add(prior.id);
+      else open.delete(prior.id);
+    for (const finding of result.findings) {
+      const id = findingId(finding.path, finding.claim);
+      known[id] = finding;
+      open.add(id);
+    }
+  }
+  return Object.fromEntries([...open].filter((id) => id in known).map((id) => [id, known[id]!]));
+}
+
 export async function dismissFinding(
   directory: string,
   id: string,
