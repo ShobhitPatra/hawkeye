@@ -142,6 +142,30 @@ describe("prepareRound", () => {
       "round 2 for o/r#7 at aaaaaaa (after round 1 at aaaaaaa)",
     );
   });
+  it("carries a dismissal into round three after round two withdrew the finding", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hawkeye-reviews-"));
+    const first = await prepareRound({ reference, token: "t", root }, deps);
+    await writeFile(first.resultPath, JSON.stringify(firstResult));
+    await writeFile(
+      join(first.directory, "dismissed.json"),
+      JSON.stringify({ [findingId(undefined, "Nit")]: "we like it" }),
+    );
+    const second = await prepareRound({ reference, token: "t", root }, deps);
+    await writeFile(
+      second.resultPath,
+      JSON.stringify({
+        ...firstResult,
+        findings: [firstResult.findings[0]],
+        priorFindings: [{ id: findingId(undefined, "Nit"), status: "withdrawn", note: "ok" }],
+      }),
+    );
+    const third = await prepareRound({ reference, token: "t", root }, deps);
+    const prompt = await readFile(join(third.directory, "prompt.md"), "utf8");
+    expect(prompt).toContain(
+      `- [${findingId(undefined, "Nit")}] optional · Nit\n  dismissed by the author: we like it`,
+    );
+    expect(prompt).toContain(`- [${findingId("x.ts", "Bug")}] should_fix · Bug (x.ts:1)`);
+  });
   it("starts a plain round when no earlier round has a result and warns about a broken one", async () => {
     const root = await mkdtemp(join(tmpdir(), "hawkeye-reviews-"));
     const createWorktreeSpy = vi.fn(fakeCreateWorktree);

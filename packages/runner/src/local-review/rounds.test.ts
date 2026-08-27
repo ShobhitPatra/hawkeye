@@ -133,11 +133,11 @@ describe("rounds", () => {
     await writeFile(join(second, "dismissed.json"), JSON.stringify({ x: 7 }));
     await dismissFinding(third, findingId("src/a.ts", "Third"), "later");
     const warnings: string[] = [];
-    expect(await collectDismissals(root, 3, (line) => warnings.push(line))).toEqual({
-      [findingId("src/a.ts", "Nit")]: "by design",
+    expect(await collectDismissals(root, 3, (line) => warnings.push(line))).toMatchObject({
+      [findingId("src/a.ts", "Nit")]: { note: "by design", finding: { claim: "Nit" } },
     });
     expect(warnings).toEqual([
-      `skipping ${join(second, "dismissed.json")}: ${join(second, "dismissed.json")} is not a dismissal file: x needs a reason`,
+      `skipping ${second}: ${join(second, "dismissed.json")} is not a dismissal file: x needs a reason`,
     ]);
     await expect(readDismissals(second)).rejects.toThrow("is not a dismissal file");
   });

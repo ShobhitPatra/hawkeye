@@ -9,6 +9,7 @@ import {
   findingId,
   type Finding,
   type PreviousRound,
+  type PriorFinding,
   type readRepositoryRules,
   removeTrustedConfig,
   type PullRequestReference,
@@ -20,7 +21,7 @@ import {
   pullRequestDirectory,
   collectDismissals,
   type RoundMeta,
-  type Dismissals,
+  type DismissedFindings,
 } from "./rounds.js";
 
 export type { RoundMeta } from "./rounds.js";
@@ -144,22 +145,30 @@ export function describePreparedRound(prepared: PreparedRound): string[] {
 function describePreviousRound(
   previous: { meta: { headSha: string }; result: { findings: Finding[] } },
   interdiff: string | undefined,
-  dismissals: Dismissals,
+  dismissed: DismissedFindings,
 ): PreviousRound {
+  const carried = new Set<string>();
+  const findings: PriorFinding[] = previous.result.findings.map((finding) => {
+    const id = findingId(finding.path, finding.claim);
+    carried.add(id);
+    return priorFinding(id, finding, dismissed[id]?.note);
+  });
+  for (const [id, entry] of Object.entries(dismissed))
+    if (!carried.has(id)) findings.push(priorFinding(id, entry.finding, entry.note));
   return {
     headSha: previous.meta.headSha,
     ...(interdiff === undefined ? {} : { interdiff }),
-    findings: previous.result.findings.map((finding) => {
-      const id = findingId(finding.path, finding.claim);
-      const note = dismissals[id];
-      return {
-        id,
-        severity: finding.severity,
-        claim: finding.claim,
-        ...(finding.path === undefined ? {} : { path: finding.path }),
-        ...(finding.line === undefined ? {} : { line: finding.line }),
-        ...(note === undefined ? {} : { status: "dismissed" as const, note }),
-      };
-    }),
+    findings,
+  };
+}
+
+function priorFinding(id: string, finding: Finding, note: string | undefined): PriorFinding {
+  return {
+    id,
+    severity: finding.severity,
+    claim: finding.claim,
+    ...(finding.path === undefined ? {} : { path: finding.path }),
+    ...(finding.line === undefined ? {} : { line: finding.line }),
+    ...(note === undefined ? {} : { dismissed: { note } }),
   };
 }

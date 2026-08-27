@@ -1,6 +1,6 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { findingId, parseReviewResult, type ReviewResult } from "@hawkeye/core";
+import { type Finding, findingId, parseReviewResult, type ReviewResult } from "@hawkeye/core";
 
 const ROUND_PREFIX = "round-";
 
@@ -16,6 +16,8 @@ export type RoundMeta = {
 };
 export type Round = { directory: string; meta: RoundMeta; result?: ReviewResult };
 export type Dismissals = Record<string, string>;
+export type DismissedFinding = { note: string; finding: Finding };
+export type DismissedFindings = Record<string, DismissedFinding>;
 
 export function parseRoundMeta(raw: unknown, path: string): RoundMeta {
   const meta = raw as Partial<RoundMeta> | null;
@@ -89,15 +91,22 @@ export async function collectDismissals(
   pullRequestDir: string,
   before: number,
   warn: (line: string) => void = () => {},
-): Promise<Dismissals> {
-  const merged: Dismissals = {};
+): Promise<DismissedFindings> {
+  const merged: DismissedFindings = {};
   for (const name of await listRounds(pullRequestDir)) {
     const directory = join(pullRequestDir, name);
     if (Number(name.slice(ROUND_PREFIX.length)) >= before) continue;
     try {
-      Object.assign(merged, await readDismissals(directory));
+      const dismissals = await readDismissals(directory);
+      if (Object.keys(dismissals).length === 0) continue;
+      const result = await readRoundResult(directory);
+      if (result === undefined) continue;
+      for (const finding of result.findings) {
+        const note = dismissals[findingId(finding.path, finding.claim)];
+        if (note !== undefined) merged[findingId(finding.path, finding.claim)] = { note, finding };
+      }
     } catch (error) {
-      warn(`skipping ${join(directory, "dismissed.json")}: ${(error as Error).message}`);
+      warn(`skipping ${directory}: ${(error as Error).message}`);
     }
   }
   return merged;

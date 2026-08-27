@@ -6,8 +6,7 @@ export type PriorFinding = {
   claim: string;
   path?: string;
   line?: number;
-  status?: "dismissed";
-  note?: string;
+  dismissed?: { note: string };
 };
 export type PreviousRound = { headSha: string; interdiff?: string; findings: PriorFinding[] };
 
@@ -50,9 +49,9 @@ function priorFindingLine(finding: PriorFinding): string {
       ? ""
       : ` (${finding.path}${finding.line === undefined ? "" : `:${finding.line}`})`;
   const line = `- [${finding.id}] ${finding.severity} · ${finding.claim.replace(/\r?\n/g, " ")}${location}`;
-  return finding.status === "dismissed"
-    ? `${line}\n  dismissed by the author: ${(finding.note ?? "").replace(/\r?\n/g, " ")}`
-    : line;
+  return finding.dismissed === undefined
+    ? line
+    : `${line}\n  dismissed by the author: ${finding.dismissed.note.replace(/\r?\n/g, " ")}`;
 }
 
 function fence(tag: string, attributes: string, content: string): string {
