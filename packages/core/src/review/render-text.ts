@@ -49,7 +49,7 @@ export function renderReviewText({ result, meta, rounds }: RenderTextInput): str
     lines.push("", "Rounds:");
     for (const round of rounds)
       lines.push(
-        `- round ${round.round} · ${round.headSha.slice(0, 7)} · ${round.verdict.replaceAll("_", " ")} · ${round.startedAt}`,
+        `- round ${round.round} · ${round.headSha.slice(0, 7)} · ${round.verdict.replaceAll("_", " ")} · ${round.startedAt}${round.round === meta.round ? " (this review)" : ""}`,
       );
   }
   return lines.join("\n");

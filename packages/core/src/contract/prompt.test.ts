@@ -170,14 +170,20 @@ describe("buildPrompt", () => {
     );
     expect(p.indexOf('source="diff"')).toBeLessThan(p.indexOf("# Previous round"));
   });
-  it("says the head is unchanged when the interdiff is empty", () => {
+  it("says the head is unchanged when the interdiff is empty and the head is the same", () => {
     const p = buildPrompt({
       ...input,
-      previousRound: { headSha: "a".repeat(40), interdiff: "", findings: [] },
+      previousRound: { headSha: input.pullRequest.headSha, interdiff: "", findings: [] },
     });
     expect(p).toContain(
       "The head is unchanged since the previous round; this is a re-review of the same head.",
     );
+    const moved = buildPrompt({
+      ...input,
+      previousRound: { headSha: "d".repeat(40), interdiff: "", findings: [] },
+    });
+    expect(moved).toContain("touch only excluded files");
+    expect(moved).not.toContain("re-review of the same head");
     expect(p).toContain("(no findings)");
     expect(p).not.toContain('source="interdiff"');
   });

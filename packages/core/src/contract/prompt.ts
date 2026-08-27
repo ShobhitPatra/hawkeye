@@ -109,13 +109,15 @@ ${fence("untrusted_data", 'source="diff"', diff)}`);
       interdiff === undefined
         ? "The previous head is no longer on the server (the branch was rewritten), so there is no interdiff; review the full diff above and use the prior findings as context."
         : interdiff === ""
-          ? "The head is unchanged since the previous round; this is a re-review of the same head."
+          ? headSha === pullRequest.headSha
+            ? "The head is unchanged since the previous round; this is a re-review of the same head."
+            : "The head moved since the previous round, but the changes touch only excluded files (lockfiles, build output), so there is nothing new to review; check the prior findings."
           : `Changes on this branch since the previous round (when the branch merged from its base in between, those upstream commits can appear here; they are not the author's changes). Lockfiles and build output are excluded.\n${fence("untrusted_data", 'source="interdiff"', interdiff)}`;
     const newFindingsRule =
       interdiff === undefined
         ? "- Raise new findings about anything in the full diff that the previous round missed."
         : interdiff === ""
-          ? "- Raise new findings about anything in the full diff that the previous round missed; nothing changed, so look again rather than repeat."
+          ? "- Raise new findings about anything in the full diff that the previous round missed; nothing reviewable changed, so look again rather than repeat."
           : "- Raise new findings only about the changes since the previous round or about what they newly expose; the full diff above remains the context for understanding the pull request.";
     sections.push(`# Previous round
 The previous round reviewed head ${headSha} and reported these findings; each id is stable for the same path and claim.

@@ -113,7 +113,7 @@ describe("renderReviewText", () => {
     });
     expect(
       text.endsWith(
-        "Rounds:\n- round 1 · 1111111 · changes needed · 2026-08-25T10:00:00.000Z\n- round 2 · abcdef0 · pending · 2026-08-26T10:00:00.000Z",
+        "Rounds:\n- round 1 · 1111111 · changes needed · 2026-08-25T10:00:00.000Z\n- round 2 · abcdef0 · pending · 2026-08-26T10:00:00.000Z (this review)",
       ),
     ).toBe(true);
     expect(text).not.toContain("Round 2 · head");
