@@ -111,7 +111,7 @@ ${fence("untrusted_data", 'source="diff"', diff)}`);
         : interdiff === ""
           ? headSha === pullRequest.headSha
             ? "The head is unchanged since the previous round; this is a re-review of the same head."
-            : "The head moved since the previous round, but the changes touch only excluded files (lockfiles, build output), so there is nothing new to review; check the prior findings."
+            : "The head moved since the previous round, but the tree is unchanged apart from excluded files (lockfiles, build output), so there is nothing new to review; check the prior findings."
           : `Changes on this branch since the previous round (when the branch merged from its base in between, those upstream commits can appear here; they are not the author's changes). Lockfiles and build output are excluded.\n${fence("untrusted_data", 'source="interdiff"', interdiff)}`;
     const newFindingsRule =
       interdiff === undefined

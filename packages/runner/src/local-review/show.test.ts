@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { findingId } from "@hawkeye/core";
 import { showRound } from "./show.js";
 
 const LENSES = ["intent", "behavior", "blast_radius", "verification", "fit", "hygiene"];
@@ -71,8 +72,8 @@ describe("showRound", () => {
       join(pullRequestDir, "round-2", "meta.json"),
       JSON.stringify({ ...meta, round: 2, headSha: "2".repeat(40) }),
     );
-    await mkdir(join(pullRequestDir, "round-0"));
-    await writeFile(join(pullRequestDir, "round-0", "meta.json"), "{");
+    await mkdir(join(pullRequestDir, "round-5"));
+    await writeFile(join(pullRequestDir, "round-5", "meta.json"), "{");
     await mkdir(join(pullRequestDir, "round-4"));
     await writeFile(
       join(pullRequestDir, "round-4", "meta.json"),
@@ -81,8 +82,9 @@ describe("showRound", () => {
     await writeFile(join(pullRequestDir, "round-4", "result.json"), JSON.stringify({ nope: 1 }));
     const warnings: string[] = [];
     const text = await showRound(directory, (line) => warnings.push(line));
-    expect(warnings).toHaveLength(1);
+    expect(warnings).toHaveLength(2);
     expect(warnings[0]).toContain(`${join(pullRequestDir, "round-4")}: Invalid review result`);
+    expect(warnings[1]).toContain(`skipping ${join(pullRequestDir, "round-5")}`);
     expect(text).toContain("Prior findings:\n- [id1] addressed · guarded now");
     expect(
       text.endsWith(
@@ -144,5 +146,38 @@ describe("showRound", () => {
     const warnings: string[] = [];
     await showRound(directory, (line) => warnings.push(line));
     expect(warnings).toEqual(["round 3 follows round 2 but reports no priorFindings"]);
+  });
+  it("warns when a later round drops some of the previous round's findings", async () => {
+    const directory = await roundWith({
+      verdict: "ship",
+      summary: "- fine",
+      lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
+      findings: [],
+      priorFindings: [],
+    });
+    const pullRequestDir = join(directory, "..");
+    await writeFile(
+      join(directory, "meta.json"),
+      JSON.stringify({ ...meta, previousRound: 2, previousHeadSha: "b".repeat(40) }),
+    );
+    await mkdir(join(pullRequestDir, "round-2"));
+    await writeFile(
+      join(pullRequestDir, "round-2", "meta.json"),
+      JSON.stringify({ ...meta, round: 2, headSha: "2".repeat(40) }),
+    );
+    await writeFile(
+      join(pullRequestDir, "round-2", "result.json"),
+      JSON.stringify({
+        verdict: "ship",
+        summary: "- bug",
+        lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
+        findings: [{ severity: "must_fix", claim: "Crash", detail: "boom" }],
+      }),
+    );
+    const warnings: string[] = [];
+    await showRound(directory, (line) => warnings.push(line));
+    expect(warnings).toEqual([
+      `round 3 does not report prior finding ${findingId(undefined, "Crash")} from round 2`,
+    ]);
   });
 });

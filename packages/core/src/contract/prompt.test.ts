@@ -182,7 +182,7 @@ describe("buildPrompt", () => {
       ...input,
       previousRound: { headSha: "d".repeat(40), interdiff: "", findings: [] },
     });
-    expect(moved).toContain("touch only excluded files");
+    expect(moved).toContain("unchanged apart from excluded files");
     expect(moved).not.toContain("re-review of the same head");
     expect(p).toContain("(no findings)");
     expect(p).not.toContain('source="interdiff"');
