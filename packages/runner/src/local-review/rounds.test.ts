@@ -118,8 +118,12 @@ describe("rounds", () => {
       [id]: "still by design",
     });
     await expect(dismissFinding(directory, "000000000000", "no")).rejects.toThrow(
-      `no finding 000000000000 in ${join(directory, "result.json")}`,
+      `no finding 000000000000 in ${directory} or an earlier round`,
     );
+    const later = await roundDir(root, 3, resultWith("Other"));
+    expect((await dismissFinding(later, id, "from later")).directory).toBe(directory);
+    expect(await readDismissals(directory)).toEqual({ [id]: "from later" });
+    expect(await readDismissals(later)).toEqual({});
     await expect(dismissFinding(directory, id, " ")).rejects.toThrow("a dismissal needs a reason");
     const pending = await roundDir(root, 2);
     await expect(dismissFinding(pending, id, "no")).rejects.toThrow(`no review yet in ${pending}`);

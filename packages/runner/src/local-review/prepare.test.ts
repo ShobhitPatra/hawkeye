@@ -130,7 +130,7 @@ describe("prepareRound", () => {
     const prompt = await readFile(join(second.directory, "prompt.md"), "utf8");
     expect(prompt).toContain(`- [${findingId("x.ts", "Bug")}] should_fix · Bug (x.ts:1)`);
     expect(prompt).toContain(
-      `- [${findingId(undefined, "Nit")}] optional · Nit\n  dismissed by the author: we like it`,
+      `- [${findingId(undefined, "Nit")}] optional · Nit\n  small\n  dismissed by the author: we like it`,
     );
     expect(prompt).toContain("diff --git a/y b/y\n+later");
     expect(second.meta).toMatchObject({ round: 2, previousRound: 1, previousHeadSha: headSha });
@@ -162,7 +162,7 @@ describe("prepareRound", () => {
     const third = await prepareRound({ reference, token: "t", root }, deps);
     const prompt = await readFile(join(third.directory, "prompt.md"), "utf8");
     expect(prompt).toContain(
-      `- [${findingId(undefined, "Nit")}] optional · Nit\n  dismissed by the author: we like it`,
+      `- [${findingId(undefined, "Nit")}] optional · Nit\n  small\n  dismissed by the author: we like it`,
     );
     expect(prompt).toContain(`- [${findingId("x.ts", "Bug")}] should_fix · Bug (x.ts:1)`);
   });

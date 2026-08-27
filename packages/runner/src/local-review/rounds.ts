@@ -1,5 +1,5 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { type Finding, findingId, parseReviewResult, type ReviewResult } from "@hawkeye/core";
 
 const ROUND_PREFIX = "round-";
@@ -116,15 +116,30 @@ export async function dismissFinding(
   directory: string,
   id: string,
   reason: string,
-): Promise<Dismissals> {
+): Promise<{ directory: string; dismissals: Dismissals }> {
   if (reason.trim() === "") throw new Error("a dismissal needs a reason");
   const result = await readRoundResult(directory);
   if (result === undefined) throw new Error(`no review yet in ${directory}`);
-  if (!result.findings.some((finding) => findingId(finding.path, finding.claim) === id))
-    throw new Error(`no finding ${id} in ${join(directory, "result.json")}`);
-  const dismissals = { ...(await readDismissals(directory)), [id]: reason };
-  await writeFile(join(directory, "dismissed.json"), JSON.stringify(dismissals, null, 2));
-  return dismissals;
+  const raisedIn = await roundThatRaised(directory, id);
+  if (raisedIn === undefined)
+    throw new Error(`no finding ${id} in ${directory} or an earlier round`);
+  const dismissals = { ...(await readDismissals(raisedIn)), [id]: reason };
+  await writeFile(join(raisedIn, "dismissed.json"), JSON.stringify(dismissals, null, 2));
+  return { directory: raisedIn, dismissals };
+}
+
+async function roundThatRaised(directory: string, id: string): Promise<string | undefined> {
+  const pullRequestDir = dirname(directory);
+  const round = Number(basename(directory).slice(ROUND_PREFIX.length));
+  const candidates = (await listRounds(pullRequestDir))
+    .filter((name) => Number(name.slice(ROUND_PREFIX.length)) <= round)
+    .reverse();
+  for (const name of candidates) {
+    const result = await readRoundResult(join(pullRequestDir, name)).catch(() => undefined);
+    if (result?.findings.some((finding) => findingId(finding.path, finding.claim) === id))
+      return join(pullRequestDir, name);
+  }
+  return undefined;
 }
 
 export function pullRequestDirectory(

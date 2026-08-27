@@ -333,8 +333,8 @@ export function createProgram(io: {
     .argument("<reason>", "why the finding does not apply; carried into the next round")
     .action(async (roundDirectory: string, id: string, reason: string) => {
       try {
-        await dismissFinding(expandHome(roundDirectory, homedir()), id, reason);
-        io.stdout(`dismissed ${id}`);
+        const dismissed = await dismissFinding(expandHome(roundDirectory, homedir()), id, reason);
+        io.stdout(`dismissed ${id} in ${dismissed.directory}`);
       } catch (error) {
         io.stderr(`error: ${(error as Error).message}`);
         process.exitCode = 1;

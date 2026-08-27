@@ -167,6 +167,7 @@ function priorFinding(id: string, finding: Finding, note: string | undefined): P
     id,
     severity: finding.severity,
     claim: finding.claim,
+    detail: finding.detail,
     ...(finding.path === undefined ? {} : { path: finding.path }),
     ...(finding.line === undefined ? {} : { line: finding.line }),
     ...(note === undefined ? {} : { dismissed: { note } }),

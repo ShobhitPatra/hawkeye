@@ -138,11 +138,19 @@ describe("buildPrompt", () => {
         headSha: "c".repeat(40),
         interdiff: "diff --git a/g b/g\n+2\n",
         findings: [
-          { id: "id1", severity: "must_fix", claim: "Null deref", path: "src/a.ts", line: 3 },
+          {
+            id: "id1",
+            severity: "must_fix",
+            claim: "Null deref",
+            path: "src/a.ts",
+            line: 3,
+            detail: "x may be undefined",
+          },
           {
             id: "id2",
             severity: "optional",
             claim: "Rename",
+            detail: "too short",
             dismissed: { note: "name is fine" },
           },
         ],
@@ -150,7 +158,10 @@ describe("buildPrompt", () => {
     });
     expect(p).toContain(`# Previous round\nThe previous round reviewed head ${"c".repeat(40)}`);
     expect(p).toContain("- [id1] must_fix · Null deref (src/a.ts:3)");
-    expect(p).toContain("- [id2] optional · Rename\n  dismissed by the author: name is fine");
+    expect(p).toContain("- [id1] must_fix · Null deref (src/a.ts:3)\n  x may be undefined");
+    expect(p).toContain(
+      "- [id2] optional · Rename\n  too short\n  dismissed by the author: name is fine",
+    );
     expect(p).toContain('<untrusted_data source="interdiff">\ndiff --git a/g b/g\n+2\n');
     expect(p).toContain('<untrusted_data source="prior_findings">');
     expect(p).toContain("Report every prior finding in priorFindings");
