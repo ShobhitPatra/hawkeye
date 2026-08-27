@@ -51,6 +51,26 @@ export function gitAuthorization(
   };
 }
 
+async function interdiffOf(
+  git: (cwd: string | undefined, ...args: string[]) => Promise<string>,
+  directory: string,
+  previousHeadSha: string,
+  baseSha: string,
+): Promise<string> {
+  const touched = (await git(directory, "diff", "--name-only", `${baseSha}..HEAD`))
+    .split("\n")
+    .filter((path) => path !== "");
+  if (touched.length === 0) return "";
+  return git(
+    directory,
+    "diff",
+    `${previousHeadSha}..HEAD`,
+    "--",
+    ...touched,
+    ...GENERATED_PATHSPECS.slice(1),
+  );
+}
+
 export async function createWorktree(input: CreateWorktreeInput): Promise<Worktree> {
   const redact = (text: string) =>
     input.token === undefined
@@ -134,13 +154,7 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
     const interdiff =
       previousHeadSha === undefined
         ? undefined
-        : await git(
-            input.directory,
-            "diff",
-            `${previousHeadSha}..HEAD`,
-            "--",
-            ...GENERATED_PATHSPECS,
-          );
+        : await interdiffOf(git, input.directory, previousHeadSha, input.baseSha);
 
     return {
       path: input.directory,
