@@ -32,9 +32,11 @@ export function parseRoundMeta(raw: unknown, path: string): RoundMeta {
     meta === null ||
     !Number.isInteger(meta.round) ||
     typeof meta.headSha !== "string" ||
-    meta.headSha === ""
+    meta.headSha === "" ||
+    typeof meta.startedAt !== "string" ||
+    meta.startedAt === ""
   )
-    throw new Error(`${path} is not a round meta file: round and headSha are required`);
+    throw new Error(`${path} is not a round meta file: round, headSha and startedAt are required`);
   return meta as RoundMeta;
 }
 

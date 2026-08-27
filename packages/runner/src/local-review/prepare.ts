@@ -71,7 +71,7 @@ export async function prepareRound(
   const previousRound =
     previous === undefined
       ? undefined
-      : await {
+      : {
           headSha: previous.meta.headSha,
           ...(worktree.interdiff === undefined ? {} : { interdiff: worktree.interdiff }),
           findings: await priorFindingsBefore(
