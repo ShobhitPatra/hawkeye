@@ -1,4 +1,5 @@
-export const MAX_POLL_FAILURES = 3;
+const MAX_POLL_FAILURES = 3;
+const MAX_POLL_INTERVAL_SECONDS = 60;
 
 export type DeviceLoginInput = {
   baseUrl: string;
@@ -18,6 +19,16 @@ function text(value: unknown, field: string): string {
   return value;
 }
 
+function seconds(value: unknown, field: string): number {
+  if (
+    !Number.isInteger(value) ||
+    (value as number) < 1 ||
+    (value as number) > MAX_POLL_INTERVAL_SECONDS
+  )
+    throw new Error(`invalid login response: ${field}`);
+  return value as number;
+}
+
 export async function deviceLogin(input: DeviceLoginInput): Promise<string> {
   const baseUrl = input.baseUrl.replace(/\/+$/, "");
   const sleep = input.sleep ?? sleepFor;
@@ -30,21 +41,19 @@ export async function deviceLogin(input: DeviceLoginInput): Promise<string> {
   const payload = (await started.json().catch(() => ({}))) as Record<string, unknown>;
   if (started.status !== 201)
     throw new Error(
-      `the control plane refused the login: ${started.status}${typeof payload.error === "string" ? ` ${payload.error}` : ""}`,
+      `the control plane refused the login: ${started.status}${typeof payload.error === "string" ? ` ${payload.error}` : ""}${started.status === 400 ? ` (the runner name was "${input.runnerName}"; pass --name to change it)` : ""}`,
     );
   const code = text(payload.code, "code");
   const deviceSecret = text(payload.deviceSecret, "deviceSecret");
   const verifyUrl = text(payload.verifyUrl, "verifyUrl");
-  const intervalSeconds = payload.intervalSeconds;
-  if (!Number.isInteger(intervalSeconds) || (intervalSeconds as number) < 1)
-    throw new Error("invalid login response: intervalSeconds");
+  const intervalSeconds = seconds(payload.intervalSeconds, "intervalSeconds");
 
   input.log(`code ${code}`);
   input.log(`approve at ${verifyUrl}`);
 
   let failures = 0;
   for (;;) {
-    await sleep((intervalSeconds as number) * 1000);
+    await sleep(intervalSeconds * 1000);
     const collected = await input
       .fetch(`${baseUrl}/api/runner/login/collect`, {
         method: "POST",

@@ -76,12 +76,17 @@ describe("deviceLogin", () => {
   it("rejects a refused or malformed start", async () => {
     await expect(
       login([Response.json({ error: "a runner needs a name" }, { status: 400 })]).promise,
-    ).rejects.toThrow("the control plane refused the login: 400 a runner needs a name");
+    ).rejects.toThrow(
+      'the control plane refused the login: 400 a runner needs a name (the runner name was "laptop"; pass --name to change it)',
+    );
     await expect(
       login([Response.json({ ...started, deviceSecret: "" }, { status: 201 })]).promise,
     ).rejects.toThrow("invalid login response: deviceSecret");
     await expect(
       login([Response.json({ ...started, intervalSeconds: 0 }, { status: 201 })]).promise,
+    ).rejects.toThrow("invalid login response: intervalSeconds");
+    await expect(
+      login([Response.json({ ...started, intervalSeconds: 86_400 }, { status: 201 })]).promise,
     ).rejects.toThrow("invalid login response: intervalSeconds");
   });
   it("rejects an approved response without a token", async () => {
