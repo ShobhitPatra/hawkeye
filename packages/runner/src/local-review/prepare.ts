@@ -118,9 +118,13 @@ export async function prepareRound(
       title: pullRequest.title,
       author: pullRequest.author,
     },
-    ...(previous === undefined
+    ...(previousRound === undefined
       ? {}
-      : { previousRound: previous.meta.round, previousHeadSha: previous.meta.headSha }),
+      : {
+          previousRound: previous!.meta.round,
+          previousHeadSha: previous!.meta.headSha,
+          carriedFindings: previousRound.findings.map((finding) => finding.id),
+        }),
   };
   await writeFile(join(directory, "meta.json"), JSON.stringify(meta, null, 2));
   await pruneOlderCheckouts(pullRequestDir, round);

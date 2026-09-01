@@ -221,4 +221,27 @@ describe("showRound", () => {
     expect(warnings).toEqual([]);
     expect(text).toContain(`- [${findingId(undefined, "Old")}] withdrawn · Old · dismissed`);
   });
+  it("checks the reported prior findings against what the prompt carried", async () => {
+    const directory = await roundWith({
+      verdict: "ship",
+      summary: "- fine",
+      lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
+      findings: [],
+      priorFindings: [],
+    });
+    await writeFile(
+      join(directory, "meta.json"),
+      JSON.stringify({
+        ...meta,
+        previousRound: 2,
+        previousHeadSha: "b".repeat(40),
+        carriedFindings: ["carried1"],
+      }),
+    );
+    const warnings: string[] = [];
+    await showRound(directory, (line) => warnings.push(line));
+    expect(warnings).toEqual([
+      "round 3 does not report prior finding carried1 carried from earlier rounds",
+    ]);
+  });
 });

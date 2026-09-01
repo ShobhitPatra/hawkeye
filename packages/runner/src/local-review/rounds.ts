@@ -19,6 +19,7 @@ export type RoundMeta = {
   pullRequest: { owner: string; repo: string; number: number; title: string; author: string };
   previousRound?: number;
   previousHeadSha?: string;
+  carriedFindings?: string[];
 };
 export type Round = { directory: string; meta: RoundMeta; result?: ReviewResult };
 export type Dismissals = Record<string, string>;
@@ -68,7 +69,7 @@ export async function latestCompletedRound(
   warn: (line: string) => void = () => {},
 ): Promise<Required<Round> | undefined> {
   const rounds = await listRounds(pullRequestDir);
-  for (const name of rounds.reverse()) {
+  for (const name of rounds.toReversed()) {
     const directory = join(pullRequestDir, name);
     try {
       const round = await readRound(directory);
@@ -194,7 +195,7 @@ export async function withdrawDismissal(
   const round = Number(basename(directory).slice(ROUND_PREFIX.length));
   for (const name of (await listRounds(pullRequestDir))
     .filter((candidate) => Number(candidate.slice(ROUND_PREFIX.length)) <= round)
-    .reverse()) {
+    .toReversed()) {
     const candidate = join(pullRequestDir, name);
     const dismissals = await readDismissals(candidate);
     if (!(id in dismissals)) continue;
@@ -224,7 +225,7 @@ async function roundThatRaised(directory: string, id: string): Promise<string | 
   const round = Number(basename(directory).slice(ROUND_PREFIX.length));
   const candidates = (await listRounds(pullRequestDir))
     .filter((name) => Number(name.slice(ROUND_PREFIX.length)) <= round)
-    .reverse();
+    .toReversed();
   for (const name of candidates) {
     const result = await readRoundResult(join(pullRequestDir, name)).catch(() => undefined);
     if (result?.findings.some((finding) => findingId(finding.path, finding.claim) === id))
@@ -250,7 +251,9 @@ export async function listRounds(pullRequestDir: string): Promise<string[]> {
   return entries
     .filter((entry) => entry.isDirectory() && /^round-[1-9]\d*$/.test(entry.name))
     .map((entry) => entry.name)
-    .sort((a, b) => Number(a.slice(ROUND_PREFIX.length)) - Number(b.slice(ROUND_PREFIX.length)));
+    .toSorted(
+      (a, b) => Number(a.slice(ROUND_PREFIX.length)) - Number(b.slice(ROUND_PREFIX.length)),
+    );
 }
 
 export async function createRound(

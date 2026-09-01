@@ -133,7 +133,12 @@ describe("prepareRound", () => {
       `- [${findingId(undefined, "Nit")}] optional · Nit\n  small\n  dismissed by the author: we like it`,
     );
     expect(prompt).toContain("diff --git a/y b/y\n+later");
-    expect(second.meta).toMatchObject({ round: 2, previousRound: 1, previousHeadSha: headSha });
+    expect(second.meta).toMatchObject({
+      round: 2,
+      previousRound: 1,
+      previousHeadSha: headSha,
+      carriedFindings: [findingId("x.ts", "Bug"), findingId(undefined, "Nit")],
+    });
     expect(JSON.parse(await readFile(join(second.directory, "meta.json"), "utf8"))).toMatchObject({
       previousRound: 1,
       previousHeadSha: headSha,

@@ -23,7 +23,8 @@ export async function showRound(
       warn,
     );
     for (const prior of expected) priorClaims[prior.id] = prior.claim;
-    const missing = expected.map((prior) => prior.id).filter((id) => !reported.has(id));
+    const carried = meta.carriedFindings ?? expected.map((prior) => prior.id);
+    const missing = carried.filter((id) => !reported.has(id));
     if (result.priorFindings === undefined)
       warn(`round ${meta.round} follows round ${meta.previousRound} but reports no priorFindings`);
     else if (missing.length > 0)
