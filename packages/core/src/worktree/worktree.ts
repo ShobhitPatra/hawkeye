@@ -56,7 +56,7 @@ async function changedPaths(
   directory: string,
   range: string,
 ): Promise<string[]> {
-  return (await git(directory, "diff", "--name-only", "-z", range))
+  return (await git(directory, "diff", "--no-renames", "--name-only", "-z", range))
     .split("\0")
     .filter((path) => path !== "");
 }
