@@ -22,6 +22,7 @@ const git = (cwd: string, ...args: string[]) =>
 let origin: string;
 let baseSha: string;
 let headSha: string;
+let previousHeadSha: string;
 
 beforeAll(async () => {
   const root = await mkdtemp(join(tmpdir(), "hawkeye-wt-"));
@@ -37,8 +38,12 @@ beforeAll(async () => {
   baseSha = (await git(work, "rev-parse", "HEAD")).stdout.trim();
   await git(work, "switch", "-q", "-c", "feat");
   await writeFile(join(work, "a.txt"), "one\ntwo\n");
+  await git(work, "commit", "-q", "-am", "previous head");
+  previousHeadSha = (await git(work, "rev-parse", "HEAD")).stdout.trim();
+  await writeFile(join(work, "c.txt"), "three\n");
   await writeFile(join(work, "pnpm-lock.yaml"), "lockfileVersion: 9\nregenerated: true\n");
-  await git(work, "commit", "-q", "-am", "head");
+  await git(work, "add", ".");
+  await git(work, "commit", "-q", "-m", "head");
   headSha = (await git(work, "rev-parse", "HEAD")).stdout.trim();
   await git(root, "clone", "-q", "--bare", work, origin);
   await git(root, "--git-dir", origin, "update-ref", "refs/pull/1/head", headSha);
@@ -70,6 +75,61 @@ describe("createWorktree", () => {
     });
     expect(wt.diff).toContain("+two");
     expect(wt.diff).not.toContain("pnpm-lock.yaml");
+    await wt.remove();
+  });
+  it("computes the interdiff from the previous head when one is given", async () => {
+    const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
+    const wt = await createWorktree({
+      cloneUrl: origin,
+      pullRequestNumber: 1,
+      headSha,
+      baseSha,
+      directory,
+      previousHeadSha,
+    });
+    expect(wt.diff).toContain("+two");
+    expect(wt.interdiff).toContain("+three");
+    expect(wt.interdiff).not.toContain("+two");
+    expect(wt.interdiff).not.toContain("pnpm-lock.yaml");
+    await wt.remove();
+  });
+  it("returns an empty interdiff when the previous head is the head", async () => {
+    const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
+    const wt = await createWorktree({
+      cloneUrl: origin,
+      pullRequestNumber: 1,
+      headSha,
+      baseSha,
+      directory,
+      previousHeadSha: headSha,
+    });
+    expect(wt.interdiff).toBe("");
+    await wt.remove();
+  });
+  it("omits the interdiff without a previous head", async () => {
+    const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
+    const wt = await createWorktree({
+      cloneUrl: origin,
+      pullRequestNumber: 1,
+      headSha,
+      baseSha,
+      directory,
+    });
+    expect(wt.interdiff).toBeUndefined();
+    await wt.remove();
+  });
+  it("omits the interdiff when the previous head is no longer on the server", async () => {
+    const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
+    const wt = await createWorktree({
+      cloneUrl: origin,
+      pullRequestNumber: 1,
+      headSha,
+      baseSha,
+      previousHeadSha: "f".repeat(40),
+      directory,
+    });
+    expect(wt.interdiff).toBeUndefined();
+    expect(wt.diff).toContain("+two");
     await wt.remove();
   });
   it("passes the credential through the environment, not argv or the config", async () => {
@@ -113,6 +173,89 @@ describe("createWorktree", () => {
     expect(config).not.toContain("ghs_secrettoken");
     expect(config).not.toMatch(/\[remote "origin"\]/);
     expect((await git(directory, "remote")).stdout.trim()).toBe("");
+    await wt.remove();
+  });
+  it("keeps upstream files merged from the base out of the interdiff", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hawkeye-merge-"));
+    const work = join(root, "work");
+    const bare = join(root, "origin.git");
+    await mkdir(work);
+    await git(work, "init", "-q", "-b", "main");
+    await writeFile(join(work, "a.txt"), "one\n");
+    await git(work, "add", ".");
+    await git(work, "commit", "-q", "-m", "base");
+    await git(work, "switch", "-q", "-c", "feat");
+    await writeFile(join(work, "a.txt"), "one\ntwo\n");
+    await git(work, "commit", "-q", "-am", "previous");
+    const previous = (await git(work, "rev-parse", "HEAD")).stdout.trim();
+    await git(work, "switch", "-q", "main");
+    await writeFile(join(work, "upstream.txt"), "from main\n");
+    await git(work, "add", ".");
+    await git(work, "commit", "-q", "-m", "upstream");
+    const mainTip = (await git(work, "rev-parse", "HEAD")).stdout.trim();
+    await git(work, "switch", "-q", "feat");
+    await git(work, "merge", "-q", "--no-edit", "main");
+    await writeFile(join(work, "a.txt"), "one\ntwo\nthree\n");
+    await git(work, "commit", "-q", "-am", "head");
+    const head = (await git(work, "rev-parse", "HEAD")).stdout.trim();
+    await git(root, "clone", "-q", "--bare", work, bare);
+    await git(root, "--git-dir", bare, "update-ref", "refs/pull/1/head", head);
+
+    const directory = join(root, "checkout");
+    const wt = await createWorktree({
+      cloneUrl: bare,
+      pullRequestNumber: 1,
+      headSha: head,
+      baseSha: mainTip,
+      previousHeadSha: previous,
+      directory,
+    });
+    expect(wt.diff).not.toContain("upstream.txt");
+    expect(wt.interdiff).toContain("+three");
+    expect(wt.interdiff).not.toContain("upstream.txt");
+    await wt.remove();
+  });
+  it("keeps a file the author reverted, deleted or renamed since the previous round in the interdiff", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hawkeye-revert-"));
+    const work = join(root, "work");
+    const bare = join(root, "origin.git");
+    await mkdir(work);
+    await git(work, "init", "-q", "-b", "main");
+    await writeFile(join(work, "a.txt"), "one\n");
+    await git(work, "add", ".");
+    await git(work, "commit", "-q", "-m", "base");
+    const base = (await git(work, "rev-parse", "HEAD")).stdout.trim();
+    await git(work, "switch", "-q", "-c", "feat");
+    await writeFile(join(work, "a.txt"), "one\ntwo\n");
+    await writeFile(join(work, "b.txt"), "temporary\n");
+    await writeFile(join(work, "café.txt"), "accent\n");
+    await writeFile(join(work, "old.txt"), "moving\n");
+    await git(work, "add", ".");
+    await git(work, "commit", "-q", "-m", "previous");
+    const previous = (await git(work, "rev-parse", "HEAD")).stdout.trim();
+    await writeFile(join(work, "a.txt"), "one\n");
+    await git(work, "rm", "-q", "b.txt");
+    await writeFile(join(work, "café.txt"), "accent\nmore\n");
+    await git(work, "mv", "old.txt", "new.txt");
+    await git(work, "add", ".");
+    await git(work, "commit", "-q", "-m", "head");
+    const head = (await git(work, "rev-parse", "HEAD")).stdout.trim();
+    await git(root, "clone", "-q", "--bare", work, bare);
+    await git(root, "--git-dir", bare, "update-ref", "refs/pull/1/head", head);
+
+    const directory = join(root, "checkout");
+    const wt = await createWorktree({
+      cloneUrl: bare,
+      pullRequestNumber: 1,
+      headSha: head,
+      baseSha: base,
+      previousHeadSha: previous,
+      directory,
+    });
+    expect(wt.interdiff).toContain("-two");
+    expect(wt.interdiff).toContain("-temporary");
+    expect(wt.interdiff).toContain("+more");
+    expect(wt.interdiff).toMatch(/rename from old\.txt|--- a\/old\.txt/);
     await wt.remove();
   });
   it("diffs against the merge base when the base branch advanced", async () => {

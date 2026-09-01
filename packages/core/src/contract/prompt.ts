@@ -1,4 +1,15 @@
-import { LENSES } from "./schema.js";
+import { LENSES, type Severity } from "./schema.js";
+
+export type PriorFinding = {
+  id: string;
+  severity: Severity;
+  claim: string;
+  path?: string;
+  line?: number;
+  detail: string;
+  dismissed?: { note: string };
+};
+export type PreviousRound = { headSha: string; interdiff?: string; findings: PriorFinding[] };
 
 export type PromptInput = {
   repository: { owner: string; repo: string };
@@ -16,6 +27,7 @@ export type PromptInput = {
   resultPath: string;
   contractOverride?: string;
   checkoutPath?: string;
+  previousRound?: PreviousRound;
 };
 
 const LENS_GUIDE: Record<(typeof LENSES)[number], string> = {
@@ -31,6 +43,17 @@ const LENS_GUIDE: Record<(typeof LENSES)[number], string> = {
   hygiene:
     "Commit quality, documentation kept in lockstep, licensing, secrets, anything a maintainer must gate on.",
 };
+
+function priorFindingLine(finding: PriorFinding): string {
+  const location =
+    finding.path === undefined
+      ? ""
+      : ` (${finding.path}${finding.line === undefined ? "" : `:${finding.line}`})`;
+  const line = `- [${finding.id}] ${finding.severity} · ${finding.claim.replace(/\r?\n/g, " ")}${location}\n  ${finding.detail.replace(/\r?\n/g, " ")}`;
+  return finding.dismissed === undefined
+    ? line
+    : `${line}\n  dismissed by the author: ${finding.dismissed.note.replace(/\r?\n/g, " ")}`;
+}
 
 function fence(tag: string, attributes: string, content: string): string {
   const closing = new RegExp(`</${tag}`, "gi");
@@ -80,6 +103,39 @@ ${repositoryRules.map((r) => fence("repository_rules", `path="${r.path}"`, r.con
 Lockfiles and build output are excluded from this diff.
 ${fence("untrusted_data", 'source="diff"', diff)}`);
 
+  if (input.previousRound !== undefined) {
+    const { headSha, interdiff, findings } = input.previousRound;
+    const since =
+      interdiff === undefined
+        ? "The previous head is no longer on the server (the branch was rewritten), so there is no interdiff; review the full diff above and use the prior findings as context."
+        : interdiff === ""
+          ? headSha === pullRequest.headSha
+            ? "The head is unchanged since the previous round; this is a re-review of the same head."
+            : "The head moved since the previous round, but nothing reviewable changed in the files this pull request touches (only excluded files, or changes merged in from the base branch), so there is nothing new to review; check the prior findings."
+          : `Changes on this branch since the previous round, limited to the files this pull request touches (an upstream change merged in between can still appear in those files; it is not the author's change). Lockfiles and build output are excluded.\n${fence("untrusted_data", 'source="interdiff"', interdiff)}`;
+    const newFindingsRule =
+      interdiff === undefined
+        ? "- Raise new findings about anything in the full diff that the previous round missed."
+        : interdiff === ""
+          ? "- Raise new findings about anything in the full diff that the previous round missed; nothing reviewable changed, so look again rather than repeat."
+          : "- Raise new findings only about the changes since the previous round or about what they newly expose; the full diff above remains the context for understanding the pull request.";
+    sections.push(`# Previous round
+The previous round reviewed head ${headSha}. These are its findings, together with findings carried from earlier rounds (still open, or dismissed by the author); each id is stable for the same path and claim.
+${fence(
+  "untrusted_data",
+  'source="prior_findings"',
+  findings.length === 0 ? "(no findings)" : findings.map(priorFindingLine).join("\n"),
+)}
+
+# Changes since the previous round (interdiff)
+${since}
+
+Rules for this round:
+- Report every prior finding in priorFindings with its id and a status: addressed when the new changes resolve it, open when it still stands, withdrawn when it no longer holds or was wrong. A finding dismissed by the author is withdrawn with the author's note unless the new changes prove the note wrong.
+- Repeat every still-open finding in findings with the same path and claim so its id stays stable.
+${newFindingsRule}`);
+  }
+
   if (input.contractOverride === undefined) {
     sections.push(`# Lenses
 Assess each of these six lenses once:
@@ -114,8 +170,10 @@ When you are done, write the result as JSON to ${resultPath} and stop. Write not
   "verdict": "ship" | "mergeable" | "changes_needed" | "blocked",
   "summary": string,
   "lenses": [{ "name": "intent" | "behavior" | "blast_radius" | "verification" | "fit" | "hygiene", "assessment": string }],
-  "findings": [{ "path"?: string, "line"?: number, "side"?: "RIGHT" | "LEFT", "severity": "must_fix" | "should_fix" | "optional" | "inherited", "claim": string, "detail": string, "rationale"?: string, "suggestion"?: string }]
+  "findings": [{ "path"?: string, "line"?: number, "side"?: "RIGHT" | "LEFT", "severity": "must_fix" | "should_fix" | "optional" | "inherited", "claim": string, "detail": string, "rationale"?: string, "suggestion"?: string }],
+  "priorFindings"?: [{ "id": string, "status": "addressed" | "open" | "withdrawn", "note": string }]
 }
+priorFindings is required when a previous round is given above and must list every prior finding; omit it otherwise.
 lenses must list each of the six lenses exactly once. verdict is blocked if any finding is must_fix; changes_needed if any finding is should_fix; mergeable if any finding is optional or inherited; otherwise ship.`);
 
   return sections.join("\n\n");

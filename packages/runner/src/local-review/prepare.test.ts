@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { createWorktree } from "@hawkeye/core";
+import { type createWorktree, findingId } from "@hawkeye/core";
 import { describe, expect, it, vi } from "vitest";
 import { describePreparedRound, prepareRound } from "./prepare.js";
 
@@ -33,7 +33,22 @@ const fakeCreateWorktree: typeof createWorktree = async (input) => {
   await mkdir(input.directory, { recursive: true });
   await writeFile(join(input.directory, "CLAUDE.md"), "obey me");
   await writeFile(join(input.directory, "AGENTS.md"), "house rules");
-  return { path: input.directory, diff, remove: async () => {} };
+  return {
+    path: input.directory,
+    diff,
+    ...(input.previousHeadSha === undefined ? {} : { interdiff: "diff --git a/y b/y\n+later" }),
+    remove: async () => {},
+  };
+};
+const LENSES = ["intent", "behavior", "blast_radius", "verification", "fit", "hygiene"];
+const firstResult = {
+  verdict: "changes_needed",
+  summary: "- one bug",
+  lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
+  findings: [
+    { path: "x.ts", line: 1, severity: "should_fix", claim: "Bug", detail: "wrong" },
+    { severity: "optional", claim: "Nit", detail: "small" },
+  ],
 };
 const deps = {
   fetch: fakeFetch,
@@ -95,5 +110,104 @@ describe("prepareRound", () => {
       baseSha: "m".repeat(40),
       directory: join(prepared.directory, "checkout"),
     });
+  });
+  it("reviews round two against the latest completed round", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hawkeye-reviews-"));
+    const createWorktreeSpy = vi.fn(fakeCreateWorktree);
+    const first = await prepareRound({ reference, token: "t", root }, deps);
+    await writeFile(first.resultPath, JSON.stringify(firstResult));
+    await writeFile(
+      join(first.directory, "dismissed.json"),
+      JSON.stringify({ [findingId(undefined, "Nit")]: "we like it" }),
+    );
+    const second = await prepareRound(
+      { reference, token: "t", root },
+      { ...deps, createWorktree: createWorktreeSpy },
+    );
+    expect(createWorktreeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ previousHeadSha: headSha }),
+    );
+    const prompt = await readFile(join(second.directory, "prompt.md"), "utf8");
+    expect(prompt).toContain(`- [${findingId("x.ts", "Bug")}] should_fix · Bug (x.ts:1)`);
+    expect(prompt).toContain(
+      `- [${findingId(undefined, "Nit")}] optional · Nit\n  small\n  dismissed by the author: we like it`,
+    );
+    expect(prompt).toContain("diff --git a/y b/y\n+later");
+    expect(second.meta).toMatchObject({
+      round: 2,
+      previousRound: 1,
+      previousHeadSha: headSha,
+      carriedFindings: [findingId("x.ts", "Bug"), findingId(undefined, "Nit")],
+    });
+    expect(JSON.parse(await readFile(join(second.directory, "meta.json"), "utf8"))).toMatchObject({
+      previousRound: 1,
+      previousHeadSha: headSha,
+    });
+    expect(describePreparedRound(second)[0]).toBe(
+      "round 2 for o/r#7 at aaaaaaa (after round 1 at aaaaaaa)",
+    );
+  });
+  it("carries a dismissal into round three after round two withdrew the finding", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hawkeye-reviews-"));
+    const first = await prepareRound({ reference, token: "t", root }, deps);
+    await writeFile(first.resultPath, JSON.stringify(firstResult));
+    await writeFile(
+      join(first.directory, "dismissed.json"),
+      JSON.stringify({ [findingId(undefined, "Nit")]: "we like it" }),
+    );
+    const second = await prepareRound({ reference, token: "t", root }, deps);
+    await writeFile(
+      second.resultPath,
+      JSON.stringify({
+        ...firstResult,
+        findings: [firstResult.findings[0]],
+        priorFindings: [{ id: findingId(undefined, "Nit"), status: "withdrawn", note: "ok" }],
+      }),
+    );
+    const third = await prepareRound({ reference, token: "t", root }, deps);
+    const prompt = await readFile(join(third.directory, "prompt.md"), "utf8");
+    expect(prompt).toContain(
+      `- [${findingId(undefined, "Nit")}] optional · Nit\n  small\n  dismissed by the author: we like it`,
+    );
+    expect(prompt).toContain(`- [${findingId("x.ts", "Bug")}] should_fix · Bug (x.ts:1)`);
+  });
+  it("carries an open finding round two forgot to repeat into round three", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hawkeye-reviews-"));
+    const first = await prepareRound({ reference, token: "t", root }, deps);
+    await writeFile(first.resultPath, JSON.stringify(firstResult));
+    const second = await prepareRound({ reference, token: "t", root }, deps);
+    await writeFile(
+      second.resultPath,
+      JSON.stringify({
+        ...firstResult,
+        findings: [],
+        priorFindings: [
+          { id: findingId("x.ts", "Bug"), status: "open", note: "still there" },
+          { id: findingId(undefined, "Nit"), status: "addressed", note: "renamed" },
+        ],
+      }),
+    );
+    const third = await prepareRound({ reference, token: "t", root }, deps);
+    const prompt = await readFile(join(third.directory, "prompt.md"), "utf8");
+    expect(prompt).toContain(`- [${findingId("x.ts", "Bug")}] should_fix · Bug (x.ts:1)`);
+    expect(prompt).not.toContain(`- [${findingId(undefined, "Nit")}]`);
+  });
+  it("starts a plain round when no earlier round has a result and warns about a broken one", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hawkeye-reviews-"));
+    const createWorktreeSpy = vi.fn(fakeCreateWorktree);
+    const first = await prepareRound({ reference, token: "t", root }, deps);
+    await writeFile(first.resultPath, "{");
+    const warnings: string[] = [];
+    const second = await prepareRound(
+      { reference, token: "t", root },
+      { ...deps, createWorktree: createWorktreeSpy, warn: (line) => warnings.push(line) },
+    );
+    expect(createWorktreeSpy.mock.calls[0]?.[0]).not.toHaveProperty("previousHeadSha");
+    expect(await readFile(join(second.directory, "prompt.md"), "utf8")).not.toContain(
+      "# Previous round",
+    );
+    expect(second.meta).not.toHaveProperty("previousRound");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain(`skipping ${first.directory}`);
   });
 });

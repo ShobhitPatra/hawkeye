@@ -10,16 +10,16 @@ import {
   removeTrustedConfig,
   type PullRequestReference,
 } from "@hawkeye/core";
-import { createRound, pruneOlderCheckouts, pullRequestDirectory } from "./rounds.js";
+import {
+  createRound,
+  latestCompletedRound,
+  pruneOlderCheckouts,
+  pullRequestDirectory,
+  priorFindingsBefore,
+  type RoundMeta,
+} from "./rounds.js";
 
-export type RoundMeta = {
-  round: number;
-  headSha: string;
-  baseSha: string;
-  mergeBaseSha: string;
-  startedAt: string;
-  pullRequest: { owner: string; repo: string; number: number; title: string; author: string };
-};
+export type { RoundMeta } from "./rounds.js";
 
 export type PrepareInput = {
   reference: PullRequestReference;
@@ -32,6 +32,7 @@ export type PrepareDependencies = {
   createWorktree: typeof createWorktree;
   readRepositoryRules: typeof readRepositoryRules;
   now(): Date;
+  warn?(line: string): void;
 };
 export type PreparedRound = {
   meta: RoundMeta;
@@ -56,6 +57,7 @@ export async function prepareRound(
   );
   const linkedIssue = await fetchLinkedIssue(github, reference, pullRequest.body, token);
   const pullRequestDir = pullRequestDirectory(input.root, reference);
+  const previous = await latestCompletedRound(pullRequestDir, deps.warn);
   const { round, directory } = await createRound(pullRequestDir);
   const worktree = await deps.createWorktree({
     cloneUrl: pullRequest.cloneUrl,
@@ -64,7 +66,21 @@ export async function prepareRound(
     headSha: pullRequest.headSha,
     baseSha: mergeBaseSha,
     directory: join(directory, "checkout"),
+    ...(previous === undefined ? {} : { previousHeadSha: previous.meta.headSha }),
   });
+  const previousRound =
+    previous === undefined
+      ? undefined
+      : {
+          headSha: previous.meta.headSha,
+          ...(worktree.interdiff === undefined ? {} : { interdiff: worktree.interdiff }),
+          findings: await priorFindingsBefore(
+            pullRequestDir,
+            round,
+            previous.result.findings,
+            deps.warn,
+          ),
+        };
   const repositoryRules = await deps.readRepositoryRules(worktree.path);
   await removeTrustedConfig(worktree.path);
   const resultPath = join(directory, "result.json");
@@ -85,6 +101,7 @@ export async function prepareRound(
       diff: worktree.diff,
       resultPath,
       checkoutPath: worktree.path,
+      ...(previousRound === undefined ? {} : { previousRound }),
       ...(input.contractOverride === undefined ? {} : { contractOverride: input.contractOverride }),
     }),
   );
@@ -101,6 +118,13 @@ export async function prepareRound(
       title: pullRequest.title,
       author: pullRequest.author,
     },
+    ...(previousRound === undefined
+      ? {}
+      : {
+          previousRound: previous!.meta.round,
+          previousHeadSha: previous!.meta.headSha,
+          carriedFindings: previousRound.findings.map((finding) => finding.id),
+        }),
   };
   await writeFile(join(directory, "meta.json"), JSON.stringify(meta, null, 2));
   await pruneOlderCheckouts(pullRequestDir, round);
@@ -110,8 +134,12 @@ export async function prepareRound(
 export function describePreparedRound(prepared: PreparedRound): string[] {
   const { meta } = prepared;
   const { owner, repo, number } = meta.pullRequest;
+  const after =
+    meta.previousRound === undefined || meta.previousHeadSha === undefined
+      ? ""
+      : ` (after round ${meta.previousRound} at ${meta.previousHeadSha.slice(0, 7)})`;
   return [
-    `round ${meta.round} for ${owner}/${repo}#${number} at ${meta.headSha.slice(0, 7)}`,
+    `round ${meta.round} for ${owner}/${repo}#${number} at ${meta.headSha.slice(0, 7)}${after}`,
     prepared.directory,
     prepared.checkoutPath,
     prepared.resultPath,

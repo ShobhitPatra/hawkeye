@@ -5,6 +5,8 @@ import { promisify } from "node:util";
 
 const run = promisify(execFile);
 const RULE_FILES = ["AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md"];
+const UNADVERTISED_OBJECT =
+  /unadvertised object|not our ref|couldn't find remote ref|no such remote ref|upload-pack: not our ref|did not send all necessary objects/i;
 const GENERATED_PATHSPECS = [
   ".",
   ":(exclude,glob)**/pnpm-lock.yaml",
@@ -16,7 +18,12 @@ const GENERATED_PATHSPECS = [
   ":(exclude,glob)**/*.min.css",
 ];
 
-export type Worktree = { path: string; diff: string; remove(): Promise<void> };
+export type Worktree = {
+  path: string;
+  diff: string;
+  interdiff?: string;
+  remove(): Promise<void>;
+};
 export type CreateWorktreeInput = {
   cloneUrl: string;
   token?: string;
@@ -24,6 +31,7 @@ export type CreateWorktreeInput = {
   headSha: string;
   baseSha: string;
   directory: string;
+  previousHeadSha?: string;
 };
 
 const AUTHORIZATION_ENV = "HAWKEYE_GIT_AUTHORIZATION";
@@ -43,6 +51,44 @@ export function gitAuthorization(
   };
 }
 
+async function changedPaths(
+  git: (cwd: string | undefined, ...args: string[]) => Promise<string>,
+  directory: string,
+  range: string,
+): Promise<string[]> {
+  return (await git(directory, "diff", "--no-renames", "--name-only", "-z", range))
+    .split("\0")
+    .filter((path) => path !== "");
+}
+
+async function interdiffOf(
+  git: (cwd: string | undefined, ...args: string[]) => Promise<string>,
+  directory: string,
+  previousHeadSha: string,
+  baseSha: string,
+): Promise<string> {
+  const atPrevious = new Set(
+    (await git(directory, "ls-tree", "-r", "--name-only", "-z", previousHeadSha))
+      .split("\0")
+      .filter((path) => path !== ""),
+  );
+  const touched = new Set([
+    ...(await changedPaths(git, directory, `${baseSha}..HEAD`)),
+    ...(await changedPaths(git, directory, `${previousHeadSha}..HEAD`)).filter((path) =>
+      atPrevious.has(path),
+    ),
+  ]);
+  if (touched.size === 0) return "";
+  return git(
+    directory,
+    "diff",
+    `${previousHeadSha}..HEAD`,
+    "--",
+    ...touched,
+    ...GENERATED_PATHSPECS.slice(1),
+  );
+}
+
 export async function createWorktree(input: CreateWorktreeInput): Promise<Worktree> {
   const redact = (text: string) =>
     input.token === undefined
@@ -56,7 +102,7 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
       return (
         await run("git", args, {
           cwd,
-          env: { ...process.env, ...auth.env, GIT_TERMINAL_PROMPT: "0" },
+          env: { ...process.env, ...auth.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" },
           maxBuffer: 64 * 1024 * 1024,
         })
       ).stdout;
@@ -93,6 +139,25 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
       "origin",
       input.baseSha,
     );
+    const previousHeadSha =
+      input.previousHeadSha === undefined
+        ? undefined
+        : await git(
+            input.directory,
+            ...auth.args,
+            "fetch",
+            "--quiet",
+            "--depth",
+            "1",
+            "origin",
+            input.previousHeadSha,
+          ).then(
+            () => input.previousHeadSha,
+            (error: Error) => {
+              if (!UNADVERTISED_OBJECT.test(error.message)) throw error;
+              return undefined;
+            },
+          );
     await git(input.directory, "remote", "remove", "origin");
     await git(input.directory, "checkout", "--quiet", "--detach", fetchedHead);
     if (fetchedHead !== input.headSha)
@@ -104,10 +169,15 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
       "--",
       ...GENERATED_PATHSPECS,
     );
+    const interdiff =
+      previousHeadSha === undefined
+        ? undefined
+        : await interdiffOf(git, input.directory, previousHeadSha, input.baseSha);
 
     return {
       path: input.directory,
       diff,
+      ...(interdiff === undefined ? {} : { interdiff }),
       remove: () => rm(input.directory, { recursive: true, force: true }),
     };
   } catch (error) {
