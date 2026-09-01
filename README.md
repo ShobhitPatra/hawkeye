@@ -181,7 +181,7 @@ Hosted: a Vercel project with a Neon Postgres and the same env, configured with 
 1. **Runner alone, manual.** `hawkeye review <pr-url>` from a laptop: worktree → `claude -p` → findings → posted as `hawkeye[bot]` via the same `core` posting module, using a locally held App key. Proves contract and identity. Dogfood. (shipped: `hawkeye review <pr-url>`)
 2. **Control plane + arm.** Next.js app with GitHub sign-in, App webhooks, PR list, Arm, jobs; runner becomes a daemon that long-polls with a copied runner token; reviews on every push with quiet window and interdiff; control plane posts.
 3. **Multi-user + OSS release.** Official hosted instance, Codex harness, self-host docs (`docker compose`, App Manifest flow at `/setup`), public repo under MIT.
-4. **Always-on + polish.** Runner Docker image for a VPS, device-code runner login, run history and budget view, re-review-now, machine-user identity for OSS PRs.
+4. **Always-on + polish.** Runner Docker image for a VPS, run history and budget view, re-review-now, machine-user identity for OSS PRs.
 
 ## Decisions
 

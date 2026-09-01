@@ -8,11 +8,14 @@ const started = {
   expiresAt: "2026-01-01T12:10:00.000Z",
   intervalSeconds: 5,
 };
+const slept: number[] = [];
 
-function login(responses: Response[], overrides: { now?: () => Date } = {}) {
+function login(responses: (Response | Error)[]) {
+  slept.length = 0;
   const fetch = vi.fn(async () => {
     const next = responses.shift();
     if (next === undefined) throw new Error("unexpected fetch");
+    if (next instanceof Error) throw next;
     return next;
   });
   const logged: string[] = [];
@@ -21,8 +24,9 @@ function login(responses: Response[], overrides: { now?: () => Date } = {}) {
     runnerName: "laptop",
     fetch: fetch as unknown as typeof globalThis.fetch,
     log: (line) => logged.push(line),
-    sleep: async () => {},
-    now: overrides.now ?? (() => new Date("2026-01-01T12:00:00.000Z")),
+    sleep: async (milliseconds) => {
+      slept.push(milliseconds);
+    },
   });
   return { fetch, logged, promise };
 }
@@ -35,6 +39,7 @@ describe("deviceLogin", () => {
       Response.json({ status: "approved", token: "hk_new" }),
     ]);
     await expect(promise).resolves.toBe("hk_new");
+    expect(slept).toEqual([5000, 5000]);
     expect(logged).toEqual(["code AAAA-BBBB", "approve at " + started.verifyUrl]);
     const [startUrl, startInit] = fetch.mock.calls[0]! as unknown as [string, RequestInit];
     expect(startUrl).toBe("https://hawkeye.example/api/runner/login");
@@ -50,22 +55,23 @@ describe("deviceLogin", () => {
     ]);
     await expect(promise).rejects.toThrow("the login expired before it was approved");
   });
-  it("throws when the deadline passes without approval", async () => {
-    const clock = { value: new Date("2026-01-01T12:00:00.000Z") };
-    const { promise } = login(
-      [
-        Response.json(started, { status: 201 }),
-        Response.json({ status: "pending" }),
-        Response.json({ status: "pending" }),
-      ],
-      {
-        now: () => {
-          clock.value = new Date(clock.value.getTime() + 6 * 60_000);
-          return clock.value;
-        },
-      },
+  it("retries transient poll failures and gives up after three in a row", async () => {
+    const { promise } = login([
+      Response.json(started, { status: 201 }),
+      Response.json({}, { status: 502 }),
+      new Error("socket hang up"),
+      Response.json({ status: "approved", token: "hk_new" }),
+    ]);
+    await expect(promise).resolves.toBe("hk_new");
+    const failing = login([
+      Response.json(started, { status: 201 }),
+      Response.json({}, { status: 502 }),
+      new Error("socket hang up"),
+      Response.json({}, { status: 503 }),
+    ]);
+    await expect(failing.promise).rejects.toThrow(
+      "the control plane failed the login 3 times in a row",
     );
-    await expect(promise).rejects.toThrow("the login expired before it was approved");
   });
   it("rejects a refused or malformed start", async () => {
     await expect(
@@ -74,6 +80,9 @@ describe("deviceLogin", () => {
     await expect(
       login([Response.json({ ...started, deviceSecret: "" }, { status: 201 })]).promise,
     ).rejects.toThrow("invalid login response: deviceSecret");
+    await expect(
+      login([Response.json({ ...started, intervalSeconds: 0 }, { status: 201 })]).promise,
+    ).rejects.toThrow("invalid login response: intervalSeconds");
   });
   it("rejects an approved response without a token", async () => {
     const { promise } = login([

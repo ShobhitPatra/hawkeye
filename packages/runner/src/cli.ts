@@ -22,7 +22,7 @@ import { resolveGitHubToken } from "./local-review/token.js";
 import { createRunDirectory } from "./run-directory.js";
 import { createControlPlaneClient } from "./runner/client.js";
 import { deviceLogin } from "./runner/device-login.js";
-import { loadRunnerConfig, writeRunnerConfig } from "./runner/config.js";
+import { assertControlPlaneUrl, loadRunnerConfig, writeRunnerConfig } from "./runner/config.js";
 import { runRunnerLoop } from "./runner/loop.js";
 
 const CONFIG_PATH = join(homedir(), ".config", "hawkeye", "config.json");
@@ -243,9 +243,10 @@ export function createProgram(io: {
     .description("connect this machine: approve a code on /connect, or pass a token directly")
     .requiredOption("--url <url>", "control plane URL, e.g. https://hawkeye.example")
     .option("--token <token>", "runner token created on /runners; omit for the device flow")
-    .option("--name <name>", "runner name shown on /connect and /runners", hostname())
+    .option("--name <name>", "runner name for the device flow (ignored with --token)", hostname())
     .action(async (options: { url: string; token?: string; name: string }) => {
       try {
+        assertControlPlaneUrl(options.url);
         const token =
           options.token ??
           (await deviceLogin({
