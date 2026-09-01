@@ -22,7 +22,7 @@ export async function loadRunnerConfig(input: {
     const value = input.env[envName] || fromFile;
     if (value === undefined || value === "")
       throw new Error(
-        `Missing ${fileName}: run "hawkeye runner login --url <url> --token <token>" or set ${envName}`,
+        `Missing ${fileName}: run "hawkeye runner login --url <url>" or set ${envName}`,
       );
     return value;
   };
@@ -32,10 +32,14 @@ export async function loadRunnerConfig(input: {
   };
 }
 
-export async function writeRunnerConfig(configPath: string, config: RunnerConfig): Promise<void> {
-  const url = URL.parse(config.controlPlaneUrl);
+export function assertControlPlaneUrl(value: string): void {
+  const url = URL.parse(value);
   if (url === null || (url.protocol !== "http:" && url.protocol !== "https:"))
-    throw new Error(`--url must be an http(s) URL, got "${config.controlPlaneUrl}"`);
+    throw new Error(`--url must be an http(s) URL, got "${value}"`);
+}
+
+export async function writeRunnerConfig(configPath: string, config: RunnerConfig): Promise<void> {
+  assertControlPlaneUrl(config.controlPlaneUrl);
   if (config.token === "") throw new Error("--token must not be empty");
   await mkdir(dirname(configPath), { recursive: true, mode: 0o700 });
   await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
