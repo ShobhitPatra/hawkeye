@@ -102,7 +102,7 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
       return (
         await run("git", args, {
           cwd,
-          env: { ...process.env, ...auth.env, GIT_TERMINAL_PROMPT: "0" },
+          env: { ...process.env, ...auth.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" },
           maxBuffer: 64 * 1024 * 1024,
         })
       ).stdout;
