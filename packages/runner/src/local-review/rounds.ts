@@ -26,7 +26,7 @@ export type Dismissals = Record<string, string>;
 export type DismissedFinding = { note: string; finding: Finding };
 export type DismissedFindings = Record<string, DismissedFinding>;
 
-export function parseRoundMeta(raw: unknown, path: string): RoundMeta {
+function parseRoundMeta(raw: unknown, path: string): RoundMeta {
   const meta = raw as Partial<RoundMeta> | null;
   if (
     typeof meta !== "object" ||
@@ -121,7 +121,7 @@ export async function collectDismissals(
   return merged;
 }
 
-export async function collectOpenFindings(
+async function collectOpenFindings(
   pullRequestDir: string,
   before: number,
   warn: (line: string) => void = () => {},
