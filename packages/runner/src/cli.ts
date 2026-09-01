@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
+import { homedir, hostname } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { Command } from "commander";
@@ -21,6 +21,7 @@ import { showRound } from "./local-review/show.js";
 import { resolveGitHubToken } from "./local-review/token.js";
 import { createRunDirectory } from "./run-directory.js";
 import { createControlPlaneClient } from "./runner/client.js";
+import { deviceLogin } from "./runner/device-login.js";
 import { loadRunnerConfig, writeRunnerConfig } from "./runner/config.js";
 import { runRunnerLoop } from "./runner/loop.js";
 
@@ -239,15 +240,22 @@ export function createProgram(io: {
 
   runner
     .command("login")
-    .description("store the control plane URL and runner token")
+    .description("connect this machine: approve a code on /connect, or pass a token directly")
     .requiredOption("--url <url>", "control plane URL, e.g. https://hawkeye.example")
-    .requiredOption("--token <token>", "runner token created on /runners")
-    .action(async (options: { url: string; token: string }) => {
+    .option("--token <token>", "runner token created on /runners; omit for the device flow")
+    .option("--name <name>", "runner name shown on /connect and /runners", hostname())
+    .action(async (options: { url: string; token?: string; name: string }) => {
       try {
-        await writeRunnerConfig(RUNNER_CONFIG_PATH, {
-          controlPlaneUrl: options.url,
-          token: options.token,
-        });
+        const token =
+          options.token ??
+          (await deviceLogin({
+            baseUrl: options.url,
+            runnerName: options.name,
+            fetch,
+            log: io.stderr,
+          }));
+        await writeRunnerConfig(RUNNER_CONFIG_PATH, { controlPlaneUrl: options.url, token });
+        if (options.token === undefined) io.stdout(`runner ${options.name} connected`);
         io.stdout(`saved ${RUNNER_CONFIG_PATH}`);
       } catch (error) {
         io.stderr(`error: ${(error as Error).message}`);
