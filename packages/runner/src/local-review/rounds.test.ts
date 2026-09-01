@@ -155,10 +155,25 @@ describe("rounds", () => {
     const later = await roundDir(root, 2, resultWith("Other"));
     const id = findingId("src/a.ts", "Nit");
     await dismissFinding(first, id, "by design");
-    expect((await withdrawDismissal(later, id)).directory).toBe(first);
+    await dismissFinding(later, findingId("src/a.ts", "Other"), "here too");
+    await writeFile(
+      join(later, "dismissed.json"),
+      JSON.stringify({ [findingId("src/a.ts", "Other")]: "here too", [id]: "again" }),
+    );
+    expect((await withdrawDismissal(later, id)).directory).toBe(later);
     expect(await readDismissals(first)).toEqual({});
+    expect(await readDismissals(later)).toEqual({ [findingId("src/a.ts", "Other")]: "here too" });
     await expect(withdrawDismissal(later, id)).rejects.toThrow(
       `no dismissal of ${id} in ${later} or an earlier round`,
+    );
+  });
+  it("names an unreadable round instead of denying the finding exists", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hawkeye-reviews-"));
+    const broken = await roundDir(root, 1);
+    await writeFile(join(broken, "result.json"), "{");
+    const current = await roundDir(root, 2, resultWith("Here"));
+    await expect(dismissFinding(current, "000000000000", "no")).rejects.toThrow(
+      `(unreadable result in ${broken})`,
     );
   });
 });

@@ -193,6 +193,7 @@ export async function withdrawDismissal(
 ): Promise<{ directory: string }> {
   const pullRequestDir = dirname(directory);
   const round = Number(basename(directory).slice(ROUND_PREFIX.length));
+  const cleared: string[] = [];
   for (const name of (await listRounds(pullRequestDir))
     .filter((candidate) => Number(candidate.slice(ROUND_PREFIX.length)) <= round)
     .toReversed()) {
@@ -201,8 +202,9 @@ export async function withdrawDismissal(
     if (!(id in dismissals)) continue;
     const { [id]: _withdrawn, ...remaining } = dismissals;
     await writeFile(join(candidate, "dismissed.json"), JSON.stringify(remaining, null, 2));
-    return { directory: candidate };
+    cleared.push(candidate);
   }
+  if (cleared.length > 0) return { directory: cleared[0]! };
   throw new Error(`no dismissal of ${id} in ${directory} or an earlier round`);
 }
 
@@ -212,26 +214,35 @@ export async function dismissFinding(
   reason: string,
 ): Promise<{ directory: string; dismissals: Dismissals }> {
   if (reason.trim() === "") throw new Error("a dismissal needs a reason");
-  const raisedIn = await roundThatRaised(directory, id);
+  const { raisedIn, unreadable } = await roundThatRaised(directory, id);
   if (raisedIn === undefined)
-    throw new Error(`no finding ${id} in ${directory} or an earlier round`);
+    throw new Error(
+      `no finding ${id} in ${directory} or an earlier round${unreadable.length === 0 ? "" : ` (unreadable result in ${unreadable.join(", ")})`}`,
+    );
   const dismissals = { ...(await readDismissals(raisedIn)), [id]: reason };
   await writeFile(join(raisedIn, "dismissed.json"), JSON.stringify(dismissals, null, 2));
   return { directory: raisedIn, dismissals };
 }
 
-async function roundThatRaised(directory: string, id: string): Promise<string | undefined> {
+async function roundThatRaised(
+  directory: string,
+  id: string,
+): Promise<{ raisedIn?: string; unreadable: string[] }> {
   const pullRequestDir = dirname(directory);
   const round = Number(basename(directory).slice(ROUND_PREFIX.length));
-  const candidates = (await listRounds(pullRequestDir))
-    .filter((name) => Number(name.slice(ROUND_PREFIX.length)) <= round)
-    .toReversed();
-  for (const name of candidates) {
-    const result = await readRoundResult(join(pullRequestDir, name)).catch(() => undefined);
+  const unreadable: string[] = [];
+  for (const name of (await listRounds(pullRequestDir))
+    .filter((candidate) => Number(candidate.slice(ROUND_PREFIX.length)) <= round)
+    .toReversed()) {
+    const candidate = join(pullRequestDir, name);
+    const result = await readRoundResult(candidate).catch(() => {
+      unreadable.push(candidate);
+      return undefined;
+    });
     if (result?.findings.some((finding) => findingId(finding.path, finding.claim) === id))
-      return join(pullRequestDir, name);
+      return { raisedIn: candidate, unreadable };
   }
-  return undefined;
+  return { unreadable };
 }
 
 export function pullRequestDirectory(
