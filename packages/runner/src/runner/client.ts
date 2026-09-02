@@ -63,6 +63,16 @@ function priorFinding(value: unknown, field: string): PriorFinding {
     detail: text(entry.detail, `${field}.detail`),
     ...(entry.path === undefined ? {} : { path: text(entry.path, `${field}.path`) }),
     ...(entry.line === undefined ? {} : { line: integer(entry.line, `${field}.line`) }),
+    ...(entry.dismissed === undefined
+      ? {}
+      : {
+          dismissed: {
+            note: text(
+              record(entry.dismissed, `${field}.dismissed`).note,
+              `${field}.dismissed.note`,
+            ),
+          },
+        }),
   };
 }
 
