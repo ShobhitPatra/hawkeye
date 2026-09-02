@@ -265,6 +265,31 @@ describe("postReviewForRun", () => {
     expect(rows.find((row) => row.headSha === headSha)).toMatchObject({ githubReviewId: "5" });
   });
 
+  it("fails the round and frees the reservation when the supplemental fails for another reason", async () => {
+    github.updateReview = vi.fn(async () => {});
+    github.postReview = vi.fn(async () => {
+      throw new GitHubRequestError(502, "GitHub POST failed: 502");
+    });
+    await seedLivingReview({ ...result, findings: [] });
+
+    await expect(post()).resolves.toBe("failed");
+    expect(github.updateReview).not.toHaveBeenCalled();
+    const rows = await db.select().from(schema.reviewPosted);
+    expect(rows.find((row) => row.headSha === headSha)).toBeUndefined();
+  });
+
+  it("keeps the reservation when the supplemental posted but the living patch failed", async () => {
+    github.updateReview = vi.fn(async () => {
+      throw new GitHubRequestError(500, "GitHub PUT failed: 500");
+    });
+    await seedLivingReview({ ...result, findings: [] });
+
+    await expect(post()).resolves.toBe("failed");
+    expect(github.postReview).toHaveBeenCalledTimes(1);
+    const rows = await db.select().from(schema.reviewPosted);
+    expect(rows.find((row) => row.headSha === headSha)).toMatchObject({ githubReviewId: null });
+  });
+
   it("shares one living review across users arming the same pull request", async () => {
     github.updateReview = vi.fn(async () => {});
     await seedLivingReview(result);

@@ -2,6 +2,7 @@ import {
   encodeMarker,
   findingId,
   type GitHubClient,
+  GitHubRequestError,
   HAWKEYE_REPOSITORY_URL,
   type RoundSummary,
   postRenderedReview,
@@ -207,10 +208,11 @@ export async function postReviewForRun(
           token,
         );
         roundReviewId = supplemental.id;
+        githubWrote = true;
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        if (!(error instanceof GitHubRequestError && error.status === 422)) throw error;
         log(
-          `supplemental review not posted (${message}); keeping every finding in the living body`,
+          `supplemental review rejected (${error.message}); keeping every finding in the living body`,
         );
         finalBody = render(new Map()).body;
       }
