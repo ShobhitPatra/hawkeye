@@ -22,13 +22,16 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "type": "module",
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "dev": "tsx src/bin.ts"
+    "dev": "tsx src/bin.ts",
+    "prepack": "cp ../../LICENSE LICENSE",
+    "prepublishOnly": "pnpm --filter @hawkeye/core build && pnpm run build"
   },
   "dependencies": {
     "commander": "^15.0.0",

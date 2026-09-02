@@ -5,6 +5,7 @@ import { homedir, hostname } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { Command } from "commander";
+import packageJson from "../package.json" with { type: "json" };
 import {
   createClaudeCodeHarness,
   createGitHubClient,
@@ -74,9 +75,9 @@ export function createProgram(io: {
   stdout(line: string): void;
   stderr(line: string): void;
 }): Command {
-  const program = new Command("hawkeye").description(
-    "Personal code reviewer on your own Claude plan",
-  );
+  const program = new Command("hawkeye")
+    .version(packageJson.version)
+    .description("Personal code reviewer on your own Claude plan");
 
   program
     .command("review")

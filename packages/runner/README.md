@@ -1,6 +1,6 @@
 # hawkeye-review
 
-The personal AI code reviewer. Runs on the Claude plan you already pay for — nothing for repo admins to install, no API key, nothing posted unless you connect the hosted dashboard.
+The personal AI code reviewer. Runs on the Claude plan you already pay for — nothing for repo admins to install, no API key. `prepare` and `show` are read-only; the runner daemon only reports to the control plane you connect.
 
 Design, docs and source: https://github.com/ShobhitPatra/hawkeye
 
