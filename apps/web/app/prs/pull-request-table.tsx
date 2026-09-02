@@ -36,16 +36,14 @@ export function PullRequestTable({
                     {pullRequest.owner}/{pullRequest.repo}
                   </Link>
                 ) : (
-                  <>
-                    {pullRequest.owner}/{pullRequest.repo}
-                  </>
+                  `${pullRequest.owner}/${pullRequest.repo}`
                 )}
               </td>
               <td>
                 {isArmed ? (
                   <Link href={pageHref}>#{pullRequest.number}</Link>
                 ) : (
-                  <>#{pullRequest.number}</>
+                  `#${pullRequest.number}`
                 )}
               </td>
               <td>

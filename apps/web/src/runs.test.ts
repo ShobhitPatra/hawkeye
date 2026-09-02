@@ -207,4 +207,28 @@ describe("hasArmedPullRequest", () => {
     await db.update(schema.armedPr).set({ disarmedAt: new Date() });
     await expect(hasArmedPullRequest(db, coordinates)).resolves.toBe(true);
   });
+  it("lists findings from the latest arm only", async () => {
+    const [old] = await db
+      .insert(schema.armedPr)
+      .values({
+        userId: "user-1",
+        installationId: "10",
+        owner: "octo",
+        repo: "repo",
+        number: 7,
+        armedAt: new Date("2026-01-01T00:00:00.000Z"),
+        disarmedAt: new Date("2026-01-02T00:00:00.000Z"),
+      })
+      .returning();
+    await db.insert(schema.finding).values({
+      armedPrId: old!.id,
+      stableId: "stale0000000",
+      severity: "should_fix",
+      claim: "Stale copy",
+      firstSeenSha: "a".repeat(40),
+    });
+
+    const findings = await listFindingsForPullRequest(db, coordinates);
+    expect(findings.map((finding) => finding.stableId)).not.toContain("stale0000000");
+  });
 });

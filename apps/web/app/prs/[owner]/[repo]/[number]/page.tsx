@@ -49,7 +49,12 @@ export default async function PullRequestRunsPage({
   params: Promise<{ owner: string; repo: string; number: string }>;
 }) {
   const session = await requireSession();
-  const reference = parsePullRequestParams(await params);
+  let reference: ReturnType<typeof parsePullRequestParams>;
+  try {
+    reference = parsePullRequestParams(await params);
+  } catch {
+    notFound();
+  }
   const db = getDb();
   const coordinates = { ...reference, userId: session.user.id };
 

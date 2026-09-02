@@ -99,7 +99,20 @@ export async function listFindingsForPullRequest(
     })
     .from(finding)
     .innerJoin(armedPr, eq(armedPr.id, finding.armedPrId))
-    .where(userArmsOf(input));
+    .where(
+      and(
+        userArmsOf(input),
+        eq(
+          finding.armedPrId,
+          db
+            .select({ id: armedPr.id })
+            .from(armedPr)
+            .where(userArmsOf(input))
+            .orderBy(desc(armedPr.armedAt))
+            .limit(1),
+        ),
+      ),
+    );
 
   return rows.toSorted(
     (a, b) =>
