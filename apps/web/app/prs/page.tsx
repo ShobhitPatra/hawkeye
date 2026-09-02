@@ -3,7 +3,7 @@ import { listArmedPullRequests } from "@/arming";
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
 import { listUserOpenPullRequests } from "@/pull-requests";
-import { runnerStatus } from "@/runner-status";
+import { describeRunnerStatus, runnerStatus } from "@/runner-status";
 import { requireSession } from "@/session";
 import { PullRequestTable } from "./pull-request-table";
 
@@ -34,7 +34,7 @@ export default async function PullRequestsPage() {
     <main>
       <h1>Pull requests</h1>
       <p>
-        {runner.online ? "Runner online" : `Runner offline · ${runner.waitingJobs} waiting`}
+        {describeRunnerStatus(runner)}
         {!runner.online && (
           <>
             {" "}
