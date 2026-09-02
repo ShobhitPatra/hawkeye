@@ -125,5 +125,6 @@ describe("claude code harness", () => {
     const at = args.indexOf("--model");
     expect(at).toBeGreaterThan(-1);
     expect(args[at + 1]).toBe("opus");
+    expect(() => createClaudeCodeHarness({ model: " " })).toThrow("model must not be empty");
   });
 });

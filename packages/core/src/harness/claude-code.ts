@@ -25,6 +25,8 @@ const exists = (path: string) =>
 export function createClaudeCodeHarness(
   options: { executable?: string; spawn?: SpawnLike; model?: string } = {},
 ): HarnessSpec {
+  if (options.model !== undefined && options.model.trim() === "")
+    throw new Error("model must not be empty");
   const executable = options.executable ?? "claude";
   const spawn = options.spawn ?? nodeSpawn;
 
