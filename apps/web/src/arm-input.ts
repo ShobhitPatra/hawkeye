@@ -5,24 +5,22 @@ const digitsPattern = /^[0-9]+$/;
 
 const MAX_POSTGRES_INT = 2147483647;
 
-function readName(formData: FormData, field: string) {
-  const value = formData.get(field);
+function parseName(field: string, value: unknown) {
   if (typeof value !== "string" || !namePattern.test(value)) {
     throw new Error(`invalid ${field}`);
   }
   return value;
 }
 
-function readDigits(formData: FormData, field: string) {
-  const value = formData.get(field);
+function parseDigits(field: string, value: unknown) {
   if (typeof value !== "string" || !digitsPattern.test(value)) {
     throw new Error(`invalid ${field}`);
   }
   return value;
 }
 
-function readPullRequestNumber(formData: FormData) {
-  const number = Number(readDigits(formData, "number"));
+function parseNumber(value: unknown) {
+  const number = Number(parseDigits("number", value));
   if (!Number.isSafeInteger(number) || number <= 0 || number > MAX_POSTGRES_INT) {
     throw new Error("invalid number");
   }
@@ -30,8 +28,20 @@ function readPullRequestNumber(formData: FormData) {
 }
 
 export function parsePullRequestInput(formData: FormData): PullRequestReference {
-  const number = readPullRequestNumber(formData);
-  return { owner: readName(formData, "owner"), repo: readName(formData, "repo"), number };
+  return parsePullRequestParams({
+    owner: formData.get("owner"),
+    repo: formData.get("repo"),
+    number: formData.get("number"),
+  });
+}
+
+export function parsePullRequestParams(params: {
+  owner: unknown;
+  repo: unknown;
+  number: unknown;
+}): PullRequestReference {
+  const number = parseNumber(params.number);
+  return { owner: parseName("owner", params.owner), repo: parseName("repo", params.repo), number };
 }
 
 export function parseArmInput(
@@ -39,6 +49,6 @@ export function parseArmInput(
 ): PullRequestReference & { installationId: string } {
   return {
     ...parsePullRequestInput(formData),
-    installationId: readDigits(formData, "installationId"),
+    installationId: parseDigits("installationId", formData.get("installationId")),
   };
 }

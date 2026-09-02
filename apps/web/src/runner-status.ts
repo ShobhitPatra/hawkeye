@@ -31,3 +31,7 @@ export async function runnerStatus(
     waitingJobs: waiting?.waitingJobs ?? 0,
   };
 }
+
+export function describeRunnerStatus(status: RunnerStatus): string {
+  return status.online ? "Runner online" : `Runner offline · ${status.waitingJobs} waiting`;
+}
