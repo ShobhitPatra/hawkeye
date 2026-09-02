@@ -25,6 +25,7 @@ function pullRequestWithHead(headSha: string) {
     baseSha: "b".repeat(40),
     baseRef: "main",
     cloneUrl: "https://github.com/octo/repo.git",
+    commits: 1,
   };
 }
 

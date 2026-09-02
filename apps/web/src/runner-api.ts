@@ -1,18 +1,21 @@
 import {
   type ClaimedJob,
+  findingId,
   type GitHubClient,
+  type PriorFinding,
   RUN_RESULT_STATUSES,
   parseReviewResult,
   type RunEvent,
   type RunResultReport,
   type RunResultStatus,
 } from "@hawkeye/core";
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
 import {
   armedPr,
   DEFAULT_MAX_TURNS,
   DEFAULT_WALL_CLOCK_MINUTES,
+  finding,
   job,
   reviewPosted,
   run,
@@ -65,6 +68,47 @@ async function settingsFor(db: Db, userId: string): Promise<ClaimedJob["settings
   };
 }
 
+async function previousRoundFor(db: Db, armedPrId: string): Promise<ClaimedJob["previousRound"]> {
+  const [latest] = await db
+    .select({ headSha: job.headSha, result: run.result })
+    .from(run)
+    .innerJoin(job, eq(job.id, run.jobId))
+    .innerJoin(reviewPosted, eq(reviewPosted.runId, run.id))
+    .where(and(eq(job.armedPrId, armedPrId), eq(run.status, "ok")))
+    .orderBy(desc(run.startedAt))
+    .limit(1);
+  if (!latest?.result) return undefined;
+  const byId = new Map<string, PriorFinding>();
+  for (const entry of latest.result.findings) {
+    const id = findingId(entry.path, entry.claim);
+    if (byId.has(id)) continue;
+    byId.set(id, {
+      id,
+      severity: entry.severity,
+      claim: entry.claim,
+      detail: entry.detail,
+      ...(entry.path === undefined ? {} : { path: entry.path }),
+      ...(entry.line === undefined ? {} : { line: entry.line }),
+    });
+  }
+  const open = await db
+    .select()
+    .from(finding)
+    .where(and(eq(finding.armedPrId, armedPrId), isNull(finding.resolvedSha)));
+  for (const row of open) {
+    if (byId.has(row.stableId)) continue;
+    byId.set(row.stableId, {
+      id: row.stableId,
+      severity: row.severity,
+      claim: row.claim,
+      detail: row.claim,
+      ...(row.path === null ? {} : { path: row.path }),
+      ...(row.line === null ? {} : { line: row.line }),
+    });
+  }
+  return { headSha: latest.headSha, findings: [...byId.values()] };
+}
+
 export async function claimJob(request: Request, deps: ClaimDeps): Promise<Response> {
   const runner = await requireRunner(request, deps.db);
   if (runner instanceof Response) return runner;
@@ -113,6 +157,8 @@ export async function claimJob(request: Request, deps: ClaimDeps): Promise<Respo
         installationToken,
         settings: await settingsFor(deps.db, runner.userId),
       };
+      const previousRound = await previousRoundFor(deps.db, armed.id);
+      if (previousRound !== undefined) body.previousRound = previousRound;
       return Response.json(body, { status: 200 });
     }
 

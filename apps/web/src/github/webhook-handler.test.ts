@@ -30,6 +30,7 @@ const github: GitHubClient = {
     baseSha: "b".repeat(40),
     baseRef: "main",
     cloneUrl: "https://github.com/octo/repo.git",
+    commits: 1,
   })),
   linkedIssue: unsupported(),
   reviews: unsupported(),
