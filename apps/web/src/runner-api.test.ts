@@ -205,7 +205,12 @@ describe("claimJob", () => {
       { db, github },
       firstRunId,
     );
-    await enqueue();
+    await enqueueJob(db, {
+      armedPrId: "armed-1",
+      headSha: "c".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: new Date(now.getTime() - 60_000),
+    });
 
     const response = await claimJob(request("/api/runner/jobs"), claimDeps());
 
