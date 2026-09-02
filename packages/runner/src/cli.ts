@@ -86,6 +86,7 @@ export function createProgram(io: {
     .option("--force", "review even if this head sha was already reviewed", false)
     .option("--max-turns <n>", "assistant turn limit", "40")
     .option("--wall-clock-minutes <n>", "wall clock limit in minutes", "15")
+    .option("--model <name>", "model passed to the claude CLI (else its default)")
     .option(
       "--contract <path>",
       "review contract that replaces the built-in lens and finding rules",
@@ -99,6 +100,7 @@ export function createProgram(io: {
           maxTurns: string;
           wallClockMinutes: string;
           contract?: string;
+          model?: string;
         },
       ) => {
         let runDirectory: string | undefined;
@@ -153,7 +155,9 @@ export function createProgram(io: {
             },
             {
               github: createGitHubClient({ appId: config.appId, privateKeyPem, fetch }),
-              harness: createClaudeCodeHarness(),
+              harness: createClaudeCodeHarness(
+                options.model === undefined ? {} : { model: options.model },
+              ),
               createWorktree,
               readRepositoryRules,
               log,
@@ -182,11 +186,12 @@ export function createProgram(io: {
     .command("runner")
     .description("review armed pull requests claimed from the control plane")
     .option("--once", "claim at most one job, then exit", false)
+    .option("--model <name>", "model passed to the claude CLI (else its default)")
     .option(
       "--contract <path>",
       "review contract that replaces the built-in lens and finding rules",
     )
-    .action(async (options: { once: boolean; contract?: string }) => {
+    .action(async (options: { once: boolean; contract?: string; model?: string }) => {
       try {
         const config = await loadRunnerConfig({
           env: process.env,
@@ -217,7 +222,9 @@ export function createProgram(io: {
                 token: config.token,
                 fetch,
               }),
-              harness: createClaudeCodeHarness(),
+              harness: createClaudeCodeHarness(
+                options.model === undefined ? {} : { model: options.model },
+              ),
               createWorktree,
               readRepositoryRules,
               createRunDirectory: (reference) =>
