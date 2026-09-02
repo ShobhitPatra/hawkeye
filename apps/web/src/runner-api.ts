@@ -313,29 +313,16 @@ export async function recordResult(
     .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
     .where(eq(job.id, completed.jobId));
   if (!target) throw new Error(`run ${runId} has no armed pull request`);
-  const [newerDone] = await deps.db
-    .select({ id: job.id })
-    .from(job)
-    .where(
-      and(
-        sql`${job.armedPrId} in (select id from ${armedPr} where owner = ${target.armedPr.owner} and repo = ${target.armedPr.repo} and number = ${target.armedPr.number})`,
-        eq(job.state, "done"),
-        sql`(${job.createdAt}, ${job.id}) > (select created_at, id from ${job} own where own.id = ${completed.jobId})`,
-      ),
-    )
-    .limit(1);
-  if (newerDone)
-    return Response.json(
-      { ok: true, posted: "superseded", findings: "superseded" },
-      { status: 200 },
-    );
   const posted = await postReviewForRun(deps, {
     runId,
+    jobId: completed.jobId,
     armedPr: target.armedPr,
     headSha: target.headSha,
     result,
     commentable: report.commentable ?? {},
   });
+  if (posted === "superseded")
+    return Response.json({ ok: true, posted, findings: "superseded" }, { status: 200 });
   const [recordedBefore] = await deps.db
     .select({ id: reviewPosted.id })
     .from(reviewPosted)

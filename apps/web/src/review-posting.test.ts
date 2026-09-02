@@ -59,6 +59,7 @@ function createGitHub(): GitHubClient {
 let db: Db;
 let github: GitHubClient;
 let runId: string;
+let jobId: string;
 let runnerId: string;
 
 beforeEach(async () => {
@@ -72,6 +73,7 @@ beforeEach(async () => {
   });
   const { runner } = await createRunnerToken(db, { userId: "user-1", name: "laptop" });
   runnerId = runner.id;
+  jobId = queued.id;
   runId = (await createRun(db, { jobId: queued.id, runnerId: runner.id })).id;
   github = createGitHub();
 });
@@ -85,6 +87,7 @@ async function seedLivingReview(previousResult: ReviewResult) {
       baseSha: "b".repeat(40),
       notBefore: new Date(),
       state: "done",
+      createdAt: new Date("2026-01-01T00:00:00Z"),
     })
     .returning({ id: schema.job.id });
   const [previousRun] = await db
@@ -111,7 +114,7 @@ async function seedLivingReview(previousResult: ReviewResult) {
 }
 
 const post = (commentable: Record<string, number[]> = { "a.txt": [1, 2] }) =>
-  postReviewForRun({ db, github }, { runId, armedPr, headSha, result, commentable });
+  postReviewForRun({ db, github }, { runId, jobId, armedPr, headSha, result, commentable });
 
 describe("postReviewForRun", () => {
   it("renders, posts as the installation and records the review", async () => {
@@ -236,17 +239,19 @@ describe("postReviewForRun", () => {
     });
   });
 
-  it("reaps a stale in-flight reservation and reviews the head", async () => {
-    await db.insert(schema.reviewPosted).values({
-      runId,
+  it("returns superseded when a newer round of the pull request is already done", async () => {
+    await db.insert(schema.job).values({
       armedPrId: armedPr.id,
-      headSha,
-      githubReviewId: null,
-      postedAt: new Date(Date.now() - 11 * 60 * 1000),
+      headSha: "d".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: new Date(),
+      state: "done",
     });
 
-    await expect(post()).resolves.toBe("posted");
-    expect(github.postReview).toHaveBeenCalledTimes(1);
+    await expect(post()).resolves.toBe("superseded");
+    expect(github.installationTokenById).not.toHaveBeenCalled();
+    expect(github.postReview).not.toHaveBeenCalled();
+    expect(await db.select().from(schema.reviewPosted)).toHaveLength(0);
   });
 
   it("re-patches the living body without inline comments when the supplemental hits a 422", async () => {
@@ -278,7 +283,7 @@ describe("postReviewForRun", () => {
     expect(rows.find((row) => row.headSha === headSha)).toBeUndefined();
   });
 
-  it("keeps the reservation when the supplemental posted but the living patch failed", async () => {
+  it("records the supplemental when it posted but the living patch failed", async () => {
     github.updateReview = vi.fn(async () => {
       throw new GitHubRequestError(500, "GitHub PUT failed: 500");
     });
@@ -287,7 +292,7 @@ describe("postReviewForRun", () => {
     await expect(post()).resolves.toBe("failed");
     expect(github.postReview).toHaveBeenCalledTimes(1);
     const rows = await db.select().from(schema.reviewPosted);
-    expect(rows.find((row) => row.headSha === headSha)).toMatchObject({ githubReviewId: null });
+    expect(rows.find((row) => row.headSha === headSha)).toMatchObject({ githubReviewId: "9" });
   });
 
   it("shares one living review across users arming the same pull request", async () => {
@@ -309,6 +314,7 @@ describe("postReviewForRun", () => {
       { db, github },
       {
         runId,
+        jobId,
         armedPr: otherArm!,
         headSha,
         result,
@@ -352,7 +358,7 @@ describe("postReviewForRun", () => {
     await expect(
       postReviewForRun(
         { db, github, log },
-        { runId, armedPr, headSha, result, commentable: { "a.txt": [2] } },
+        { runId, jobId, armedPr, headSha, result, commentable: { "a.txt": [2] } },
       ),
     ).resolves.toBe("posted");
     const calls = (github.postReview as ReturnType<typeof vi.fn>).mock.calls;

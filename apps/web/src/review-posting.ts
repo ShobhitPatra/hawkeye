@@ -10,21 +10,21 @@ import {
   renderReview,
   type ReviewResult,
 } from "@hawkeye/core";
-import { and, asc, desc, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, or, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { armedPr as armedPrTable, job, reviewPosted, run } from "./db/schema";
+import { supersededBy } from "./findings";
 
 export type ReviewPostingDeps = { db: Db; github: GitHubClient; log?: (line: string) => void };
 export type ReviewPostingInput = {
   runId: string;
+  jobId: string;
   armedPr: { id: string; installationId: string; owner: string; repo: string; number: number };
   headSha: string;
   result: ReviewResult;
   commentable: Record<string, number[]>;
 };
-export type ReviewPostingOutcome = "posted" | "already-posted" | "failed";
-
-const STALE_RESERVATION_MS = 10 * 60 * 1000;
+export type ReviewPostingOutcome = "posted" | "already-posted" | "superseded" | "failed";
 
 function toCommentableMap(commentable: Record<string, number[]>): Map<string, Set<number>> {
   return new Map(Object.entries(commentable).map(([path, lines]) => [path, new Set(lines)]));
@@ -102,7 +102,7 @@ async function roundsFor(
       round: index + 1,
       headSha: row.headSha,
       verdict: row.result.verdict,
-      startedAt: row.startedAt.toISOString(),
+      startedAt: `${row.startedAt.toISOString().slice(0, 16).replace("T", " ")} UTC`,
     };
   });
 }
@@ -111,127 +111,107 @@ export async function postReviewForRun(
   deps: ReviewPostingDeps,
   input: ReviewPostingInput,
 ): Promise<ReviewPostingOutcome> {
-  const { db, github } = deps;
+  const { github } = deps;
   const log = deps.log ?? (() => {});
   const { armedPr, headSha } = input;
-  const reservation = await db.transaction(async (tx) => {
+  return deps.db.transaction(async (tx) => {
     await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtextextended(${`${armedPr.owner}/${armedPr.repo}#${armedPr.number}@${headSha}`}, 0))`,
+      sql`select pg_advisory_xact_lock(hashtextextended(${`${armedPr.owner}/${armedPr.repo}#${armedPr.number}`}, 0))`,
     );
-    await tx
-      .delete(reviewPosted)
-      .where(
-        and(
-          sql`${reviewPosted.armedPrId} in (select id from ${armedPrTable} where owner = ${armedPr.owner} and repo = ${armedPr.repo} and number = ${armedPr.number})`,
-          eq(reviewPosted.headSha, headSha),
-          isNull(reviewPosted.githubReviewId),
-          lt(reviewPosted.postedAt, new Date(Date.now() - STALE_RESERVATION_MS)),
-        ),
-      );
     const [postedForHead] = await tx
       .select({ id: reviewPosted.id })
       .from(reviewPosted)
       .innerJoin(armedPrTable, eq(armedPrTable.id, reviewPosted.armedPrId))
-      .where(
-        and(
-          eq(armedPrTable.owner, armedPr.owner),
-          eq(armedPrTable.repo, armedPr.repo),
-          eq(armedPrTable.number, armedPr.number),
-          eq(reviewPosted.headSha, headSha),
-        ),
-      );
-    if (postedForHead) return undefined;
-    const [inserted] = await tx
+      .where(and(samePullRequest(armedPr), eq(reviewPosted.headSha, headSha)))
+      .limit(1);
+    if (postedForHead) return "already-posted";
+    if (await supersededBy(tx, input.jobId)) return "superseded";
+    const [reservation] = await tx
       .insert(reviewPosted)
       .values({ runId: input.runId, armedPrId: armedPr.id, headSha, githubReviewId: null })
-      .onConflictDoNothing({ target: [reviewPosted.armedPrId, reviewPosted.headSha] })
       .returning({ id: reviewPosted.id });
-    return inserted;
-  });
-  if (!reservation) return "already-posted";
+    if (!reservation) throw new Error("the review reservation was not inserted");
+    const record = (githubReviewId: string) =>
+      tx.update(reviewPosted).set({ githubReviewId }).where(eq(reviewPosted.id, reservation.id));
 
-  let githubWrote = false;
-  try {
-    const token = await github.installationTokenById(armedPr.installationId);
-    const reference = { owner: armedPr.owner, repo: armedPr.repo, number: armedPr.number };
-    const living = await livingReviewFor(db, armedPr);
+    let githubWrote = false;
+    try {
+      const token = await github.installationTokenById(armedPr.installationId);
+      const reference = { owner: armedPr.owner, repo: armedPr.repo, number: armedPr.number };
+      const living = await livingReviewFor(tx, armedPr);
 
-    if (!living) {
-      const render = (commentable: Map<string, Set<number>>) =>
-        renderReview({
+      if (!living) {
+        const render = (commentable: Map<string, Set<number>>) =>
+          renderReview({
+            result: input.result,
+            headSha,
+            commentable,
+            repositoryUrl: HAWKEYE_REPOSITORY_URL,
+          });
+        const { posted } = await postRenderedReview({
+          github,
+          reference,
+          token,
+          review: render(toCommentableMap(input.commentable)),
+          renderBodyOnly: () => render(new Map()),
+          log,
+        });
+        githubWrote = true;
+        await record(posted.id);
+        return "posted";
+      }
+
+      const { previousIds, priorClaims } = await previousRoundFindings(tx, armedPr);
+      const rounds = await roundsFor(tx, armedPr, input.runId);
+      const render = (map: Map<string, Set<number>>) =>
+        renderLivingReview({
           result: input.result,
           headSha,
-          commentable,
+          commentable: map,
           repositoryUrl: HAWKEYE_REPOSITORY_URL,
+          previousIds,
+          priorClaims,
+          rounds,
         });
-      const { posted } = await postRenderedReview({
-        github,
-        reference,
-        token,
-        review: render(toCommentableMap(input.commentable)),
-        renderBodyOnly: () => render(new Map()),
-        log,
-      });
-      githubWrote = true;
-      await db
-        .update(reviewPosted)
-        .set({ githubReviewId: posted.id })
-        .where(eq(reviewPosted.id, reservation.id));
-      return "posted";
-    }
-
-    const { previousIds, priorClaims } = await previousRoundFindings(db, armedPr);
-    const rounds = await roundsFor(db, armedPr, input.runId);
-    const render = (map: Map<string, Set<number>>) =>
-      renderLivingReview({
-        result: input.result,
-        headSha,
-        commentable: map,
-        repositoryUrl: HAWKEYE_REPOSITORY_URL,
-        previousIds,
-        priorClaims,
-        rounds,
-      });
-    const inline = render(toCommentableMap(input.commentable));
-    let roundReviewId = living.githubReviewId;
-    let finalBody = inline.body;
-    if (inline.comments.length > 0) {
-      try {
-        const supplemental = await github.postReview(
-          reference,
-          {
-            event: "COMMENT",
-            commit_id: headSha,
-            body: encodeMarker(headSha),
-            comments: inline.comments,
-          },
-          token,
-        );
-        roundReviewId = supplemental.id;
-        githubWrote = true;
-      } catch (error) {
-        if (!(error instanceof GitHubRequestError && error.status === 422)) throw error;
-        log(
-          `supplemental review rejected (${error.message}); keeping every finding in the living body`,
-        );
-        finalBody = render(new Map()).body;
+      const inline = render(toCommentableMap(input.commentable));
+      let finalBody = inline.body;
+      let supplementalPosted = false;
+      if (inline.comments.length > 0) {
+        try {
+          const supplemental = await github.postReview(
+            reference,
+            {
+              event: "COMMENT",
+              commit_id: headSha,
+              body: encodeMarker(headSha),
+              comments: inline.comments,
+            },
+            token,
+          );
+          githubWrote = true;
+          await record(supplemental.id);
+          supplementalPosted = true;
+        } catch (error) {
+          if (!(error instanceof GitHubRequestError && error.status === 422)) throw error;
+          log(
+            `supplemental review rejected (${error.message}); keeping every finding in the living body`,
+          );
+          finalBody = render(new Map()).body;
+        }
       }
+      await github.updateReview(reference, living.githubReviewId, finalBody, token);
+      githubWrote = true;
+      if (!supplementalPosted) await record(living.githubReviewId);
+      return "posted";
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      log(`review not posted for run ${input.runId}: ${message}`);
+      if (!githubWrote) await tx.delete(reviewPosted).where(eq(reviewPosted.id, reservation.id));
+      await tx
+        .update(run)
+        .set({ error: `post: ${message}` })
+        .where(eq(run.id, input.runId));
+      return "failed";
     }
-    await github.updateReview(reference, living.githubReviewId, finalBody, token);
-    githubWrote = true;
-    await db
-      .update(reviewPosted)
-      .set({ githubReviewId: roundReviewId })
-      .where(eq(reviewPosted.id, reservation.id));
-    return "posted";
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    log(`review not posted for run ${input.runId}: ${message}`);
-    if (!githubWrote) await db.delete(reviewPosted).where(eq(reviewPosted.id, reservation.id));
-    await db
-      .update(run)
-      .set({ error: `post: ${message}` })
-      .where(eq(run.id, input.runId));
-    return "failed";
-  }
+  });
 }
