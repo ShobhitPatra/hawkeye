@@ -23,7 +23,7 @@ const exists = (path: string) =>
   );
 
 export function createClaudeCodeHarness(
-  options: { executable?: string; spawn?: SpawnLike } = {},
+  options: { executable?: string; spawn?: SpawnLike; model?: string } = {},
 ): HarnessSpec {
   const executable = options.executable ?? "claude";
   const spawn = options.spawn ?? nodeSpawn;
@@ -46,6 +46,7 @@ export function createClaudeCodeHarness(
         "user",
         "--settings",
         input.settingsPath,
+        ...(options.model === undefined ? [] : ["--model", options.model]),
       ];
       const child = spawn(executable, args, {
         cwd: input.cwd,
