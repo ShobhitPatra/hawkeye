@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { armedPullRequestKey } from "@/arming";
 import { formatUpdated } from "@/format-updated";
 import type { ListedPullRequest } from "@/pull-requests";
@@ -26,12 +27,27 @@ export function PullRequestTable({
       <tbody>
         {pullRequests.map((pullRequest) => {
           const isArmed = armed.has(armedPullRequestKey(pullRequest));
+          const pageHref = `/prs/${pullRequest.owner}/${pullRequest.repo}/${pullRequest.number}`;
           return (
             <tr key={pullRequest.htmlUrl}>
               <td>
-                {pullRequest.owner}/{pullRequest.repo}
+                {isArmed ? (
+                  <Link href={pageHref}>
+                    {pullRequest.owner}/{pullRequest.repo}
+                  </Link>
+                ) : (
+                  <>
+                    {pullRequest.owner}/{pullRequest.repo}
+                  </>
+                )}
               </td>
-              <td>#{pullRequest.number}</td>
+              <td>
+                {isArmed ? (
+                  <Link href={pageHref}>#{pullRequest.number}</Link>
+                ) : (
+                  <>#{pullRequest.number}</>
+                )}
+              </td>
               <td>
                 <a href={pullRequest.htmlUrl}>{pullRequest.title}</a>
                 {isArmed && <span> armed</span>}

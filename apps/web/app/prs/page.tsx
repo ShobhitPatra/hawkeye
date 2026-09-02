@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { listArmedPullRequests } from "@/arming";
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
 import { listUserOpenPullRequests } from "@/pull-requests";
+import { runnerStatus } from "@/runner-status";
 import { requireSession } from "@/session";
 import { PullRequestTable } from "./pull-request-table";
 
@@ -19,17 +21,27 @@ export default async function PullRequestsPage() {
   }
 
   const db = getDb();
-  const [{ pullRequests, failures }, armed] = await Promise.all([
+  const [{ pullRequests, failures }, armed, runner] = await Promise.all([
     listUserOpenPullRequests(
       { db, github: createGitHubAppClient({ fetch }) },
       { userId: session.user.id, login },
     ),
     listArmedPullRequests(db, session.user.id),
+    runnerStatus(db, session.user.id),
   ]);
 
   return (
     <main>
       <h1>Pull requests</h1>
+      <p>
+        {runner.online ? "Runner online" : `Runner offline · ${runner.waitingJobs} waiting`}
+        {!runner.online && (
+          <>
+            {" "}
+            <Link href="/connect">Connect a runner</Link>
+          </>
+        )}
+      </p>
       {pullRequests.length === 0 ? (
         <p>No open pull requests</p>
       ) : (
