@@ -728,7 +728,7 @@ describe("recordResult", () => {
       transaction: {
         value: (...args: Parameters<typeof db.transaction>) => {
           transactions += 1;
-          if (transactions > 1) throw new Error("db gone");
+          if (transactions > 2) throw new Error("db gone");
           return db.transaction(...args);
         },
       },

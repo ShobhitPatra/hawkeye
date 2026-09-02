@@ -2,6 +2,7 @@ import {
   encodeMarker,
   findingId,
   type GitHubClient,
+  GitHubRequestError,
   HAWKEYE_REPOSITORY_URL,
   type LivingRoundSummary,
   postRenderedReview,
@@ -9,7 +10,7 @@ import {
   renderReview,
   type ReviewResult,
 } from "@hawkeye/core";
-import { and, asc, desc, eq, isNotNull, ne } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { armedPr as armedPrTable, job, reviewPosted, run } from "./db/schema";
 
@@ -29,6 +30,8 @@ export type ReviewPostingInput = {
   commentable: Record<string, number[]>;
 };
 export type ReviewPostingOutcome = "posted" | "already-posted" | "failed";
+
+const STALE_RESERVATION_MS = 10 * 60 * 1000;
 
 function toCommentableMap(commentable: Record<string, number[]>): Map<string, Set<number>> {
   return new Map(Object.entries(commentable).map(([path, lines]) => [path, new Set(lines)]));
@@ -112,26 +115,40 @@ export async function postReviewForRun(
   const { db, github } = deps;
   const log = deps.log ?? (() => {});
   const { armedPr, headSha } = input;
-  const [postedByOtherArm] = await db
-    .select({ id: reviewPosted.id })
-    .from(reviewPosted)
-    .innerJoin(armedPrTable, eq(armedPrTable.id, reviewPosted.armedPrId))
-    .where(
-      and(
-        eq(armedPrTable.owner, armedPr.owner),
-        eq(armedPrTable.repo, armedPr.repo),
-        eq(armedPrTable.number, armedPr.number),
-        ne(armedPrTable.id, armedPr.id),
-        eq(reviewPosted.headSha, headSha),
-      ),
+  const reservation = await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`${armedPr.owner}/${armedPr.repo}#${armedPr.number}@${headSha}`}, 0))`,
     );
-  if (postedByOtherArm) return "already-posted";
-
-  const [reservation] = await db
-    .insert(reviewPosted)
-    .values({ runId: input.runId, armedPrId: armedPr.id, headSha, githubReviewId: null })
-    .onConflictDoNothing({ target: [reviewPosted.armedPrId, reviewPosted.headSha] })
-    .returning({ id: reviewPosted.id });
+    await tx
+      .delete(reviewPosted)
+      .where(
+        and(
+          eq(reviewPosted.armedPrId, armedPr.id),
+          eq(reviewPosted.headSha, headSha),
+          isNull(reviewPosted.githubReviewId),
+          lt(reviewPosted.postedAt, new Date(Date.now() - STALE_RESERVATION_MS)),
+        ),
+      );
+    const [postedForHead] = await tx
+      .select({ id: reviewPosted.id })
+      .from(reviewPosted)
+      .innerJoin(armedPrTable, eq(armedPrTable.id, reviewPosted.armedPrId))
+      .where(
+        and(
+          eq(armedPrTable.owner, armedPr.owner),
+          eq(armedPrTable.repo, armedPr.repo),
+          eq(armedPrTable.number, armedPr.number),
+          eq(reviewPosted.headSha, headSha),
+        ),
+      );
+    if (postedForHead) return undefined;
+    const [inserted] = await tx
+      .insert(reviewPosted)
+      .values({ runId: input.runId, armedPrId: armedPr.id, headSha, githubReviewId: null })
+      .onConflictDoNothing({ target: [reviewPosted.armedPrId, reviewPosted.headSha] })
+      .returning({ id: reviewPosted.id });
+    return inserted;
+  });
   if (!reservation) return "already-posted";
 
   try {
@@ -173,17 +190,34 @@ export async function postReviewForRun(
       rounds: await roundsFor(db, armedPr),
     });
     await github.updateReview(reference, living.githubReviewId, body, token);
+    let roundReviewId = living.githubReviewId;
     if (comments.length > 0) {
-      const supplemental = await github.postReview(
-        reference,
-        { event: "COMMENT", commit_id: headSha, body: encodeMarker(headSha), comments },
-        token,
-      );
-      await db
-        .update(reviewPosted)
-        .set({ githubReviewId: supplemental.id })
-        .where(eq(reviewPosted.id, reservation.id));
+      try {
+        const supplemental = await github.postReview(
+          reference,
+          { event: "COMMENT", commit_id: headSha, body: encodeMarker(headSha), comments },
+          token,
+        );
+        roundReviewId = supplemental.id;
+      } catch (error) {
+        if (!(error instanceof GitHubRequestError && error.status === 422)) throw error;
+        log("inline anchors rejected (422); keeping every finding in the living body");
+        const bodyOnly = renderLivingReview({
+          result: input.result,
+          headSha,
+          commentable: new Map(),
+          repositoryUrl: HAWKEYE_REPOSITORY_URL,
+          previousIds,
+          priorClaims,
+          rounds: await roundsFor(db, armedPr),
+        });
+        await github.updateReview(reference, living.githubReviewId, bodyOnly.body, token);
+      }
     }
+    await db
+      .update(reviewPosted)
+      .set({ githubReviewId: roundReviewId })
+      .where(eq(reviewPosted.id, reservation.id));
     return "posted";
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

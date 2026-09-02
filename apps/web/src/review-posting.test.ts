@@ -232,8 +232,37 @@ describe("postReviewForRun", () => {
     const rows = await db.select().from(schema.reviewPosted);
     expect(rows.find((row) => row.headSha === headSha)).toMatchObject({
       runId,
-      githubReviewId: null,
+      githubReviewId: "5",
     });
+  });
+
+  it("reaps a stale in-flight reservation and reviews the head", async () => {
+    await db.insert(schema.reviewPosted).values({
+      runId,
+      armedPrId: armedPr.id,
+      headSha,
+      githubReviewId: null,
+      postedAt: new Date(Date.now() - 11 * 60 * 1000),
+    });
+
+    await expect(post()).resolves.toBe("posted");
+    expect(github.postReview).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-patches the living body without inline comments when the supplemental hits a 422", async () => {
+    github.updateReview = vi.fn(async () => {});
+    github.postReview = vi.fn(async () => {
+      throw new GitHubRequestError(422, "GitHub POST failed: 422");
+    });
+    await seedLivingReview({ ...result, findings: [] });
+
+    await expect(post()).resolves.toBe("posted");
+    expect(github.updateReview).toHaveBeenCalledTimes(2);
+    const secondBody = (github.updateReview as ReturnType<typeof vi.fn>).mock
+      .calls[1]![2] as string;
+    expect(secondBody).not.toContain("(inline)");
+    const rows = await db.select().from(schema.reviewPosted);
+    expect(rows.find((row) => row.headSha === headSha)).toMatchObject({ githubReviewId: "5" });
   });
 
   it("deletes the reservation and records the failure when the patch fails", async () => {
