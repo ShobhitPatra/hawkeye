@@ -312,7 +312,7 @@ export async function recordResult(
     .from(job)
     .where(
       and(
-        eq(job.armedPrId, target.armedPr.id),
+        sql`${job.armedPrId} in (select id from ${armedPr} where owner = ${target.armedPr.owner} and repo = ${target.armedPr.repo} and number = ${target.armedPr.number})`,
         eq(job.state, "done"),
         sql`(${job.createdAt}, ${job.id}) > (select created_at, id from ${job} own where own.id = ${completed.jobId})`,
       ),

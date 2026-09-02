@@ -284,7 +284,7 @@ describe("postReviewForRun", () => {
       { db, github },
       {
         runId,
-        armedPr: { ...otherArm!, userId: "user-2" },
+        armedPr: otherArm!,
         headSha,
         result,
         commentable: {},

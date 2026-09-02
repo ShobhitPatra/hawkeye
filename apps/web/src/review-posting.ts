@@ -2,7 +2,6 @@ import {
   encodeMarker,
   findingId,
   type GitHubClient,
-  GitHubRequestError,
   HAWKEYE_REPOSITORY_URL,
   type LivingRoundSummary,
   postRenderedReview,
@@ -17,14 +16,7 @@ import { armedPr as armedPrTable, job, reviewPosted, run } from "./db/schema";
 export type ReviewPostingDeps = { db: Db; github: GitHubClient; log?: (line: string) => void };
 export type ReviewPostingInput = {
   runId: string;
-  armedPr: {
-    id: string;
-    userId: string;
-    installationId: string;
-    owner: string;
-    repo: string;
-    number: number;
-  };
+  armedPr: { id: string; installationId: string; owner: string; repo: string; number: number };
   headSha: string;
   result: ReviewResult;
   commentable: Record<string, number[]>;
@@ -202,8 +194,10 @@ export async function postReviewForRun(
         );
         roundReviewId = supplemental.id;
       } catch (error) {
-        if (!(error instanceof GitHubRequestError && error.status === 422)) throw error;
-        log("inline anchors rejected (422); keeping every finding in the living body");
+        const message = error instanceof Error ? error.message : String(error);
+        log(
+          `supplemental review not posted (${message}); keeping every finding in the living body`,
+        );
         const bodyOnly = renderLivingReview({
           result: input.result,
           headSha,

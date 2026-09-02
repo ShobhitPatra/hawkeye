@@ -31,8 +31,11 @@ function priorFindingLines(
 ): string[] {
   if (result.priorFindings === undefined || result.priorFindings.length === 0) return [];
   const lines = ["", "### Prior findings", ""];
+  const currentClaims = new Map(
+    result.findings.map((finding) => [findingId(finding.path, finding.claim), finding.claim] as const),
+  );
   for (const prior of result.priorFindings) {
-    const claim = priorClaims?.[prior.id];
+    const claim = priorClaims?.[prior.id] ?? currentClaims.get(prior.id);
     lines.push(
       `- [${prior.id}] ${prior.status}${claim === undefined ? "" : ` · ${oneLine(claim)}`} · ${oneLine(prior.note)}`,
     );

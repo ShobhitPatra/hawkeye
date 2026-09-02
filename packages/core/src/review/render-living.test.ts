@@ -75,7 +75,7 @@ describe("renderLivingReview", () => {
     const r = renderLivingReview(input());
     const openId = findingId("src/a.ts", "Old bug");
     const addressedId = findingId("src/b.ts", "Fixed bug");
-    expect(r.body).toContain(`- [${openId}] open · still unaddressed`);
+    expect(r.body).toContain(`- [${openId}] open · Old bug · still unaddressed`);
     expect(r.body).toContain(`- [${addressedId}] addressed · Fixed bug · fixed in c2`);
   });
   it("omits the prior findings section when the result reports none", () => {
