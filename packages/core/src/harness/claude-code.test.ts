@@ -114,4 +114,17 @@ describe("claude code harness", () => {
     expect(command).toContain(s.resultPath);
     expect(command).toContain("exit 2");
   });
+
+  it("passes the model through to the claude CLI", async () => {
+    const s = await scratch();
+    const exe = await fakeClaude(
+      `printf '%s\\n' "$@" > "$(dirname "$0")/args"; echo '{"type":"result"}'; exit 0`,
+    );
+    await createClaudeCodeHarness({ executable: exe, model: "opus" }).run(input(s));
+    const args = (await readFile(join(exe, "..", "args"), "utf8")).split("\n");
+    const at = args.indexOf("--model");
+    expect(at).toBeGreaterThan(-1);
+    expect(args[at + 1]).toBe("opus");
+    expect(() => createClaudeCodeHarness({ model: " " })).toThrow("model must not be empty");
+  });
 });
