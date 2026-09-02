@@ -864,7 +864,11 @@ describe("recordResult", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, posted: "posted", findings: "superseded" });
+    expect(await response.json()).toEqual({
+      ok: true,
+      posted: "superseded",
+      findings: "superseded",
+    });
     expect(await db.select().from(schema.finding)).toHaveLength(0);
   });
 

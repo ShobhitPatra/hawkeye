@@ -265,6 +265,41 @@ describe("postReviewForRun", () => {
     expect(rows.find((row) => row.headSha === headSha)).toMatchObject({ githubReviewId: "5" });
   });
 
+  it("shares one living review across users arming the same pull request", async () => {
+    github.updateReview = vi.fn(async () => {});
+    await seedLivingReview(result);
+    await db.insert(schema.user).values({ id: "user-2", name: "other", email: "x@example.com" });
+    const [otherArm] = await db
+      .insert(schema.armedPr)
+      .values({
+        userId: "user-2",
+        installationId: armedPr.installationId,
+        owner: armedPr.owner,
+        repo: armedPr.repo,
+        number: armedPr.number,
+      })
+      .returning();
+
+    const outcome = await postReviewForRun(
+      { db, github },
+      {
+        runId,
+        armedPr: { ...otherArm!, userId: "user-2" },
+        headSha,
+        result,
+        commentable: {},
+      },
+    );
+    expect(outcome).toBe("posted");
+    expect(github.updateReview).toHaveBeenCalledWith(
+      expect.anything(),
+      "5",
+      expect.any(String),
+      expect.anything(),
+    );
+    expect(github.postReview).not.toHaveBeenCalled();
+  });
+
   it("deletes the reservation and records the failure when the patch fails", async () => {
     github.updateReview = vi.fn(async () => {
       throw new GitHubRequestError(500, "GitHub PUT failed: 500");

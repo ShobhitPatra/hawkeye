@@ -307,6 +307,22 @@ export async function recordResult(
     .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
     .where(eq(job.id, completed.jobId));
   if (!target) throw new Error(`run ${runId} has no armed pull request`);
+  const [newerDone] = await deps.db
+    .select({ id: job.id })
+    .from(job)
+    .where(
+      and(
+        eq(job.armedPrId, target.armedPr.id),
+        eq(job.state, "done"),
+        sql`(${job.createdAt}, ${job.id}) > (select created_at, id from ${job} own where own.id = ${completed.jobId})`,
+      ),
+    )
+    .limit(1);
+  if (newerDone)
+    return Response.json(
+      { ok: true, posted: "superseded", findings: "superseded" },
+      { status: 200 },
+    );
   const posted = await postReviewForRun(deps, {
     runId,
     armedPr: target.armedPr,

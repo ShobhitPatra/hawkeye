@@ -37,9 +37,8 @@ function toCommentableMap(commentable: Record<string, number[]>): Map<string, Se
   return new Map(Object.entries(commentable).map(([path, lines]) => [path, new Set(lines)]));
 }
 
-function userPullRequest(armedPr: ReviewPostingInput["armedPr"]) {
+function samePullRequest(armedPr: ReviewPostingInput["armedPr"]) {
   return and(
-    eq(armedPrTable.userId, armedPr.userId),
     eq(armedPrTable.owner, armedPr.owner),
     eq(armedPrTable.repo, armedPr.repo),
     eq(armedPrTable.number, armedPr.number),
@@ -54,7 +53,7 @@ async function livingReviewFor(
     .select({ githubReviewId: reviewPosted.githubReviewId })
     .from(reviewPosted)
     .innerJoin(armedPrTable, eq(armedPrTable.id, reviewPosted.armedPrId))
-    .where(and(userPullRequest(armedPr), isNotNull(reviewPosted.githubReviewId)))
+    .where(and(samePullRequest(armedPr), isNotNull(reviewPosted.githubReviewId)))
     .orderBy(asc(reviewPosted.postedAt))
     .limit(1);
   if (!row?.githubReviewId) return undefined;
@@ -70,7 +69,7 @@ async function previousRoundFindings(
     .from(reviewPosted)
     .innerJoin(run, eq(run.id, reviewPosted.runId))
     .innerJoin(armedPrTable, eq(armedPrTable.id, reviewPosted.armedPrId))
-    .where(and(userPullRequest(armedPr), isNotNull(reviewPosted.githubReviewId)))
+    .where(and(samePullRequest(armedPr), isNotNull(reviewPosted.githubReviewId)))
     .orderBy(desc(reviewPosted.postedAt))
     .limit(1);
   if (!latest?.result) throw new Error("the living review has no run result behind it");
@@ -95,7 +94,7 @@ async function roundsFor(
     .innerJoin(job, eq(job.id, run.jobId))
     .innerJoin(reviewPosted, eq(reviewPosted.runId, run.id))
     .innerJoin(armedPrTable, eq(armedPrTable.id, job.armedPrId))
-    .where(and(userPullRequest(armedPr), eq(run.status, "ok")))
+    .where(and(samePullRequest(armedPr), eq(run.status, "ok")))
     .orderBy(asc(run.startedAt));
   return rows.map((row, index) => {
     if (!row.result) throw new Error(`round ${index + 1} has an ok run without a result`);
@@ -123,7 +122,7 @@ export async function postReviewForRun(
       .delete(reviewPosted)
       .where(
         and(
-          eq(reviewPosted.armedPrId, armedPr.id),
+          sql`${reviewPosted.armedPrId} in (select id from ${armedPrTable} where owner = ${armedPr.owner} and repo = ${armedPr.repo} and number = ${armedPr.number})`,
           eq(reviewPosted.headSha, headSha),
           isNull(reviewPosted.githubReviewId),
           lt(reviewPosted.postedAt, new Date(Date.now() - STALE_RESERVATION_MS)),
@@ -151,6 +150,7 @@ export async function postReviewForRun(
   });
   if (!reservation) return "already-posted";
 
+  let githubWrote = false;
   try {
     const token = await github.installationTokenById(armedPr.installationId);
     const reference = { owner: armedPr.owner, repo: armedPr.repo, number: armedPr.number };
@@ -172,6 +172,7 @@ export async function postReviewForRun(
         renderBodyOnly: () => render(new Map()),
         log,
       });
+      githubWrote = true;
       await db
         .update(reviewPosted)
         .set({ githubReviewId: posted.id })
@@ -190,6 +191,7 @@ export async function postReviewForRun(
       rounds: await roundsFor(db, armedPr),
     });
     await github.updateReview(reference, living.githubReviewId, body, token);
+    githubWrote = true;
     let roundReviewId = living.githubReviewId;
     if (comments.length > 0) {
       try {
@@ -222,7 +224,7 @@ export async function postReviewForRun(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     log(`review not posted for run ${input.runId}: ${message}`);
-    await db.delete(reviewPosted).where(eq(reviewPosted.id, reservation.id));
+    if (!githubWrote) await db.delete(reviewPosted).where(eq(reviewPosted.id, reservation.id));
     await db
       .update(run)
       .set({ error: `post: ${message}` })
