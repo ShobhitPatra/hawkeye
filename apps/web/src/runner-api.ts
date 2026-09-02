@@ -9,7 +9,7 @@ import {
   type RunResultReport,
   type RunResultStatus,
 } from "@hawkeye/core";
-import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
 import {
   armedPr,
@@ -74,7 +74,13 @@ async function previousRoundFor(db: Db, armedPrId: string): Promise<ClaimedJob["
     .from(run)
     .innerJoin(job, eq(job.id, run.jobId))
     .innerJoin(reviewPosted, eq(reviewPosted.runId, run.id))
-    .where(and(eq(job.armedPrId, armedPrId), eq(run.status, "ok")))
+    .where(
+      and(
+        eq(job.armedPrId, armedPrId),
+        eq(run.status, "ok"),
+        isNotNull(reviewPosted.githubReviewId),
+      ),
+    )
     .orderBy(desc(run.startedAt))
     .limit(1);
   if (!latest?.result) return undefined;

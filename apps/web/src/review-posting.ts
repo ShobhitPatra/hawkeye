@@ -3,13 +3,13 @@ import {
   findingId,
   type GitHubClient,
   HAWKEYE_REPOSITORY_URL,
-  type LivingRoundSummary,
+  type RoundSummary,
   postRenderedReview,
   renderLivingReview,
   renderReview,
   type ReviewResult,
 } from "@hawkeye/core";
-import { and, asc, desc, eq, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { armedPr as armedPrTable, job, reviewPosted, run } from "./db/schema";
 
@@ -79,14 +79,21 @@ async function previousRoundFindings(
 async function roundsFor(
   db: Db,
   armedPr: ReviewPostingInput["armedPr"],
-): Promise<LivingRoundSummary[]> {
+  currentRunId: string,
+): Promise<RoundSummary[]> {
   const rows = await db
     .select({ headSha: job.headSha, startedAt: run.startedAt, result: run.result })
     .from(run)
     .innerJoin(job, eq(job.id, run.jobId))
     .innerJoin(reviewPosted, eq(reviewPosted.runId, run.id))
     .innerJoin(armedPrTable, eq(armedPrTable.id, job.armedPrId))
-    .where(and(samePullRequest(armedPr), eq(run.status, "ok")))
+    .where(
+      and(
+        samePullRequest(armedPr),
+        eq(run.status, "ok"),
+        or(isNotNull(reviewPosted.githubReviewId), eq(run.id, currentRunId)),
+      ),
+    )
     .orderBy(asc(run.startedAt));
   return rows.map((row, index) => {
     if (!row.result) throw new Error(`round ${index + 1} has an ok run without a result`);
@@ -180,7 +187,7 @@ export async function postReviewForRun(
       repositoryUrl: HAWKEYE_REPOSITORY_URL,
       previousIds,
       priorClaims,
-      rounds: await roundsFor(db, armedPr),
+      rounds: await roundsFor(db, armedPr, input.runId),
     });
     await github.updateReview(reference, living.githubReviewId, body, token);
     githubWrote = true;
@@ -205,7 +212,7 @@ export async function postReviewForRun(
           repositoryUrl: HAWKEYE_REPOSITORY_URL,
           previousIds,
           priorClaims,
-          rounds: await roundsFor(db, armedPr),
+          rounds: await roundsFor(db, armedPr, input.runId),
         });
         await github.updateReview(reference, living.githubReviewId, bodyOnly.body, token);
       }

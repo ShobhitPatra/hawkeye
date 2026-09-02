@@ -28,7 +28,6 @@ export type { RenderedReview, ReviewComment } from "./review/render.js";
 export { renderReview, type RenderInput } from "./review/render.js";
 export {
   renderLivingReview,
-  type LivingRoundSummary,
   type RenderLivingReviewInput,
   type RenderedLivingReview,
 } from "./review/render-living.js";

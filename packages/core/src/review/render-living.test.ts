@@ -18,8 +18,13 @@ const result = (): ReviewResult => ({
   ],
 });
 const rounds = [
-  { round: 1, headSha: "a".repeat(40), verdict: "changes_needed", startedAt: "2026-01-01" },
-  { round: 2, headSha: head, verdict: "ship", startedAt: "2026-01-02" },
+  {
+    round: 1,
+    headSha: "a".repeat(40),
+    verdict: "changes_needed" as const,
+    startedAt: "2026-01-01",
+  },
+  { round: 2, headSha: head, verdict: "ship" as const, startedAt: "2026-01-02" },
 ];
 const input = (previousIds = new Set([findingId("src/a.ts", "Old bug")])) => ({
   result: result(),
