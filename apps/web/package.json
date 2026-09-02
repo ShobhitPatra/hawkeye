@@ -9,7 +9,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "db:generate": "drizzle-kit generate",
-    "auth:generate": "auth generate --config src/auth.cli.ts --output src/db/auth-schema.ts -y",
+    "auth:generate": "auth generate --config src/auth.cli.ts --output src/db/auth-schema.ts -y && node scripts/auth-timestamptz.mjs",
     "db:migrate": "tsx --env-file-if-exists=.env src/db/migrate.ts"
   },
   "dependencies": {
