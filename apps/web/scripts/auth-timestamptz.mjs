@@ -8,6 +8,6 @@ const rewritten = source.replaceAll(
 );
 if (rewritten === source)
   throw new Error(`${path}: no bare timestamp() calls found; the generated shape changed`);
-if (/timestamp\("[^"]+"\)[,)]/.test(rewritten))
+if (/timestamp\("[^"]+"\)/.test(rewritten))
   throw new Error(`${path}: a timestamp() call was left without withTimezone`);
 writeFileSync(path, rewritten);
