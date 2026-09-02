@@ -66,6 +66,7 @@ describe("createGitHubClient", () => {
           user: { login: "alice" },
           head: { sha: "h", ref: "feat" },
           base: { sha: "b", ref: "main", repo: { clone_url: "https://github.com/o/r.git" } },
+          commits: 3,
         },
       }),
     });
@@ -85,7 +86,25 @@ describe("createGitHubClient", () => {
       baseSha: "b",
       baseRef: "main",
       cloneUrl: "https://github.com/o/r.git",
+      commits: 3,
     });
+  });
+  it("rejects a pull request payload without a commits count", async () => {
+    const { fetchImpl } = fakeFetch({
+      "GET /repos/o/r/pulls/5": () => ({
+        json: {
+          number: 5,
+          title: "T",
+          body: null,
+          draft: false,
+          user: { login: "alice" },
+          head: { sha: "h", ref: "feat" },
+          base: { sha: "b", ref: "main", repo: { clone_url: "https://github.com/o/r.git" } },
+        },
+      }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(client.pullRequest(ref, "t")).rejects.toThrow(/commits count/);
   });
   it("resolves the merge base of the base and head shas", async () => {
     const { fetchImpl, calls } = fakeFetch({

@@ -14,6 +14,7 @@ export type PullRequestDetails = {
   baseSha: string;
   baseRef: string;
   cloneUrl: string;
+  commits: number;
 };
 export type LinkedIssue = { number: number; title: string; body: string };
 
@@ -144,7 +145,10 @@ export async function fetchPullRequestDetails(
     user: { login: string };
     head: { sha: string; ref: string };
     base: { sha: string; ref: string; repo: { clone_url: string } };
+    commits: number;
   };
+  if (!Number.isInteger(pr.commits))
+    throw new Error(`GitHub GET ${pulls(reference)} returned no commits count`);
   return {
     number: pr.number,
     title: pr.title,
@@ -156,6 +160,7 @@ export async function fetchPullRequestDetails(
     baseSha: pr.base.sha,
     baseRef: pr.base.ref,
     cloneUrl: pr.base.repo.clone_url,
+    commits: pr.commits,
   };
 }
 

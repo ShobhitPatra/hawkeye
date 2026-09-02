@@ -40,6 +40,7 @@ function deps(
       baseSha: "b".repeat(40),
       baseRef: "main",
       cloneUrl: "https://github.com/o/r.git",
+      commits: 1,
     })),
     mergeBase: vi.fn(async () => "m".repeat(40)),
     linkedIssue: vi.fn(async () => ({ number: 2, title: "I", body: "ib" })),

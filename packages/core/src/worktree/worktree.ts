@@ -32,6 +32,7 @@ export type CreateWorktreeInput = {
   baseSha: string;
   directory: string;
   previousHeadSha?: string;
+  depth?: number;
 };
 
 const AUTHORIZATION_ENV = "HAWKEYE_GIT_AUTHORIZATION";
@@ -90,6 +91,8 @@ async function interdiffOf(
 }
 
 export async function createWorktree(input: CreateWorktreeInput): Promise<Worktree> {
+  if (input.depth !== undefined && (!Number.isInteger(input.depth) || input.depth < 1))
+    throw new Error(`depth must be a positive integer, got ${input.depth}`);
   const redact = (text: string) =>
     input.token === undefined
       ? text
@@ -124,7 +127,7 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
       "fetch",
       "--quiet",
       "--depth",
-      "1",
+      String(input.depth ?? 1),
       "origin",
       `pull/${input.pullRequestNumber}/head`,
     );

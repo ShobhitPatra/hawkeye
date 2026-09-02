@@ -1,3 +1,4 @@
+import type { PriorFinding } from "../contract/prompt.js";
 import type { ReviewResult } from "../contract/schema.js";
 
 export type ClaimedJob = {
@@ -18,6 +19,7 @@ export type ClaimedJob = {
     wallClockMinutes: number;
     promptOverride?: string;
   };
+  previousRound?: { headSha: string; findings: PriorFinding[] };
 };
 
 export const RUN_RESULT_STATUSES = [

@@ -77,6 +77,36 @@ describe("createWorktree", () => {
     expect(wt.diff).not.toContain("pnpm-lock.yaml");
     await wt.remove();
   });
+  it("fetches the branch history to the given depth", async () => {
+    const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
+    const wt = await createWorktree({
+      cloneUrl: origin,
+      pullRequestNumber: 1,
+      headSha,
+      baseSha,
+      directory,
+      depth: 2,
+    });
+    const log = (await git(wt.path, "log", "--format=%s")).stdout;
+    expect(log).toContain("head");
+    expect(log).toContain("previous head");
+    await wt.remove();
+  });
+  it("rejects a depth that is not a positive integer", async () => {
+    const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
+    for (const depth of [0, -1, 1.5]) {
+      await expect(
+        createWorktree({
+          cloneUrl: origin,
+          pullRequestNumber: 1,
+          headSha,
+          baseSha,
+          directory,
+          depth,
+        }),
+      ).rejects.toThrow(/depth must be a positive integer/);
+    }
+  });
   it("computes the interdiff from the previous head when one is given", async () => {
     const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
     const wt = await createWorktree({
