@@ -5,4 +5,5 @@ export default defineConfig({
   clean: true,
   target: "node22",
   banner: { js: "#!/usr/bin/env node" },
+  noExternal: [/@hawkeye\/core/],
 });
