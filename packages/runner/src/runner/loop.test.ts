@@ -130,6 +130,7 @@ async function deps(
           ref: "main",
           repo: { clone_url: "https://github.com/o/r.git" },
         },
+        commits: 1,
       })) as typeof fetch,
     log: (line) => logged.push(line),
     heartbeatIntervalMs: 10,
@@ -289,6 +290,40 @@ describe("runRunnerLoop", () => {
     const local = await promptOf(await deps(plane.baseUrl, { contractOverride: "LOCAL RULES" }));
     expect(local).toContain("LOCAL RULES");
     expect(local).not.toContain("JOB RULES");
+  });
+  it("feeds the claimed previous round into the review prompt", async () => {
+    const withPrevious: ClaimedJob = {
+      ...claimedJob,
+      previousRound: {
+        headSha: "e".repeat(40),
+        findings: [
+          {
+            id: "abc123def456",
+            severity: "should_fix",
+            claim: "Leaks a handle",
+            detail: "Close it before returning.",
+          },
+        ],
+      },
+    };
+    const plane = await fakeControlPlane(scripted([withPrevious]));
+    servers.push(plane.server);
+    const d = await deps(plane.baseUrl, {
+      createWorktree: (async (i: { directory: string; previousHeadSha?: string }) => {
+        await mkdir(i.directory, { recursive: true });
+        expect(i.previousHeadSha).toBe("e".repeat(40));
+        return {
+          path: i.directory,
+          diff: "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1,1 +1,2 @@\n one\n+two\n",
+          interdiff: "INTERDIFF-FIXTURE-TEXT",
+          remove: async () => {},
+        };
+      }) as never,
+    });
+    const prompt = await promptOf(d);
+    expect(prompt).toContain(`The previous round reviewed head ${"e".repeat(40)}`);
+    expect(prompt).toContain("Leaks a handle");
+    expect(prompt).toContain("INTERDIFF-FIXTURE-TEXT");
   });
   it("interrupts the claim-retry sleep when aborted", async () => {
     const plane = await fakeControlPlane((_received, response) =>

@@ -16,6 +16,7 @@ const routes: Record<string, unknown> = {
     user: { login: "alice" },
     head: { sha: headSha, ref: "feat" },
     base: { sha: "b".repeat(40), ref: "main", repo: { clone_url: "https://github.com/o/r.git" } },
+    commits: 1,
   },
   "/repos/o/r/issues/3": { number: 3, title: "The issue", body: "Please add thing" },
   [`/repos/o/r/compare/${"b".repeat(40)}...${headSha}`]: {
@@ -108,6 +109,7 @@ describe("prepareRound", () => {
       pullRequestNumber: 7,
       headSha,
       baseSha: "m".repeat(40),
+      depth: 2,
       directory: join(prepared.directory, "checkout"),
     });
   });

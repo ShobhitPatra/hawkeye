@@ -1,4 +1,11 @@
-import type { ClaimedJob, RunEvent, RunResultReport } from "@hawkeye/core";
+import {
+  SEVERITIES,
+  type ClaimedJob,
+  type PriorFinding,
+  type RunEvent,
+  type RunResultReport,
+  type Severity,
+} from "@hawkeye/core";
 
 export type ResultAcknowledgement = { ok: true; posted?: string };
 
@@ -45,6 +52,31 @@ function integer(value: unknown, field: string): number {
   return Number.isInteger(value) ? (value as number) : invalid(field);
 }
 
+function priorFinding(value: unknown, field: string): PriorFinding {
+  const entry = record(value, field);
+  const severity = text(entry.severity, `${field}.severity`);
+  if (!SEVERITIES.includes(severity as Severity)) invalid(`${field}.severity`);
+  return {
+    id: text(entry.id, `${field}.id`),
+    severity: severity as Severity,
+    claim: text(entry.claim, `${field}.claim`),
+    detail: text(entry.detail, `${field}.detail`),
+    ...(entry.path === undefined ? {} : { path: text(entry.path, `${field}.path`) }),
+    ...(entry.line === undefined ? {} : { line: integer(entry.line, `${field}.line`) }),
+  };
+}
+
+function previousRound(value: unknown): NonNullable<ClaimedJob["previousRound"]> {
+  const round = record(value, "previousRound");
+  if (!Array.isArray(round.findings)) invalid("previousRound.findings");
+  return {
+    headSha: text(round.headSha, "previousRound.headSha"),
+    findings: (round.findings as unknown[]).map((entry, index) =>
+      priorFinding(entry, `previousRound.findings[${index}]`),
+    ),
+  };
+}
+
 function claimedJob(payload: unknown): ClaimedJob {
   const root = record(payload, "payload");
   const job = record(root.job, "job");
@@ -71,6 +103,9 @@ function claimedJob(payload: unknown): ClaimedJob {
         ? {}
         : { promptOverride: text(promptOverride, "settings.promptOverride") }),
     },
+    ...(root.previousRound === undefined
+      ? {}
+      : { previousRound: previousRound(root.previousRound) }),
   };
 }
 

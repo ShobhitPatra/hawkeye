@@ -65,6 +65,7 @@ export async function prepareRound(
     pullRequestNumber: pullRequest.number,
     headSha: pullRequest.headSha,
     baseSha: mergeBaseSha,
+    depth: pullRequest.commits + 1,
     directory: join(directory, "checkout"),
     ...(previous === undefined ? {} : { previousHeadSha: previous.meta.headSha }),
   });

@@ -66,6 +66,7 @@ async function reportFor(
       maxTurns: claimed.settings.maxTurns,
       wallClockMs: claimed.settings.wallClockMinutes * 60_000,
       ...(contractOverride === undefined ? {} : { contractOverride }),
+      ...(claimed.previousRound === undefined ? {} : { previousRound: claimed.previousRound }),
     },
     {
       fetch: deps.fetch,
