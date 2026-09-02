@@ -67,6 +67,12 @@ export interface GitHubClient {
     review: RenderedReview,
     token: string,
   ): Promise<{ url: string; id: string }>;
+  updateReview(
+    reference: PullRequestReference,
+    reviewId: string,
+    body: string,
+    token: string,
+  ): Promise<void>;
   listInstallationRepositories(token: string): Promise<InstallationRepository[]>;
   listOpenPullRequestsByAuthor(
     token: string,
@@ -333,6 +339,9 @@ export function createGitHubClient(input: {
       if (typeof posted.id !== "number")
         throw new Error(`GitHub POST ${path} returned no review id`);
       return { url: posted.html_url, id: String(posted.id) };
+    },
+    async updateReview(reference, reviewId, body, token) {
+      await request("PUT", `${pulls(reference)}/reviews/${reviewId}`, bearer(token), { body });
     },
     async listInstallationRepositories(token) {
       return paginate("/installation/repositories", token, (payload) =>

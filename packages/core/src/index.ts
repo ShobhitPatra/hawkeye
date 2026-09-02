@@ -24,8 +24,15 @@ export {
   type RunReviewDependencies,
   type RunReviewOutcome,
 } from "./run.js";
-export type { RenderedReview } from "./review/render.js";
+export type { RenderedReview, ReviewComment } from "./review/render.js";
 export { renderReview, type RenderInput } from "./review/render.js";
+export {
+  renderLivingReview,
+  type LivingRoundSummary,
+  type RenderLivingReviewInput,
+  type RenderedLivingReview,
+} from "./review/render-living.js";
+export { encodeMarker } from "./review/marker.js";
 export {
   postRenderedReview,
   type PostRenderedReviewInput,
