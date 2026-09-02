@@ -55,6 +55,22 @@ describe("createGitHubClient", () => {
     await expect(client.installationToken(ref)).resolves.toBe("ghs_x");
     expect((calls[0]!.init.headers as Record<string, string>).Authorization).toMatch(/^Bearer ey/);
   });
+  it("bounds every request with an abort signal", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      "GET /repos/o/r/installation": () => ({ json: { id: 155 } }),
+      "POST /app/installations/155/access_tokens": () => ({
+        status: 201,
+        json: { token: "ghs_x" },
+      }),
+    });
+    await createGitHubClient({
+      appId: "1",
+      privateKeyPem: pem,
+      fetch: fetchImpl,
+    }).installationToken(ref);
+    for (const call of calls) expect(call.init.signal).toBeInstanceOf(AbortSignal);
+  });
+
   it("maps pull request fields", async () => {
     const { fetchImpl } = fakeFetch({
       "GET /repos/o/r/pulls/5": () => ({

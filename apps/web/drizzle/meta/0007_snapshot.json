@@ -1,5 +1,5 @@
 {
-  "id": "712c0c76-e6d7-45dc-b04a-c242e7b28b6c",
+  "id": "810b6949-c4ce-4731-b1ce-3300550f99f1",
   "prevId": "2b7c3d5a-a832-4801-9cf3-970e70be40e0",
   "version": "7",
   "dialect": "postgresql",
@@ -486,7 +486,7 @@
           "name": "github_review_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "posted_at": {
           "name": "posted_at",

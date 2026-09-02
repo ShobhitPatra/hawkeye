@@ -105,6 +105,8 @@ function nextLink(header: string | null): string | undefined {
 
 const DEFAULT_API_BASE = "https://api.github.com";
 
+const REQUEST_TIMEOUT_MS = 30_000;
+
 async function sendGitHubRequest(
   fetchImpl: typeof fetch,
   method: string,
@@ -114,6 +116,7 @@ async function sendGitHubRequest(
 ): Promise<{ payload: unknown; response: Response }> {
   const response = await fetchImpl(url, {
     method,
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     headers: {
       Authorization: auth,
       Accept: "application/vnd.github+json",

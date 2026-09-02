@@ -176,22 +176,6 @@ describe("postReviewForRun", () => {
     await expect(post()).resolves.toBe("already-posted");
     expect(github.postReview).not.toHaveBeenCalled();
   });
-  it("treats a held reservation for the head as already posted", async () => {
-    await db.insert(schema.reviewPosted).values({
-      runId,
-      armedPrId: armedPr.id,
-      headSha,
-      githubReviewId: null,
-    });
-
-    await expect(post()).resolves.toBe("already-posted");
-    expect(github.installationTokenById).not.toHaveBeenCalled();
-    expect(github.postReview).not.toHaveBeenCalled();
-    const rows = await db.select().from(schema.reviewPosted);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.githubReviewId).toBeNull();
-  });
-
   it("patches the living review and posts new findings as a supplemental review", async () => {
     github.updateReview = vi.fn(async () => {});
     await seedLivingReview({
@@ -270,7 +254,7 @@ describe("postReviewForRun", () => {
     expect(rows.find((row) => row.headSha === headSha)).toMatchObject({ githubReviewId: "5" });
   });
 
-  it("fails the round and frees the reservation when the supplemental fails for another reason", async () => {
+  it("fails the round and records nothing when the supplemental fails for another reason", async () => {
     github.updateReview = vi.fn(async () => {});
     github.postReview = vi.fn(async () => {
       throw new GitHubRequestError(502, "GitHub POST failed: 502");
@@ -331,7 +315,7 @@ describe("postReviewForRun", () => {
     expect(github.postReview).not.toHaveBeenCalled();
   });
 
-  it("deletes the reservation and records the failure when the patch fails", async () => {
+  it("records nothing and marks the run failed when the patch fails", async () => {
     github.updateReview = vi.fn(async () => {
       throw new GitHubRequestError(500, "GitHub PUT failed: 500");
     });

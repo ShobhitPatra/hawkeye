@@ -46,11 +46,10 @@ async function livingReviewFor(
     .select({ githubReviewId: reviewPosted.githubReviewId })
     .from(reviewPosted)
     .innerJoin(armedPrTable, eq(armedPrTable.id, reviewPosted.armedPrId))
-    .where(and(samePullRequest(armedPr), isNotNull(reviewPosted.githubReviewId)))
+    .where(samePullRequest(armedPr))
     .orderBy(asc(reviewPosted.postedAt))
     .limit(1);
-  if (!row?.githubReviewId) return undefined;
-  return { githubReviewId: row.githubReviewId };
+  return row;
 }
 
 async function previousRoundFindings(
@@ -62,7 +61,7 @@ async function previousRoundFindings(
     .from(reviewPosted)
     .innerJoin(run, eq(run.id, reviewPosted.runId))
     .innerJoin(armedPrTable, eq(armedPrTable.id, reviewPosted.armedPrId))
-    .where(and(samePullRequest(armedPr), isNotNull(reviewPosted.githubReviewId)))
+    .where(samePullRequest(armedPr))
     .orderBy(desc(reviewPosted.postedAt))
     .limit(1);
   if (!latest?.result) throw new Error("the living review has no run result behind it");
@@ -86,13 +85,13 @@ async function roundsFor(
     .select({ headSha: job.headSha, startedAt: run.startedAt, result: run.result })
     .from(run)
     .innerJoin(job, eq(job.id, run.jobId))
-    .innerJoin(reviewPosted, eq(reviewPosted.runId, run.id))
+    .leftJoin(reviewPosted, eq(reviewPosted.runId, run.id))
     .innerJoin(armedPrTable, eq(armedPrTable.id, job.armedPrId))
     .where(
       and(
         samePullRequest(armedPr),
         eq(run.status, "ok"),
-        or(isNotNull(reviewPosted.githubReviewId), eq(run.id, currentRunId)),
+        or(isNotNull(reviewPosted.id), eq(run.id, currentRunId)),
       ),
     )
     .orderBy(asc(run.startedAt));
@@ -126,15 +125,11 @@ export async function postReviewForRun(
       .limit(1);
     if (postedForHead) return "already-posted";
     if (await supersededBy(tx, input.jobId)) return "superseded";
-    const [reservation] = await tx
-      .insert(reviewPosted)
-      .values({ runId: input.runId, armedPrId: armedPr.id, headSha, githubReviewId: null })
-      .returning({ id: reviewPosted.id });
-    if (!reservation) throw new Error("the review reservation was not inserted");
     const record = (githubReviewId: string) =>
-      tx.update(reviewPosted).set({ githubReviewId }).where(eq(reviewPosted.id, reservation.id));
+      tx
+        .insert(reviewPosted)
+        .values({ runId: input.runId, armedPrId: armedPr.id, headSha, githubReviewId });
 
-    let githubWrote = false;
     try {
       const token = await github.installationTokenById(armedPr.installationId);
       const reference = { owner: armedPr.owner, repo: armedPr.repo, number: armedPr.number };
@@ -156,7 +151,6 @@ export async function postReviewForRun(
           renderBodyOnly: () => render(new Map()),
           log,
         });
-        githubWrote = true;
         await record(posted.id);
         return "posted";
       }
@@ -188,7 +182,6 @@ export async function postReviewForRun(
             },
             token,
           );
-          githubWrote = true;
           await record(supplemental.id);
           supplementalPosted = true;
         } catch (error) {
@@ -200,13 +193,11 @@ export async function postReviewForRun(
         }
       }
       await github.updateReview(reference, living.githubReviewId, finalBody, token);
-      githubWrote = true;
       if (!supplementalPosted) await record(living.githubReviewId);
       return "posted";
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       log(`review not posted for run ${input.runId}: ${message}`);
-      if (!githubWrote) await tx.delete(reviewPosted).where(eq(reviewPosted.id, reservation.id));
       await tx
         .update(run)
         .set({ error: `post: ${message}` })
