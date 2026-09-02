@@ -316,3 +316,12 @@ describe("finding severity enum", () => {
     expect(rows.map((row) => row.label)).toEqual([...SEVERITIES]);
   });
 });
+
+describe("timestamps", () => {
+  it("uses timestamptz for every timestamp column in every table", async () => {
+    const { rows } = await client.query<{ table_name: string; column_name: string }>(
+      "select table_name, column_name from information_schema.columns where table_schema = 'public' and data_type = 'timestamp without time zone'",
+    );
+    expect(rows.map((row) => `${row.table_name}.${row.column_name}`)).toEqual([]);
+  });
+});
