@@ -1,18 +1,46 @@
 {
-  "name": "hawkeye",
-  "version": "0.0.0",
-  "private": true,
+  "name": "hawkeye-review",
+  "version": "0.1.0",
+  "description": "Personal AI code reviewer on the Claude plan you already pay for: review pull requests locally, or run the Hawkeye daemon.",
+  "keywords": [
+    "ai",
+    "claude",
+    "claude-code",
+    "code-review",
+    "pull-request"
+  ],
+  "homepage": "https://github.com/ShobhitPatra/hawkeye#readme",
+  "bugs": "https://github.com/ShobhitPatra/hawkeye/issues",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ShobhitPatra/hawkeye.git",
+    "directory": "packages/runner"
+  },
   "bin": {
     "hawkeye": "./dist/bin.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "type": "module",
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "dev": "tsx src/bin.ts"
+    "dev": "tsx src/bin.ts",
+    "prepack": "cp ../../LICENSE LICENSE",
+    "prepublishOnly": "pnpm --filter @hawkeye/core build && pnpm run build"
   },
   "dependencies": {
-    "@hawkeye/core": "workspace:*",
-    "commander": "^15.0.0"
+    "commander": "^15.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@hawkeye/core": "workspace:*"
+  },
+  "engines": {
+    "node": ">=22.12"
   }
 }
