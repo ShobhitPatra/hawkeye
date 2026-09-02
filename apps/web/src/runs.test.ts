@@ -207,6 +207,9 @@ describe("hasArmedPullRequest", () => {
     await db.update(schema.armedPr).set({ disarmedAt: new Date() });
     await expect(hasArmedPullRequest(db, coordinates)).resolves.toBe(true);
   });
+});
+
+describe("listFindingsForPullRequest", () => {
   it("lists findings from the latest arm only", async () => {
     const [old] = await db
       .insert(schema.armedPr)

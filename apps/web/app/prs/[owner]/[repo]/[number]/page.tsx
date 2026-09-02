@@ -2,46 +2,15 @@ import { notFound } from "next/navigation";
 import { parsePullRequestParams } from "@/arm-input";
 import { formatUpdated } from "@/format-updated";
 import { getDb } from "@/db";
+import { hasArmedPullRequest, listFindingsForPullRequest, listRunsForPullRequest } from "@/runs";
 import {
-  hasArmedPullRequest,
-  listFindingsForPullRequest,
-  listRunsForPullRequest,
-  type PullRequestFinding,
-  type PullRequestRun,
-} from "@/runs";
+  formatDuration,
+  formatError,
+  formatFindingLocation,
+  formatVerdict,
+  shortSha,
+} from "@/run-format";
 import { requireSession } from "@/session";
-
-const MAX_ERROR_LENGTH = 120;
-
-function short(sha: string) {
-  return sha.slice(0, 7);
-}
-
-function formatVerdict(run: PullRequestRun) {
-  if (!run.verdict) return "";
-  const verdict = run.verdict.replaceAll("_", " ");
-  if (run.reportedVerdict && run.reportedVerdict !== run.verdict) {
-    return `${verdict} (reported ${run.reportedVerdict.replaceAll("_", " ")})`;
-  }
-  return verdict;
-}
-
-function formatDuration(run: PullRequestRun) {
-  if (!run.endedAt) return "";
-  const seconds = Math.round((run.endedAt.getTime() - run.startedAt.getTime()) / 1000);
-  const minutes = Math.floor(seconds / 60);
-  return minutes > 0 ? `${minutes}m ${seconds % 60}s` : `${seconds}s`;
-}
-
-function formatError(error: string | undefined) {
-  if (!error) return "";
-  return error.length > MAX_ERROR_LENGTH ? `${error.slice(0, MAX_ERROR_LENGTH)}…` : error;
-}
-
-function formatFindingLocation(finding: PullRequestFinding) {
-  if (!finding.path) return "";
-  return finding.line === null ? ` (${finding.path})` : ` (${finding.path}:${finding.line})`;
-}
 
 export default async function PullRequestRunsPage({
   params,
@@ -92,7 +61,7 @@ export default async function PullRequestRunsPage({
             {runs.map((run) => (
               <tr key={run.id}>
                 <td>{formatUpdated(run.startedAt.toISOString(), now)}</td>
-                <td>{short(run.headSha)}</td>
+                <td>{shortSha(run.headSha)}</td>
                 <td>{run.status}</td>
                 <td>{formatVerdict(run)}</td>
                 <td>{run.turns}</td>
@@ -112,8 +81,8 @@ export default async function PullRequestRunsPage({
           {findings.map((finding) => (
             <li key={finding.stableId}>
               [{finding.stableId}] {finding.severity.replaceAll("_", " ")} {finding.claim}
-              {formatFindingLocation(finding)} · first seen {short(finding.firstSeenSha)} ·{" "}
-              {finding.resolvedSha ? `resolved ${short(finding.resolvedSha)}` : "open"}
+              {formatFindingLocation(finding)} · first seen {shortSha(finding.firstSeenSha)} ·{" "}
+              {finding.resolvedSha ? `resolved ${shortSha(finding.resolvedSha)}` : "open"}
             </li>
           ))}
         </ul>
