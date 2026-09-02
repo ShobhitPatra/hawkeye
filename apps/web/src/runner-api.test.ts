@@ -182,6 +182,130 @@ describe("claimJob", () => {
     expect(response.status).toBe(204);
   });
 
+  it("returns the previous round once an ok run has a posted review", async () => {
+    const firstRunId = await claimedRunId();
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${firstRunId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: {
+          ...reviewResult,
+          verdict: "changes_needed",
+          findings: [
+            {
+              path: "a.txt",
+              line: 2,
+              severity: "should_fix",
+              claim: "Leaks a handle",
+              detail: "Close it.",
+            },
+          ],
+        },
+      }),
+      { db, github },
+      firstRunId,
+    );
+    await enqueueJob(db, {
+      armedPrId: "armed-1",
+      headSha: "c".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: new Date(now.getTime() - 60_000),
+    });
+
+    const response = await claimJob(request("/api/runner/jobs"), claimDeps());
+
+    expect((await response.json()).previousRound).toEqual({
+      headSha: "a".repeat(40),
+      findings: [
+        {
+          id: findingId("a.txt", "Leaks a handle"),
+          severity: "should_fix",
+          claim: "Leaks a handle",
+          detail: "Close it.",
+          path: "a.txt",
+          line: 2,
+        },
+      ],
+    });
+  });
+
+  it("returns no previous round when no review was posted", async () => {
+    const firstRunId = await claimedRunId();
+    github.postReview = vi.fn(async () => {
+      throw new Error("GitHub POST failed: 500");
+    });
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${firstRunId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: reviewResult,
+      }),
+      { db, github },
+      firstRunId,
+    );
+    await enqueue();
+
+    const response = await claimJob(request("/api/runner/jobs"), claimDeps());
+
+    expect((await response.json()).previousRound).toBeUndefined();
+  });
+
+  it("appends the arm's still-open findings from earlier rounds", async () => {
+    const firstRunId = await claimedRunId();
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${firstRunId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: {
+          ...reviewResult,
+          verdict: "changes_needed",
+          findings: [
+            {
+              path: "a.txt",
+              line: 2,
+              severity: "should_fix",
+              claim: "Leaks a handle",
+              detail: "Close it.",
+            },
+          ],
+        },
+      }),
+      { db, github },
+      firstRunId,
+    );
+    await db.insert(schema.finding).values({
+      armedPrId: "armed-1",
+      stableId: findingId("b.txt", "Missing tests"),
+      severity: "optional",
+      claim: "Missing tests",
+      path: "b.txt",
+      line: 5,
+      firstSeenSha: "9".repeat(40),
+    });
+    await enqueue();
+
+    const response = await claimJob(request("/api/runner/jobs"), claimDeps());
+
+    expect((await response.json()).previousRound.findings).toEqual([
+      {
+        id: findingId("a.txt", "Leaks a handle"),
+        severity: "should_fix",
+        claim: "Leaks a handle",
+        detail: "Close it.",
+        path: "a.txt",
+        line: 2,
+      },
+      {
+        id: findingId("b.txt", "Missing tests"),
+        severity: "optional",
+        claim: "Missing tests",
+        detail: "Missing tests",
+        path: "b.txt",
+        line: 5,
+      },
+    ]);
+  });
+
   it("requeues a stale job and claims it on the first attempt", async () => {
     const queued = await enqueue();
     await db

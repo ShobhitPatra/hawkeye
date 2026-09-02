@@ -45,6 +45,7 @@ function deps(
           ref: "main",
           repo: { clone_url: "https://github.com/o/r.git" },
         },
+        commits: 2,
       })
     );
   });
@@ -61,13 +62,14 @@ function deps(
       return { status: "ok", turns: 2 };
     }),
   };
-  const createWorktree = vi.fn(async (i: { directory: string }) => {
+  const createWorktree = vi.fn(async (i: { directory: string; previousHeadSha?: string }) => {
     await mkdir(join(i.directory, ".claude"), { recursive: true });
     await writeFile(join(i.directory, "CLAUDE.md"), "project memory");
     await writeFile(join(i.directory, ".claude", "settings.json"), "{}");
     return {
       path: i.directory,
       diff: "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1,1 +1,2 @@\n one\n+two\n",
+      ...(i.previousHeadSha === undefined ? {} : { interdiff: "INTERDIFF-FIXTURE-TEXT" }),
       remove: vi.fn(async () => {}),
     };
   });
@@ -115,6 +117,7 @@ describe("runReviewJob", () => {
       headSha,
       baseSha,
       directory: join(i.runDirectory, "checkout"),
+      depth: 3,
     });
     const [url, init] = d.fetch.mock.calls[0]!;
     expect(url).toBe("https://api.github.com/repos/o/r/pulls/1");
@@ -140,6 +143,32 @@ describe("runReviewJob", () => {
     const [issueUrl, issueInit] = d.fetch.mock.calls[1]!;
     expect(issueUrl).toBe("https://api.github.com/repos/o/r/issues/2");
     expect((issueInit!.headers as Record<string, string>).Authorization).toBe("Bearer ghs_t");
+  });
+  it("feeds the previous round and the interdiff into the prompt", async () => {
+    const d = deps();
+    const previousHeadSha = "e".repeat(40);
+    const i = await input({
+      previousRound: {
+        headSha: previousHeadSha,
+        findings: [
+          {
+            id: "abc123def456",
+            severity: "should_fix",
+            claim: "Leaks a handle",
+            detail: "Close it before returning.",
+            path: "a.txt",
+            line: 2,
+          },
+        ],
+      },
+    });
+    await runReviewJob(i, d);
+    expect(d.createWorktree.mock.calls[0]![0]).toMatchObject({ previousHeadSha, depth: 3 });
+    const prompt = await readFile(join(i.runDirectory, "prompt.md"), "utf8");
+    expect(prompt).toContain(`The previous round reviewed head ${previousHeadSha}`);
+    expect(prompt).toContain("- [abc123def456] should_fix · Leaks a handle (a.txt:2)");
+    expect(prompt).toContain('source="interdiff"');
+    expect(prompt).toContain("INTERDIFF-FIXTURE-TEXT");
   });
   it("omits the linked issue section when the body links none and when the issue is gone", async () => {
     const unlinked = deps({ pullRequestBody: "no link here" });

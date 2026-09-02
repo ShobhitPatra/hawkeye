@@ -1,6 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { buildPrompt, type PromptInput } from "./contract/prompt.js";
+import { buildPrompt, type PriorFinding, type PromptInput } from "./contract/prompt.js";
 import { parseReviewResult, type ReviewResult } from "./contract/schema.js";
 import type { HarnessSpec } from "./harness/harness.js";
 import type { RunResultStatus } from "./runner/protocol.js";
@@ -13,7 +13,9 @@ export type ReviewPipelineInput = {
   runDirectory: string;
   maxTurns: number;
   wallClockMs: number;
-  prompt: Omit<PromptInput, "repositoryRules" | "diff" | "resultPath">;
+  depth?: number;
+  previousRound?: { headSha: string; findings: PriorFinding[] };
+  prompt: Omit<PromptInput, "repositoryRules" | "diff" | "resultPath" | "previousRound">;
 };
 export type ReviewPipelineDependencies = {
   harness: HarnessSpec;
@@ -38,6 +40,8 @@ export async function runReviewPipeline(
     headSha: prompt.pullRequest.headSha,
     baseSha: prompt.pullRequest.baseSha,
     directory: join(runDirectory, "checkout"),
+    ...(input.depth === undefined ? {} : { depth: input.depth }),
+    ...(input.previousRound === undefined ? {} : { previousHeadSha: input.previousRound.headSha }),
   });
   try {
     const repositoryRules = await deps.readRepositoryRules(worktree.path);
@@ -49,7 +53,21 @@ export async function runReviewPipeline(
 
     await writeFile(
       promptPath,
-      buildPrompt({ ...prompt, repositoryRules, diff: worktree.diff, resultPath }),
+      buildPrompt({
+        ...prompt,
+        repositoryRules,
+        diff: worktree.diff,
+        resultPath,
+        ...(input.previousRound === undefined
+          ? {}
+          : {
+              previousRound: {
+                headSha: input.previousRound.headSha,
+                findings: input.previousRound.findings,
+                ...(worktree.interdiff === undefined ? {} : { interdiff: worktree.interdiff }),
+              },
+            }),
+      }),
     );
 
     const streamLines: string[] = [];

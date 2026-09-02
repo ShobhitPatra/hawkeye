@@ -29,6 +29,35 @@ describe("createControlPlaneClient", () => {
     expect(init.method).toBe("GET");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer hk_1");
   });
+  it("parses a previous round with a dismissed finding", async () => {
+    const withRound = {
+      ...job,
+      previousRound: {
+        headSha: "c".repeat(40),
+        findings: [
+          {
+            id: "abc123abc123",
+            severity: "should_fix",
+            claim: "Bug",
+            detail: "wrong",
+            path: "x.ts",
+            line: 3,
+            dismissed: { note: "by design" },
+          },
+        ],
+      },
+    };
+    const { client: c } = client(() => Response.json(withRound));
+    expect(await c.claimJob()).toEqual(withRound);
+    const bad = {
+      ...withRound,
+      previousRound: { ...withRound.previousRound, findings: [{ id: "x" }] },
+    };
+    const { client: rejecting } = client(() => Response.json(bad));
+    await expect(rejecting.claimJob()).rejects.toThrow(
+      "invalid claimed job payload: previousRound.findings[0].severity",
+    );
+  });
   it("returns nothing on 204", async () => {
     const { client: c } = client(() => new Response(null, { status: 204 }));
     expect(await c.claimJob()).toBeUndefined();

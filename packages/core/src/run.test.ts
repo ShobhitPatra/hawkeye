@@ -40,6 +40,7 @@ function deps(
       baseSha: "b".repeat(40),
       baseRef: "main",
       cloneUrl: "https://github.com/o/r.git",
+      commits: 1,
     })),
     mergeBase: vi.fn(async () => "m".repeat(40)),
     linkedIssue: vi.fn(async () => ({ number: 2, title: "I", body: "ib" })),
@@ -123,6 +124,7 @@ describe("runReview", () => {
       token: "ghs_t",
       headSha: sha,
       baseSha: "m".repeat(40),
+      depth: 2,
       directory: join(i.runDirectory, "checkout"),
     });
     expect(await readFile(join(i.runDirectory, "prompt.md"), "utf8")).toContain("m".repeat(40));

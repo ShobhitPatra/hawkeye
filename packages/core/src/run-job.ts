@@ -4,6 +4,7 @@ import type { HarnessSpec } from "./harness/harness.js";
 import { commentableLines } from "./review/diff-lines.js";
 import { runReviewPipeline } from "./review-pipeline.js";
 import type { RunResultStatus } from "./runner/protocol.js";
+import type { PriorFinding } from "./contract/prompt.js";
 import type { ReviewResult } from "./contract/schema.js";
 import type { createWorktree, readRepositoryRules } from "./worktree/worktree.js";
 
@@ -16,6 +17,7 @@ export type RunReviewJobInput = {
   maxTurns: number;
   wallClockMs: number;
   contractOverride?: string;
+  previousRound?: { headSha: string; findings: PriorFinding[] };
 };
 export type RunReviewJobDependencies = {
   fetch: typeof fetch;
@@ -48,6 +50,8 @@ export async function runReviewJob(
       runDirectory: input.runDirectory,
       maxTurns: input.maxTurns,
       wallClockMs: input.wallClockMs,
+      depth: pullRequest.commits + 1,
+      ...(input.previousRound === undefined ? {} : { previousRound: input.previousRound }),
       prompt: {
         repository: { owner: reference.owner, repo: reference.repo },
         pullRequest: {

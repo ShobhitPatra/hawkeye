@@ -67,6 +67,7 @@ export async function runReview(
     {
       cloneUrl: pullRequest.cloneUrl,
       token,
+      depth: pullRequest.commits + 1,
       runDirectory,
       maxTurns: input.maxTurns,
       wallClockMs: input.wallClockMs,
