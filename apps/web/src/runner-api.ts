@@ -101,7 +101,7 @@ async function previousRoundFor(db: Db, armedPrId: string): Promise<ClaimedJob["
       id: row.stableId,
       severity: row.severity,
       claim: row.claim,
-      detail: row.claim,
+      detail: row.detail ?? row.claim,
       ...(row.path === null ? {} : { path: row.path }),
       ...(row.line === null ? {} : { line: row.line }),
     });
@@ -331,6 +331,7 @@ export async function recordResult(
     armedPrId: target.armedPr.id,
     headSha: target.headSha,
     findings: result.findings,
+    ...(result.priorFindings === undefined ? {} : { priorFindings: result.priorFindings }),
     jobId: completed.jobId,
   }).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);

@@ -35,6 +35,7 @@ const github: GitHubClient = {
   linkedIssue: unsupported(),
   reviews: unsupported(),
   postReview: unsupported(),
+  updateReview: unsupported(),
   listInstallationRepositories: unsupported(),
   listOpenPullRequestsByAuthor: unsupported(),
 };

@@ -204,6 +204,7 @@ describe("schema migrations", () => {
       stableId: "finding-3",
       severity: "must_fix",
       claim: "claim-3",
+      detail: "detail-3",
       firstSeenSha: "a3",
     });
     const [selectedFinding] = await db
@@ -215,6 +216,7 @@ describe("schema migrations", () => {
       stableId: "finding-3",
       severity: "must_fix",
       claim: "claim-3",
+      detail: "detail-3",
       firstSeenSha: "a3",
     });
 
@@ -231,6 +233,13 @@ describe("schema migrations", () => {
       headSha: "a3",
       githubReviewId: "gh-review-3",
     });
+
+    await db.insert(schema.reviewPosted).values({ runId, armedPrId, headSha: "b3" });
+    const [reservation] = await db
+      .select()
+      .from(schema.reviewPosted)
+      .where(eq(schema.reviewPosted.headSha, "b3"));
+    expect(reservation?.githubReviewId).toBeNull();
 
     await db.insert(schema.userSettings).values({ userId: "u3" });
     const [selectedUserSettings] = await db

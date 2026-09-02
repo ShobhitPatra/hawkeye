@@ -10,7 +10,15 @@ import { createRunnerToken } from "./runner-tokens";
 import { createTestDb, seedArmedPullRequest } from "./test/pglite";
 
 const headSha = "a".repeat(40);
-const armedPr = { id: "armed-1", installationId: "10", owner: "octo", repo: "repo", number: 7 };
+const previousHead = "c".repeat(40);
+const armedPr = {
+  id: "armed-1",
+  userId: "user-1",
+  installationId: "10",
+  owner: "octo",
+  repo: "repo",
+  number: 7,
+};
 const result: ReviewResult = {
   verdict: "changes_needed",
   summary: "needs work",
@@ -42,6 +50,7 @@ function createGitHub(): GitHubClient {
       url: "https://github.com/octo/repo/pull/7#pullrequestreview-9",
       id: "9",
     })),
+    updateReview: unsupported(),
     listInstallationRepositories: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
   };
@@ -50,6 +59,7 @@ function createGitHub(): GitHubClient {
 let db: Db;
 let github: GitHubClient;
 let runId: string;
+let runnerId: string;
 
 beforeEach(async () => {
   db = await createTestDb();
@@ -61,9 +71,44 @@ beforeEach(async () => {
     notBefore: new Date(),
   });
   const { runner } = await createRunnerToken(db, { userId: "user-1", name: "laptop" });
+  runnerId = runner.id;
   runId = (await createRun(db, { jobId: queued.id, runnerId: runner.id })).id;
   github = createGitHub();
 });
+
+async function seedLivingReview(previousResult: ReviewResult) {
+  const [previousJob] = await db
+    .insert(schema.job)
+    .values({
+      armedPrId: armedPr.id,
+      headSha: previousHead,
+      baseSha: "b".repeat(40),
+      notBefore: new Date(),
+      state: "done",
+    })
+    .returning({ id: schema.job.id });
+  const [previousRun] = await db
+    .insert(schema.run)
+    .values({
+      jobId: previousJob!.id,
+      runnerId,
+      status: "ok",
+      result: previousResult,
+      startedAt: new Date("2026-01-01T00:00:00Z"),
+    })
+    .returning({ id: schema.run.id });
+  await db.insert(schema.reviewPosted).values({
+    runId: previousRun!.id,
+    armedPrId: armedPr.id,
+    headSha: previousHead,
+    githubReviewId: "5",
+    postedAt: new Date("2026-01-01T00:00:00Z"),
+  });
+  await db
+    .update(schema.run)
+    .set({ status: "ok", result, startedAt: new Date("2026-01-02T00:00:00Z") })
+    .where(eq(schema.run.id, runId));
+}
 
 const post = (commentable: Record<string, number[]> = { "a.txt": [1, 2] }) =>
   postReviewForRun({ db, github }, { runId, armedPr, headSha, result, commentable });
@@ -128,21 +173,81 @@ describe("postReviewForRun", () => {
     await expect(post()).resolves.toBe("already-posted");
     expect(github.postReview).not.toHaveBeenCalled();
   });
-  it("treats a lost insert race as already posted", async () => {
-    github.postReview = vi.fn(async () => {
-      await db.insert(schema.reviewPosted).values({
-        runId,
-        armedPrId: armedPr.id,
-        headSha,
-        githubReviewId: "1",
-      });
-      return { url: "https://github.com/octo/repo/pull/7#pullrequestreview-2", id: "2" };
+  it("treats a held reservation for the head as already posted", async () => {
+    await db.insert(schema.reviewPosted).values({
+      runId,
+      armedPrId: armedPr.id,
+      headSha,
+      githubReviewId: null,
     });
 
     await expect(post()).resolves.toBe("already-posted");
+    expect(github.installationTokenById).not.toHaveBeenCalled();
+    expect(github.postReview).not.toHaveBeenCalled();
     const rows = await db.select().from(schema.reviewPosted);
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.githubReviewId).toBe("1");
+    expect(rows[0]?.githubReviewId).toBeNull();
+  });
+
+  it("patches the living review and posts new findings as a supplemental review", async () => {
+    github.updateReview = vi.fn(async () => {});
+    await seedLivingReview({
+      ...result,
+      findings: [
+        { path: "a.txt", line: 9, severity: "should_fix", claim: "unanchored", detail: "d" },
+      ],
+    });
+
+    await expect(post()).resolves.toBe("posted");
+    const [reference, reviewId, body, token] = (github.updateReview as ReturnType<typeof vi.fn>)
+      .mock.calls[0]!;
+    expect(reference).toEqual({ owner: "octo", repo: "repo", number: 7 });
+    expect(reviewId).toBe("5");
+    expect(token).toBe("ghs_token");
+    expect(body).toContain(`<!-- hawkeye: head=${headSha} -->`);
+    expect(body).toContain("### Rounds");
+    expect(body).toContain(`| 1 | \`${"c".repeat(7)}\` | changes needed |`);
+    expect(body).toContain(`| 2 | \`${"a".repeat(7)}\` | changes needed |`);
+    const [, supplemental] = (github.postReview as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(supplemental.commit_id).toBe(headSha);
+    expect(supplemental.body).toBe(`<!-- hawkeye: head=${headSha} -->`);
+    expect(supplemental.comments).toHaveLength(1);
+    expect(supplemental.comments[0]).toMatchObject({ path: "a.txt", line: 2, side: "RIGHT" });
+    const rows = await db.select().from(schema.reviewPosted);
+    expect(rows).toHaveLength(2);
+    expect(rows.find((row) => row.headSha === headSha)).toMatchObject({
+      runId,
+      githubReviewId: "9",
+    });
+    expect(rows.find((row) => row.headSha === previousHead)?.githubReviewId).toBe("5");
+  });
+
+  it("patches the living review without a supplemental review when nothing is new", async () => {
+    github.updateReview = vi.fn(async () => {});
+    await seedLivingReview(result);
+
+    await expect(post()).resolves.toBe("posted");
+    expect(github.updateReview).toHaveBeenCalledTimes(1);
+    expect(github.postReview).not.toHaveBeenCalled();
+    const rows = await db.select().from(schema.reviewPosted);
+    expect(rows.find((row) => row.headSha === headSha)).toMatchObject({
+      runId,
+      githubReviewId: null,
+    });
+  });
+
+  it("deletes the reservation and records the failure when the patch fails", async () => {
+    github.updateReview = vi.fn(async () => {
+      throw new GitHubRequestError(500, "GitHub PUT failed: 500");
+    });
+    await seedLivingReview(result);
+
+    await expect(post()).resolves.toBe("failed");
+    const rows = await db.select().from(schema.reviewPosted);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.headSha).toBe(previousHead);
+    const [row] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
+    expect(row?.error).toBe("post: GitHub PUT failed: 500");
   });
 
   it("falls back to body only on a 422", async () => {

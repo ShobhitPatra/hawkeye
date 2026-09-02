@@ -131,6 +131,68 @@ describe("recordFindings", () => {
 
     for (const row of await rows()) expect(row.resolvedSha).toBe(secondHead);
   });
+  it("stores the finding detail and updates it when the finding recurs", async () => {
+    await record(firstHead, [anchored]);
+    expect((await rows())[0]?.detail).toBe("d");
+
+    await record(secondHead, [{ ...anchored, detail: "d2" }]);
+    expect((await rows())[0]?.detail).toBe("d2");
+  });
+
+  it("resolves a finding reported addressed even when absent from the findings", async () => {
+    await record(firstHead, [anchored, unanchored]);
+
+    await expect(
+      recordFindings(db, {
+        armedPrId: "armed-1",
+        headSha: secondHead,
+        findings: [unanchored],
+        priorFindings: [
+          { id: findingId("a.txt", "Anchored claim"), status: "addressed", note: "fixed" },
+        ],
+        jobId,
+      }),
+    ).resolves.toEqual({ created: 0, updated: 1, resolved: 1 });
+
+    const stored = await rows();
+    expect(stored.find((row) => row.path === "a.txt")?.resolvedSha).toBe(secondHead);
+    expect(stored.find((row) => row.path === null)?.resolvedSha).toBeNull();
+  });
+
+  it("resolves a withdrawn finding even when it is repeated in the findings", async () => {
+    await record(firstHead, [anchored]);
+
+    await expect(
+      recordFindings(db, {
+        armedPrId: "armed-1",
+        headSha: secondHead,
+        findings: [anchored],
+        priorFindings: [
+          { id: findingId("a.txt", "Anchored claim"), status: "withdrawn", note: "false positive" },
+        ],
+        jobId,
+      }),
+    ).resolves.toEqual({ created: 0, updated: 1, resolved: 1 });
+    expect((await rows())[0]?.resolvedSha).toBe(secondHead);
+  });
+
+  it("leaves an open prior finding open", async () => {
+    await record(firstHead, [anchored]);
+
+    await expect(
+      recordFindings(db, {
+        armedPrId: "armed-1",
+        headSha: secondHead,
+        findings: [anchored],
+        priorFindings: [
+          { id: findingId("a.txt", "Anchored claim"), status: "open", note: "still there" },
+        ],
+        jobId,
+      }),
+    ).resolves.toEqual({ created: 0, updated: 1, resolved: 0 });
+    expect((await rows())[0]?.resolvedSha).toBeNull();
+  });
+
   it("reports superseded when a newer job for the pull request is done", async () => {
     const older = await enqueueJob(db, {
       armedPrId: "armed-1",
