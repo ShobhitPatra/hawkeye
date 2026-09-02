@@ -117,7 +117,7 @@ Prompt overrides: a per-user override in the dashboard (taste), plus an optional
 
 ## Data model
 
-`User` (GitHub identity) → `Runner` (token, last_seen; one per machine, revocable) · `Installation` (App install, account) · `ArmedPR` (repo, number, armed_by, quiet-window override) · `Job` (armed_pr, head_sha, base_sha, not_before, state queued/claimed/done/failed) · `Run` (job, runner, started/ended, turns, status, error) · `Finding` (armed_pr, stable_id, first_seen_sha, resolved_sha?, github_comment_id) · `ReviewPosted` (run, head_sha, github_review_id) · `UserSettings` (prompt override, max-turns, wall clock, quiet window).
+`User` (GitHub identity) → `Runner` (token, last_seen; one per machine, revocable) · `Installation` (App install, account) · `ArmedPR` (repo, number, armed_by, quiet-window override) · `Job` (armed_pr, head_sha, base_sha, not_before, state queued/claimed/done/failed) · `Run` (job, runner, started/ended, turns, status, error) · `Finding` (armed_pr, stable_id, detail, severity, first_seen_sha, resolved_sha?, github_comment_id) · `ReviewPosted` (run, armed_pr, head_sha, github_review_id? — null while a round's review is in flight; the earliest filled row per pull request is the living review) · `UserSettings` (prompt override, max-turns, wall clock, quiet window).
 
 Everything is scoped by `user_id` from day one; no orgs, teams, or roles.
 

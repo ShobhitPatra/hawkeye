@@ -257,10 +257,10 @@ describe("postReviewForRun", () => {
     await seedLivingReview({ ...result, findings: [] });
 
     await expect(post()).resolves.toBe("posted");
-    expect(github.updateReview).toHaveBeenCalledTimes(2);
-    const secondBody = (github.updateReview as ReturnType<typeof vi.fn>).mock
-      .calls[1]![2] as string;
-    expect(secondBody).not.toContain("(inline)");
+    expect(github.updateReview).toHaveBeenCalledTimes(1);
+    const patchedBody = (github.updateReview as ReturnType<typeof vi.fn>).mock
+      .calls[0]![2] as string;
+    expect(patchedBody).not.toContain("(inline)");
     const rows = await db.select().from(schema.reviewPosted);
     expect(rows.find((row) => row.headSha === headSha)).toMatchObject({ githubReviewId: "5" });
   });

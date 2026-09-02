@@ -180,23 +180,30 @@ export async function postReviewForRun(
     }
 
     const { previousIds, priorClaims } = await previousRoundFindings(db, armedPr);
-    const { body, comments } = renderLivingReview({
-      result: input.result,
-      headSha,
-      commentable: toCommentableMap(input.commentable),
-      repositoryUrl: HAWKEYE_REPOSITORY_URL,
-      previousIds,
-      priorClaims,
-      rounds: await roundsFor(db, armedPr, input.runId),
-    });
-    await github.updateReview(reference, living.githubReviewId, body, token);
-    githubWrote = true;
+    const rounds = await roundsFor(db, armedPr, input.runId);
+    const render = (map: Map<string, Set<number>>) =>
+      renderLivingReview({
+        result: input.result,
+        headSha,
+        commentable: map,
+        repositoryUrl: HAWKEYE_REPOSITORY_URL,
+        previousIds,
+        priorClaims,
+        rounds,
+      });
+    const inline = render(toCommentableMap(input.commentable));
     let roundReviewId = living.githubReviewId;
-    if (comments.length > 0) {
+    let finalBody = inline.body;
+    if (inline.comments.length > 0) {
       try {
         const supplemental = await github.postReview(
           reference,
-          { event: "COMMENT", commit_id: headSha, body: encodeMarker(headSha), comments },
+          {
+            event: "COMMENT",
+            commit_id: headSha,
+            body: encodeMarker(headSha),
+            comments: inline.comments,
+          },
           token,
         );
         roundReviewId = supplemental.id;
@@ -205,18 +212,11 @@ export async function postReviewForRun(
         log(
           `supplemental review not posted (${message}); keeping every finding in the living body`,
         );
-        const bodyOnly = renderLivingReview({
-          result: input.result,
-          headSha,
-          commentable: new Map(),
-          repositoryUrl: HAWKEYE_REPOSITORY_URL,
-          previousIds,
-          priorClaims,
-          rounds: await roundsFor(db, armedPr, input.runId),
-        });
-        await github.updateReview(reference, living.githubReviewId, bodyOnly.body, token);
+        finalBody = render(new Map()).body;
       }
     }
+    await github.updateReview(reference, living.githubReviewId, finalBody, token);
+    githubWrote = true;
     await db
       .update(reviewPosted)
       .set({ githubReviewId: roundReviewId })
