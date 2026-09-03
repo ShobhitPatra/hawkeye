@@ -230,6 +230,51 @@ describe("claimJob", () => {
     });
   });
 
+  it("returns the pull request's last posted round to a sibling arm", async () => {
+    const firstRunId = await claimedRunId();
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${firstRunId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: {
+          ...reviewResult,
+          findings: [{ severity: "should_fix", claim: "Leaks a handle", detail: "Close it." }],
+        },
+      }),
+      { db, github },
+      firstRunId,
+    );
+    await db.insert(schema.user).values({ id: "user-2", name: "other", email: "x@example.com" });
+    const [sibling] = await db
+      .insert(schema.armedPr)
+      .values({ userId: "user-2", installationId: "10", owner: "octo", repo: "a", number: 1 })
+      .returning();
+    const other = await createRunnerToken(db, { userId: "user-2", name: "desk" });
+    await enqueueJob(db, {
+      armedPrId: sibling!.id,
+      headSha: "c".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: new Date(now.getTime() - 60_000),
+    });
+
+    const response = await claimJob(
+      request("/api/runner/jobs", { bearer: other.token }),
+      claimDeps(),
+    );
+
+    expect((await response.json()).previousRound).toEqual({
+      headSha: "a".repeat(40),
+      findings: [
+        {
+          id: findingId(undefined, "Leaks a handle"),
+          severity: "should_fix",
+          claim: "Leaks a handle",
+          detail: "Close it.",
+        },
+      ],
+    });
+  });
+
   it("returns no previous round when no review was posted", async () => {
     const firstRunId = await claimedRunId();
     github.postReview = vi.fn(async () => {

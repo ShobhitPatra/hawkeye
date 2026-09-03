@@ -10,6 +10,7 @@ import {
   type RunResultStatus,
 } from "@hawkeye/core";
 import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import {
   armedPr,
@@ -69,12 +70,22 @@ async function settingsFor(db: Db, userId: string): Promise<ClaimedJob["settings
 }
 
 async function previousRoundFor(db: Db, armedPrId: string): Promise<ClaimedJob["previousRound"]> {
+  const own = alias(armedPr, "own");
   const [latest] = await db
     .select({ headSha: job.headSha, result: run.result })
     .from(run)
     .innerJoin(job, eq(job.id, run.jobId))
     .innerJoin(reviewPosted, eq(reviewPosted.runId, run.id))
-    .where(and(eq(job.armedPrId, armedPrId), eq(run.status, "ok")))
+    .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
+    .innerJoin(own, eq(own.id, armedPrId))
+    .where(
+      and(
+        eq(armedPr.owner, own.owner),
+        eq(armedPr.repo, own.repo),
+        eq(armedPr.number, own.number),
+        eq(run.status, "ok"),
+      ),
+    )
     .orderBy(desc(run.startedAt))
     .limit(1);
   if (!latest?.result) return undefined;
@@ -315,8 +326,6 @@ export async function recordResult(
     result,
     commentable: report.commentable ?? {},
   });
-  if (posted === "superseded")
-    return Response.json({ ok: true, posted, findings: "superseded" }, { status: 200 });
   const [recordedBefore] = await deps.db
     .select({ id: reviewPosted.id })
     .from(reviewPosted)
