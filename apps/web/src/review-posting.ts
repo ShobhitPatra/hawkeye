@@ -10,10 +10,10 @@ import {
   renderReview,
   type ReviewResult,
 } from "@hawkeye/core";
-import { and, asc, desc, eq, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, ne, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import { armedPr as armedPrTable, job, reviewPosted, run } from "./db/schema";
-import { supersededBy } from "./findings";
 
 export type ReviewPostingDeps = { db: Db; github: GitHubClient; log?: (line: string) => void };
 export type ReviewPostingInput = {
@@ -106,6 +106,29 @@ async function roundsFor(
   });
 }
 
+async function newerHeadReviewed(
+  db: Db,
+  armedPr: ReviewPostingInput["armedPr"],
+  jobId: string,
+): Promise<boolean> {
+  const own = alias(job, "own");
+  const [newer] = await db
+    .select({ id: job.id })
+    .from(job)
+    .innerJoin(armedPrTable, eq(armedPrTable.id, job.armedPrId))
+    .innerJoin(own, eq(own.id, jobId))
+    .where(
+      and(
+        samePullRequest(armedPr),
+        eq(job.state, "done"),
+        ne(job.headSha, own.headSha),
+        sql`(${job.createdAt}, ${job.id}) > (${own.createdAt}, ${own.id})`,
+      ),
+    )
+    .limit(1);
+  return newer !== undefined;
+}
+
 export async function postReviewForRun(
   deps: ReviewPostingDeps,
   input: ReviewPostingInput,
@@ -113,7 +136,8 @@ export async function postReviewForRun(
   const { github } = deps;
   const log = deps.log ?? (() => {});
   const { armedPr, headSha } = input;
-  return deps.db.transaction(async (tx) => {
+  const reference = { owner: armedPr.owner, repo: armedPr.repo, number: armedPr.number };
+  const outcome = await deps.db.transaction(async (tx) => {
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtextextended(${`${armedPr.owner}/${armedPr.repo}#${armedPr.number}`}, 0))`,
     );
@@ -123,8 +147,8 @@ export async function postReviewForRun(
       .innerJoin(armedPrTable, eq(armedPrTable.id, reviewPosted.armedPrId))
       .where(and(samePullRequest(armedPr), eq(reviewPosted.headSha, headSha)))
       .limit(1);
-    if (postedForHead) return "already-posted";
-    if (await supersededBy(tx, input.jobId)) return "superseded";
+    if (postedForHead) return "already-posted" as const;
+    if (await newerHeadReviewed(tx, armedPr, input.jobId)) return "superseded" as const;
     const record = (githubReviewId: string) =>
       tx
         .insert(reviewPosted)
@@ -132,7 +156,6 @@ export async function postReviewForRun(
 
     try {
       const token = await github.installationTokenById(armedPr.installationId);
-      const reference = { owner: armedPr.owner, repo: armedPr.repo, number: armedPr.number };
       const living = await livingReviewFor(tx, armedPr);
 
       if (!living) {
@@ -152,7 +175,7 @@ export async function postReviewForRun(
           log,
         });
         await record(posted.id);
-        return "posted";
+        return "posted" as const;
       }
 
       const { previousIds, priorClaims } = await previousRoundFindings(tx, armedPr);
@@ -194,15 +217,16 @@ export async function postReviewForRun(
       }
       await github.updateReview(reference, living.githubReviewId, finalBody, token);
       if (!supplementalPosted) await record(living.githubReviewId);
-      return "posted";
+      return "posted" as const;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      log(`review not posted for run ${input.runId}: ${message}`);
-      await tx
-        .update(run)
-        .set({ error: `post: ${message}` })
-        .where(eq(run.id, input.runId));
-      return "failed";
+      return { failed: error instanceof Error ? error.message : String(error) };
     }
   });
+  if (typeof outcome === "string") return outcome;
+  log(`review not posted for run ${input.runId}: ${outcome.failed}`);
+  await deps.db
+    .update(run)
+    .set({ error: `post: ${outcome.failed}` })
+    .where(eq(run.id, input.runId));
+  return "failed";
 }

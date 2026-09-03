@@ -26,7 +26,7 @@ export async function recordFindings(
 
   return db.transaction(async (tx) => {
     await tx.execute(sql`select 1 from ${armedPr} where ${armedPr.id} = ${armedPrId} for update`);
-    if (await supersededBy(tx, input.jobId)) return "superseded";
+    if (await supersededBy(tx, armedPrId, input.jobId)) return "superseded";
     const counts: RecordedFindings = { created: 0, updated: 0, resolved: 0 };
     if (byStableId.size > 0) {
       const rows = await tx
@@ -97,22 +97,16 @@ export async function recordFindings(
   });
 }
 
-export async function supersededBy(db: Db, jobId: string): Promise<boolean> {
+async function supersededBy(db: Db, armedPrId: string, jobId: string): Promise<boolean> {
   const own = alias(job, "own");
-  const ownPullRequest = alias(armedPr, "own_pull_request");
-  const newerPullRequest = alias(armedPr, "newer_pull_request");
   const [newer] = await db
     .select({ id: job.id })
     .from(job)
-    .innerJoin(newerPullRequest, eq(newerPullRequest.id, job.armedPrId))
     .innerJoin(own, eq(own.id, jobId))
-    .innerJoin(ownPullRequest, eq(ownPullRequest.id, own.armedPrId))
     .where(
       and(
+        eq(job.armedPrId, armedPrId),
         eq(job.state, "done"),
-        eq(newerPullRequest.owner, ownPullRequest.owner),
-        eq(newerPullRequest.repo, ownPullRequest.repo),
-        eq(newerPullRequest.number, ownPullRequest.number),
         sql`(${job.createdAt}, ${job.id}) > (${own.createdAt}, ${own.id})`,
       ),
     )

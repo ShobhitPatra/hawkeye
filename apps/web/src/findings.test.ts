@@ -193,6 +193,35 @@ describe("recordFindings", () => {
     expect((await rows())[0]?.resolvedSha).toBeNull();
   });
 
+  it("records findings for an arm whose sibling arm already finished the same head", async () => {
+    await db.insert(schema.user).values({ id: "user-2", name: "other", email: "x@example.com" });
+    const [otherArm] = await db
+      .insert(schema.armedPr)
+      .values({ userId: "user-2", installationId: "10", owner: "octo", repo: "repo", number: 7 })
+      .returning();
+    const own = await enqueueJob(db, {
+      armedPrId: "armed-1",
+      headSha: firstHead,
+      baseSha: "b".repeat(40),
+      notBefore: new Date(),
+    });
+    const sibling = await enqueueJob(db, {
+      armedPrId: otherArm!.id,
+      headSha: firstHead,
+      baseSha: "b".repeat(40),
+      notBefore: new Date(),
+    });
+    await db.update(schema.job).set({ state: "done" }).where(eq(schema.job.id, sibling.id));
+    await expect(
+      recordFindings(db, {
+        armedPrId: "armed-1",
+        headSha: firstHead,
+        findings: [anchored],
+        jobId: own.id,
+      }),
+    ).resolves.toEqual({ created: 1, updated: 0, resolved: 0 });
+  });
+
   it("reports superseded when a newer job for the pull request is done", async () => {
     const older = await enqueueJob(db, {
       armedPrId: "armed-1",

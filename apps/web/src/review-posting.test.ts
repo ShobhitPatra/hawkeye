@@ -238,6 +238,30 @@ describe("postReviewForRun", () => {
     expect(await db.select().from(schema.reviewPosted)).toHaveLength(0);
   });
 
+  it("posts when a sibling arm's job for the same head finished without a review", async () => {
+    await db.insert(schema.user).values({ id: "user-2", name: "other", email: "x@example.com" });
+    const [otherArm] = await db
+      .insert(schema.armedPr)
+      .values({
+        userId: "user-2",
+        installationId: armedPr.installationId,
+        owner: armedPr.owner,
+        repo: armedPr.repo,
+        number: armedPr.number,
+      })
+      .returning();
+    await db.insert(schema.job).values({
+      armedPrId: otherArm!.id,
+      headSha,
+      baseSha: "b".repeat(40),
+      notBefore: new Date(),
+      state: "done",
+    });
+
+    await expect(post()).resolves.toBe("posted");
+    expect(github.postReview).toHaveBeenCalledTimes(1);
+  });
+
   it("re-patches the living body without inline comments when the supplemental hits a 422", async () => {
     github.updateReview = vi.fn(async () => {});
     github.postReview = vi.fn(async () => {
