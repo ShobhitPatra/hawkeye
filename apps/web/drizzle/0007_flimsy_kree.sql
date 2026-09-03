@@ -1,1 +1,0 @@
-ALTER TABLE "finding" ADD COLUMN "detail" text;

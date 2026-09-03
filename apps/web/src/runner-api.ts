@@ -9,7 +9,7 @@ import {
   type RunResultReport,
   type RunResultStatus,
 } from "@hawkeye/core";
-import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import {
@@ -84,9 +84,10 @@ async function previousRoundFor(db: Db, armedPrId: string): Promise<ClaimedJob["
         eq(armedPr.repo, own.repo),
         eq(armedPr.number, own.number),
         eq(run.status, "ok"),
+        isNotNull(reviewPosted.githubReviewId),
       ),
     )
-    .orderBy(desc(run.startedAt))
+    .orderBy(desc(reviewPosted.postedAt))
     .limit(1);
   if (!latest?.result) return undefined;
   const byId = new Map<string, PriorFinding>();

@@ -183,7 +183,7 @@ export const reviewPosted = pgTable(
       .notNull()
       .references(() => armedPr.id),
     headSha: text("head_sha").notNull(),
-    githubReviewId: text("github_review_id").notNull(),
+    githubReviewId: text("github_review_id"),
     postedAt: timestamp("posted_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("review_posted_per_head").on(t.armedPrId, t.headSha)],

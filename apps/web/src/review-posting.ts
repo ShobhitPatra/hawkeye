@@ -10,7 +10,7 @@ import {
   renderReview,
   type ReviewResult,
 } from "@hawkeye/core";
-import { and, asc, desc, eq, isNotNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import { armedPr as armedPrTable, job, reviewPosted, run } from "./db/schema";
@@ -25,6 +25,8 @@ export type ReviewPostingInput = {
   commentable: Record<string, number[]>;
 };
 export type ReviewPostingOutcome = "posted" | "already-posted" | "superseded" | "failed";
+
+const STALE_RESERVATION_MS = 10 * 60 * 1000;
 
 function toCommentableMap(commentable: Record<string, number[]>): Map<string, Set<number>> {
   return new Map(Object.entries(commentable).map(([path, lines]) => [path, new Set(lines)]));
@@ -46,10 +48,11 @@ async function livingReviewFor(
     .select({ githubReviewId: reviewPosted.githubReviewId })
     .from(reviewPosted)
     .innerJoin(armedPrTable, eq(armedPrTable.id, reviewPosted.armedPrId))
-    .where(samePullRequest(armedPr))
+    .where(and(samePullRequest(armedPr), isNotNull(reviewPosted.githubReviewId)))
     .orderBy(asc(reviewPosted.postedAt))
     .limit(1);
-  return row;
+  if (!row?.githubReviewId) return undefined;
+  return { githubReviewId: row.githubReviewId };
 }
 
 async function previousRoundFindings(
@@ -61,7 +64,7 @@ async function previousRoundFindings(
     .from(reviewPosted)
     .innerJoin(run, eq(run.id, reviewPosted.runId))
     .innerJoin(armedPrTable, eq(armedPrTable.id, reviewPosted.armedPrId))
-    .where(samePullRequest(armedPr))
+    .where(and(samePullRequest(armedPr), isNotNull(reviewPosted.githubReviewId)))
     .orderBy(desc(reviewPosted.postedAt))
     .limit(1);
   if (!latest?.result) throw new Error("the living review has no run result behind it");
@@ -85,13 +88,13 @@ async function roundsFor(
     .select({ headSha: job.headSha, startedAt: run.startedAt, result: run.result })
     .from(run)
     .innerJoin(job, eq(job.id, run.jobId))
-    .leftJoin(reviewPosted, eq(reviewPosted.runId, run.id))
+    .innerJoin(reviewPosted, eq(reviewPosted.runId, run.id))
     .innerJoin(armedPrTable, eq(armedPrTable.id, job.armedPrId))
     .where(
       and(
         samePullRequest(armedPr),
         eq(run.status, "ok"),
-        or(isNotNull(reviewPosted.id), eq(run.id, currentRunId)),
+        or(isNotNull(reviewPosted.githubReviewId), eq(run.id, currentRunId)),
       ),
     )
     .orderBy(asc(run.startedAt));
@@ -106,7 +109,7 @@ async function roundsFor(
   });
 }
 
-async function newerHeadReviewed(
+async function newerHeadStarted(
   db: Db,
   armedPr: ReviewPostingInput["armedPr"],
   jobId: string,
@@ -117,12 +120,14 @@ async function newerHeadReviewed(
     .from(job)
     .innerJoin(armedPrTable, eq(armedPrTable.id, job.armedPrId))
     .innerJoin(own, eq(own.id, jobId))
+    .leftJoin(run, eq(run.jobId, job.id))
+    .leftJoin(reviewPosted, eq(reviewPosted.runId, run.id))
     .where(
       and(
         samePullRequest(armedPr),
-        eq(job.state, "done"),
         ne(job.headSha, own.headSha),
         sql`(${job.createdAt}, ${job.id}) > (${own.createdAt}, ${own.id})`,
+        or(eq(job.state, "done"), isNotNull(reviewPosted.id)),
       ),
     )
     .limit(1);
@@ -133,14 +138,23 @@ export async function postReviewForRun(
   deps: ReviewPostingDeps,
   input: ReviewPostingInput,
 ): Promise<ReviewPostingOutcome> {
-  const { github } = deps;
+  const { db, github } = deps;
   const log = deps.log ?? (() => {});
   const { armedPr, headSha } = input;
   const reference = { owner: armedPr.owner, repo: armedPr.repo, number: armedPr.number };
-  const outcome = await deps.db.transaction(async (tx) => {
+  const reservation = await db.transaction(async (tx) => {
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtextextended(${`${armedPr.owner}/${armedPr.repo}#${armedPr.number}`}, 0))`,
     );
+    await tx
+      .delete(reviewPosted)
+      .where(
+        and(
+          sql`${reviewPosted.armedPrId} in (select id from ${armedPrTable} where owner = ${armedPr.owner} and repo = ${armedPr.repo} and number = ${armedPr.number})`,
+          isNull(reviewPosted.githubReviewId),
+          lt(reviewPosted.postedAt, new Date(Date.now() - STALE_RESERVATION_MS)),
+        ),
+      );
     const [postedForHead] = await tx
       .select({ id: reviewPosted.id })
       .from(reviewPosted)
@@ -148,85 +162,101 @@ export async function postReviewForRun(
       .where(and(samePullRequest(armedPr), eq(reviewPosted.headSha, headSha)))
       .limit(1);
     if (postedForHead) return "already-posted" as const;
-    if (await newerHeadReviewed(tx, armedPr, input.jobId)) return "superseded" as const;
-    const record = (githubReviewId: string) =>
-      tx
-        .insert(reviewPosted)
-        .values({ runId: input.runId, armedPrId: armedPr.id, headSha, githubReviewId });
+    if (await newerHeadStarted(tx, armedPr, input.jobId)) return "superseded" as const;
+    const [inserted] = await tx
+      .insert(reviewPosted)
+      .values({ runId: input.runId, armedPrId: armedPr.id, headSha, githubReviewId: null })
+      .returning({ id: reviewPosted.id });
+    if (!inserted) throw new Error("the review reservation was not inserted");
+    return inserted;
+  });
+  if (typeof reservation === "string") return reservation;
+  const record = (githubReviewId: string) =>
+    db.update(reviewPosted).set({ githubReviewId }).where(eq(reviewPosted.id, reservation.id));
+  const release = () => db.delete(reviewPosted).where(eq(reviewPosted.id, reservation.id));
 
-    try {
-      const token = await github.installationTokenById(armedPr.installationId);
-      const living = await livingReviewFor(tx, armedPr);
+  let githubWrote = false;
+  try {
+    const token = await github.installationTokenById(armedPr.installationId);
+    const living = await livingReviewFor(db, armedPr);
 
-      if (!living) {
-        const render = (commentable: Map<string, Set<number>>) =>
-          renderReview({
-            result: input.result,
-            headSha,
-            commentable,
-            repositoryUrl: HAWKEYE_REPOSITORY_URL,
-          });
-        const { posted } = await postRenderedReview({
-          github,
-          reference,
-          token,
-          review: render(toCommentableMap(input.commentable)),
-          renderBodyOnly: () => render(new Map()),
-          log,
-        });
-        await record(posted.id);
-        return "posted" as const;
-      }
-
-      const { previousIds, priorClaims } = await previousRoundFindings(tx, armedPr);
-      const rounds = await roundsFor(tx, armedPr, input.runId);
-      const render = (map: Map<string, Set<number>>) =>
-        renderLivingReview({
+    if (!living) {
+      const render = (commentable: Map<string, Set<number>>) =>
+        renderReview({
           result: input.result,
           headSha,
-          commentable: map,
+          commentable,
           repositoryUrl: HAWKEYE_REPOSITORY_URL,
-          previousIds,
-          priorClaims,
-          rounds,
         });
-      const inline = render(toCommentableMap(input.commentable));
-      let finalBody = inline.body;
-      let supplementalPosted = false;
-      if (inline.comments.length > 0) {
-        try {
-          const supplemental = await github.postReview(
-            reference,
-            {
-              event: "COMMENT",
-              commit_id: headSha,
-              body: encodeMarker(headSha),
-              comments: inline.comments,
-            },
-            token,
-          );
-          await record(supplemental.id);
-          supplementalPosted = true;
-        } catch (error) {
-          if (!(error instanceof GitHubRequestError && error.status === 422)) throw error;
-          log(
-            `supplemental review rejected (${error.message}); keeping every finding in the living body`,
-          );
-          finalBody = render(new Map()).body;
-        }
-      }
-      await github.updateReview(reference, living.githubReviewId, finalBody, token);
-      if (!supplementalPosted) await record(living.githubReviewId);
-      return "posted" as const;
-    } catch (error) {
-      return { failed: error instanceof Error ? error.message : String(error) };
+      const { posted } = await postRenderedReview({
+        github,
+        reference,
+        token,
+        review: render(toCommentableMap(input.commentable)),
+        renderBodyOnly: () => render(new Map()),
+        log,
+      });
+      githubWrote = true;
+      await record(posted.id);
+      return "posted";
     }
-  });
-  if (typeof outcome === "string") return outcome;
-  log(`review not posted for run ${input.runId}: ${outcome.failed}`);
-  await deps.db
-    .update(run)
-    .set({ error: `post: ${outcome.failed}` })
-    .where(eq(run.id, input.runId));
-  return "failed";
+
+    const { previousIds, priorClaims } = await previousRoundFindings(db, armedPr);
+    const rounds = await roundsFor(db, armedPr, input.runId);
+    const render = (map: Map<string, Set<number>>) =>
+      renderLivingReview({
+        result: input.result,
+        headSha,
+        commentable: map,
+        repositoryUrl: HAWKEYE_REPOSITORY_URL,
+        previousIds,
+        priorClaims,
+        rounds,
+      });
+    const inline = render(toCommentableMap(input.commentable));
+    let finalBody = inline.body;
+    let supplementalPosted = false;
+    if (inline.comments.length > 0) {
+      try {
+        const supplemental = await github.postReview(
+          reference,
+          {
+            event: "COMMENT",
+            commit_id: headSha,
+            body: encodeMarker(headSha),
+            comments: inline.comments,
+          },
+          token,
+        );
+        githubWrote = true;
+        await record(supplemental.id);
+        supplementalPosted = true;
+      } catch (error) {
+        if (!(error instanceof GitHubRequestError && error.status === 422)) throw error;
+        log(
+          `supplemental review rejected (${error.message}); keeping every finding in the living body`,
+        );
+        finalBody = render(new Map()).body;
+      }
+    }
+    if (await newerHeadStarted(db, armedPr, input.jobId)) {
+      log(`living body not patched for run ${input.runId}: a newer head is being reviewed`);
+      if (githubWrote) return "posted";
+      await release();
+      return "superseded";
+    }
+    await github.updateReview(reference, living.githubReviewId, finalBody, token);
+    githubWrote = true;
+    if (!supplementalPosted) await record(living.githubReviewId);
+    return "posted";
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log(`review not posted for run ${input.runId}: ${message}`);
+    if (!githubWrote) await release();
+    await db
+      .update(run)
+      .set({ error: `post: ${message}` })
+      .where(eq(run.id, input.runId));
+    return "failed";
+  }
 }
