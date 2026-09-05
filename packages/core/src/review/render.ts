@@ -17,7 +17,7 @@ export type RenderInput = {
   repositoryUrl: string;
 };
 
-function oneLine(text: string): string {
+export function oneLine(text: string): string {
   return text.replace(/\r?\n/g, " ");
 }
 
@@ -57,16 +57,21 @@ function isAnchored(
   );
 }
 
-export function renderReview({
+export type ReviewSections = { lines: string[]; comments: ReviewComment[] };
+
+export function renderReviewSections({
   result,
   headSha,
   commentable,
-  repositoryUrl,
-}: RenderInput): RenderedReview {
+  commentWorthy,
+}: Pick<RenderInput, "result" | "headSha" | "commentable"> & {
+  commentWorthy?: (finding: Finding) => boolean;
+}): ReviewSections {
   const comments: ReviewComment[] = [];
   const anchored = new Set<Finding>();
   for (const finding of result.findings) {
     if (!isAnchored(finding, commentable)) continue;
+    if (commentWorthy !== undefined && !commentWorthy(finding)) continue;
     anchored.add(finding);
     comments.push({
       path: finding.path,
@@ -104,18 +109,36 @@ export function renderReview({
     }
   }
 
-  lines.push(
+  return { lines, comments };
+}
+
+export function lensTableLines(result: Pick<ReviewResult, "lenses">): string[] {
+  const lines = [
     "",
     "<details>",
     "<summary>Review lenses</summary>",
     "",
     "| Lens | Assessment |",
     "|---|---|",
-  );
+  ];
   for (const lens of result.lenses)
     lines.push(`| \`${lens.name}\` | ${tableCell(lens.assessment)} |`);
   lines.push("", "</details>");
+  return lines;
+}
 
-  lines.push("", "---", `Reviewed by [Hawkeye](${repositoryUrl}) on the author's own plan.`);
+export function footerLines(repositoryUrl: string): string[] {
+  return ["", "---", `Reviewed by [Hawkeye](${repositoryUrl}) on the author's own plan.`];
+}
+
+export function renderReview({
+  result,
+  headSha,
+  commentable,
+  repositoryUrl,
+}: RenderInput): RenderedReview {
+  const { lines, comments } = renderReviewSections({ result, headSha, commentable });
+  lines.push(...lensTableLines(result));
+  lines.push(...footerLines(repositoryUrl));
   return { event: "COMMENT", commit_id: headSha, body: lines.join("\n"), comments };
 }

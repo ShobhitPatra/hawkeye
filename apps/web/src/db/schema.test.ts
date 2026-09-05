@@ -204,6 +204,7 @@ describe("schema migrations", () => {
       stableId: "finding-3",
       severity: "must_fix",
       claim: "claim-3",
+      detail: "detail-3",
       firstSeenSha: "a3",
     });
     const [selectedFinding] = await db
@@ -215,6 +216,7 @@ describe("schema migrations", () => {
       stableId: "finding-3",
       severity: "must_fix",
       claim: "claim-3",
+      detail: "detail-3",
       firstSeenSha: "a3",
     });
 

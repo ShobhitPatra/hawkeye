@@ -52,6 +52,7 @@ function fakeGitHub(
     linkedIssue: unsupported(),
     reviews: unsupported(),
     postReview: unsupported(),
+    updateReview: unsupported(),
   };
   return {
     github,

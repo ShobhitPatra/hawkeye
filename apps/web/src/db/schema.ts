@@ -160,6 +160,7 @@ export const finding = pgTable(
     stableId: text("stable_id").notNull(),
     severity: findingSeverity("severity").notNull(),
     claim: text("claim").notNull(),
+    detail: text("detail"),
     path: text("path"),
     line: integer("line"),
     firstSeenSha: text("first_seen_sha").notNull(),
@@ -182,7 +183,7 @@ export const reviewPosted = pgTable(
       .notNull()
       .references(() => armedPr.id),
     headSha: text("head_sha").notNull(),
-    githubReviewId: text("github_review_id").notNull(),
+    githubReviewId: text("github_review_id"),
     postedAt: timestamp("posted_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("review_posted_per_head").on(t.armedPrId, t.headSha)],

@@ -55,6 +55,22 @@ describe("createGitHubClient", () => {
     await expect(client.installationToken(ref)).resolves.toBe("ghs_x");
     expect((calls[0]!.init.headers as Record<string, string>).Authorization).toMatch(/^Bearer ey/);
   });
+  it("bounds every request with an abort signal", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      "GET /repos/o/r/installation": () => ({ json: { id: 155 } }),
+      "POST /app/installations/155/access_tokens": () => ({
+        status: 201,
+        json: { token: "ghs_x" },
+      }),
+    });
+    await createGitHubClient({
+      appId: "1",
+      privateKeyPem: pem,
+      fetch: fetchImpl,
+    }).installationToken(ref);
+    for (const call of calls) expect(call.init.signal).toBeInstanceOf(AbortSignal);
+  });
+
   it("maps pull request fields", async () => {
     const { fetchImpl } = fakeFetch({
       "GET /repos/o/r/pulls/5": () => ({
@@ -181,6 +197,27 @@ describe("createGitHubClient", () => {
     expect(calls).toHaveLength(2);
     expect(calls[0]!.url).toContain("per_page=100");
     expect(calls[1]!.url).toContain("page=2");
+  });
+  it("updates a review body with a put on the review", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      "PUT /repos/o/r/pulls/5/reviews/9": () => ({ json: { id: 9 } }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(client.updateReview(ref, "9", "new body", "t")).resolves.toBeUndefined();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.init.method).toBe("PUT");
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ body: "new body" });
+    expect((calls[0]!.init.headers as Record<string, string>).Authorization).toBe("Bearer t");
+  });
+  it("throws a typed error when the review update fails", async () => {
+    const { fetchImpl } = fakeFetch({
+      "PUT /repos/o/r/pulls/5/reviews/9": () => ({ status: 422, json: { message: "nope" } }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    const err = await client.updateReview(ref, "9", "b", "ghs_secret").catch((e: Error) => e);
+    expect(err).toBeInstanceOf(GitHubRequestError);
+    expect(String(err)).toMatch(/422.*nope/);
+    expect(String(err)).not.toContain("ghs_secret");
   });
   it("rejects a posted review without a numeric id", async () => {
     const { fetchImpl } = fakeFetch({
