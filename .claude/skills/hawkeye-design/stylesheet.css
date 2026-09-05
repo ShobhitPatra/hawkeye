@@ -123,7 +123,7 @@
   outline: 2px solid var(--hk-focus);
   outline-offset: 2px;
 }
-.hk-root a {
+:where(.hk-root) a {
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 0.15em;
@@ -133,11 +133,10 @@
 .hk-wordmark,
 .hk-crumb a,
 .hk-table a,
-.hk-button,
 .hk-menu-panel a {
   text-decoration: none;
 }
-.hk-link {
+.hk-root a.hk-link {
   text-decoration: underline;
   text-underline-offset: 0.15em;
 }

@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
-import favicon from "../../../.claude/skills/hawkeye-design/favicon.svg";
 import "../../../.claude/skills/hawkeye-design/stylesheet.css";
 
 const plexSans = IBM_Plex_Sans({
@@ -16,7 +15,12 @@ const plexMono = IBM_Plex_Mono({
 
 export const metadata = {
   title: "Hawkeye",
-  icons: { icon: { url: favicon.src, type: "image/svg+xml" } },
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "32x32" },
+    ],
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
