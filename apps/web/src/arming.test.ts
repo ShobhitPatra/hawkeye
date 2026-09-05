@@ -1,16 +1,23 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
-import {
-  armPullRequest,
-  armedPullRequestKey,
-  disarmPullRequest,
-  listArmedPullRequests,
-} from "./arming";
+import { armPullRequest, armedPullRequestKey, disarmPullRequest } from "./arming";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
 import { createTestDb } from "./test/pglite";
 
 let db: Db;
+
+async function armedKeys(userId: string) {
+  const rows = await db
+    .select({
+      owner: schema.armedPr.owner,
+      repo: schema.armedPr.repo,
+      number: schema.armedPr.number,
+    })
+    .from(schema.armedPr)
+    .where(and(eq(schema.armedPr.userId, userId), isNull(schema.armedPr.disarmedAt)));
+  return new Set(rows.map(armedPullRequestKey));
+}
 
 beforeAll(async () => {
   db = await createTestDb();
@@ -117,7 +124,7 @@ describe("disarmPullRequest", () => {
     });
 
     expect(disarmed?.disarmedAt).toBeInstanceOf(Date);
-    expect(await listArmedPullRequests(db, "user-1")).not.toContain("off/repo#4");
+    expect(await armedKeys("user-1")).not.toContain("off/repo#4");
   });
 
   it("returns nothing when the pull request is not armed", async () => {
@@ -143,33 +150,11 @@ describe("disarmPullRequest", () => {
     });
 
     expect(disarmed).toBeUndefined();
-    expect(await listArmedPullRequests(db, "user-1")).toContain("mine/repo#6");
+    expect(await armedKeys("user-1")).toContain("mine/repo#6");
   });
 });
 
-describe("listArmedPullRequests", () => {
-  it("returns only the user's active pull requests", async () => {
-    await armPullRequest(db, {
-      userId: "user-2",
-      installationId: "10",
-      owner: "theirs",
-      repo: "repo",
-      number: 7,
-    });
-    await armPullRequest(db, {
-      userId: "user-2",
-      installationId: "10",
-      owner: "theirs",
-      repo: "repo",
-      number: 8,
-    });
-    await disarmPullRequest(db, { userId: "user-2", owner: "theirs", repo: "repo", number: 8 });
-
-    const armed = await listArmedPullRequests(db, "user-2");
-
-    expect(armed).toEqual(new Set(["theirs/repo#7"]));
-  });
-
+describe("armedPullRequestKey", () => {
   it("keys rows as owner/repo#number", () => {
     expect(armedPullRequestKey({ owner: "octo", repo: "repo", number: 9 })).toBe("octo/repo#9");
   });

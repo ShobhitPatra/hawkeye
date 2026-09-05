@@ -14,10 +14,10 @@ describe("run formatting", () => {
   it("renders the verdict with the reported one only when it differs", () => {
     expect(formatVerdict({})).toBe("");
     expect(formatVerdict({ verdict: "changes_needed", reportedVerdict: "changes_needed" })).toBe(
-      "changes needed",
+      "Changes needed",
     );
     expect(formatVerdict({ verdict: "ship", reportedVerdict: "blocked" })).toBe(
-      "ship (reported blocked)",
+      "Ship (reported Blocked)",
     );
   });
   it("renders durations in minutes and seconds", () => {

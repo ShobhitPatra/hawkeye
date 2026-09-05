@@ -1,11 +1,10 @@
-import Link from "next/link";
-import { listArmedPullRequests } from "@/arming";
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
+import { listPullRequestStatuses } from "@/pull-request-status";
 import { listUserOpenPullRequests } from "@/pull-requests";
-import { describeRunnerStatus, runnerStatus } from "@/runner-status";
+import { requestRunnerStatus } from "@/request-runner-status";
 import { requireSession } from "@/session";
-import { PullRequestTable } from "./pull-request-table";
+import { PullRequestsView } from "./pull-requests-view";
 
 export default async function PullRequestsPage() {
   const session = await requireSession();
@@ -13,49 +12,35 @@ export default async function PullRequestsPage() {
 
   if (!login) {
     return (
-      <main>
-        <h1>Pull requests</h1>
-        <p>Sign out and in again to load your pull requests.</p>
+      <main className="hk-page">
+        <div className="hk-header">
+          <h1 className="hk-title">Pull requests</h1>
+        </div>
+        <div className="hk-state">
+          <p>Your GitHub login is not on this session.</p>
+          <p>Sign out and in again to load your pull requests.</p>
+        </div>
       </main>
     );
   }
 
   const db = getDb();
-  const [{ pullRequests, failures }, armed, runner] = await Promise.all([
+  const [{ pullRequests, failures }, statuses, runner] = await Promise.all([
     listUserOpenPullRequests(
       { db, github: createGitHubAppClient({ fetch }) },
       { userId: session.user.id, login },
     ),
-    listArmedPullRequests(db, session.user.id),
-    runnerStatus(db, session.user.id),
+    listPullRequestStatuses(db, session.user.id),
+    requestRunnerStatus(session.user.id),
   ]);
 
   return (
-    <main>
-      <h1>Pull requests</h1>
-      <p>
-        {describeRunnerStatus(runner)}
-        {!runner.online && (
-          <>
-            {" "}
-            <Link href="/connect">Connect a runner</Link>
-          </>
-        )}
-      </p>
-      {pullRequests.length === 0 ? (
-        <p>No open pull requests</p>
-      ) : (
-        <PullRequestTable pullRequests={pullRequests} armed={armed} />
-      )}
-      {failures.length > 0 && (
-        <ul>
-          {failures.map((failure) => (
-            <li key={failure.installationId}>
-              Could not load installation {failure.installationId}: {failure.message}
-            </li>
-          ))}
-        </ul>
-      )}
-    </main>
+    <PullRequestsView
+      pullRequests={pullRequests}
+      failures={failures}
+      statuses={statuses}
+      runner={runner}
+      now={Date.now()}
+    />
   );
 }

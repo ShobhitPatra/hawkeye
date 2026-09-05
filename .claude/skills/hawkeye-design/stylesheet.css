@@ -468,7 +468,7 @@
   line-height: var(--hk-leading-heading);
   font-weight: var(--hk-weight-semibold);
 }
-.hk-verdict[data-verdict="hold"] .hk-verdict-word {
+.hk-verdict[data-verdict="blocked"] .hk-verdict-word {
   color: var(--hk-must);
 }
 .hk-verdict-why {
@@ -599,11 +599,23 @@
 .hk-arm {
   width: 8px;
   height: 8px;
+  padding: 0;
   border-radius: 50%;
   border: 1.5px solid var(--hk-fg-2);
+  background: transparent;
   display: inline-block;
   flex: none;
   vertical-align: middle;
+}
+button.hk-arm {
+  cursor: pointer;
+  position: relative;
+  transition: background-color var(--hk-duration) var(--hk-ease);
+}
+button.hk-arm::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
 }
 .hk-arm[data-armed="true"] {
   background: var(--hk-fg);

@@ -2,69 +2,133 @@ import Link from "next/link";
 import { armedPullRequestKey } from "@/arming";
 import { formatUpdated } from "@/format-updated";
 import type { ListedPullRequest } from "@/pull-requests";
+import type { PullRequestStatus } from "@/pull-request-status";
+import { verdictLabel } from "@/run-format";
 import { armAction, disarmAction } from "./actions";
+
+function StatusWord({
+  status,
+  runnerOnline,
+}: {
+  status: PullRequestStatus;
+  runnerOnline: boolean;
+}) {
+  switch (status.kind) {
+    case "armed":
+      return <span className="hk-status">Armed</span>;
+    case "queued":
+      return runnerOnline ? (
+        <span className="hk-status">Queued</span>
+      ) : (
+        <span className="hk-status" data-state="attention">
+          Waiting, runner offline
+        </span>
+      );
+    case "reviewing":
+      return (
+        <span className="hk-status" data-state="running">
+          Reviewing
+        </span>
+      );
+    case "failed":
+      return (
+        <span className="hk-status" data-state="failed">
+          Run failed
+        </span>
+      );
+    case "reviewed": {
+      const { verdict } = status.last;
+      return (
+        <span className="hk-status" data-state={verdict === "blocked" ? "failed" : undefined}>
+          {verdictLabel(verdict)}
+        </span>
+      );
+    }
+  }
+}
 
 export function PullRequestTable({
   pullRequests,
-  armed,
+  statuses,
+  runnerOnline,
+  now,
 }: {
   pullRequests: ListedPullRequest[];
-  armed: Set<string>;
+  statuses: Map<string, PullRequestStatus>;
+  runnerOnline: boolean;
+  now: number;
 }) {
-  const now = Date.now();
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>Repository</th>
-          <th>Number</th>
-          <th>Title</th>
-          <th>Branch</th>
-          <th>Updated</th>
-          <th>Review</th>
-        </tr>
-      </thead>
-      <tbody>
-        {pullRequests.map((pullRequest) => {
-          const isArmed = armed.has(armedPullRequestKey(pullRequest));
-          const pageHref = `/prs/${pullRequest.owner}/${pullRequest.repo}/${pullRequest.number}`;
-          return (
-            <tr key={pullRequest.htmlUrl}>
-              <td>
-                {isArmed ? (
-                  <Link href={pageHref}>
-                    {pullRequest.owner}/{pullRequest.repo}
-                  </Link>
-                ) : (
-                  `${pullRequest.owner}/${pullRequest.repo}`
-                )}
-              </td>
-              <td>
-                {isArmed ? (
-                  <Link href={pageHref}>#{pullRequest.number}</Link>
-                ) : (
-                  `#${pullRequest.number}`
-                )}
-              </td>
-              <td>
-                <a href={pullRequest.htmlUrl}>{pullRequest.title}</a>
-                {isArmed && <span> armed</span>}
-              </td>
-              <td>{pullRequest.headRef}</td>
-              <td>{formatUpdated(pullRequest.updatedAt, now)}</td>
-              <td>
-                <form action={isArmed ? disarmAction : armAction}>
-                  <input type="hidden" name="owner" value={pullRequest.owner} />
-                  <input type="hidden" name="repo" value={pullRequest.repo} />
-                  <input type="hidden" name="number" value={pullRequest.number} />
-                  <input type="hidden" name="installationId" value={pullRequest.installationId} />
-                  <button type="submit">{isArmed ? "Disarm" : "Arm"}</button>
-                </form>
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div className="hk-table-wrap">
+      <table className="hk-table">
+        <thead>
+          <tr>
+            <th scope="col">
+              <span className="hk-visually-hidden">Armed</span>
+            </th>
+            <th scope="col">Pull request</th>
+            <th scope="col">Status</th>
+            <th scope="col" className="hk-numeric">
+              Round
+            </th>
+            <th scope="col" className="hk-numeric">
+              Findings
+            </th>
+            <th scope="col">Reviewed</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pullRequests.map((pullRequest) => {
+            const status = statuses.get(armedPullRequestKey(pullRequest));
+            const isArmed = status !== undefined;
+            const pageHref = `/prs/${pullRequest.owner}/${pullRequest.repo}/${pullRequest.number}`;
+            const last = status && status.kind !== "armed" ? status.last : undefined;
+            return (
+              <tr key={pullRequest.htmlUrl} data-dim={isArmed ? undefined : "true"}>
+                <td className="hk-cell-arm">
+                  <form action={isArmed ? disarmAction : armAction}>
+                    <input type="hidden" name="owner" value={pullRequest.owner} />
+                    <input type="hidden" name="repo" value={pullRequest.repo} />
+                    <input type="hidden" name="number" value={pullRequest.number} />
+                    <input type="hidden" name="installationId" value={pullRequest.installationId} />
+                    <button
+                      type="submit"
+                      className="hk-arm"
+                      data-armed={isArmed ? "true" : "false"}
+                      aria-pressed={isArmed}
+                      aria-label={isArmed ? "Disarm" : "Arm"}
+                      title={isArmed ? "Disarm" : "Arm"}
+                    />
+                  </form>
+                </td>
+                <td>
+                  <div className="hk-cell-stack">
+                    {isArmed ? (
+                      <Link href={pageHref}>{pullRequest.title}</Link>
+                    ) : (
+                      <a href={pullRequest.htmlUrl}>{pullRequest.title}</a>
+                    )}
+                    <span className="hk-metadata">
+                      {pullRequest.owner}/{pullRequest.repo}{" "}
+                      <span className="hk-mono">#{pullRequest.number}</span>
+                    </span>
+                  </div>
+                </td>
+                <td>
+                  {status ? (
+                    <StatusWord status={status} runnerOnline={runnerOnline} />
+                  ) : (
+                    <span className="hk-status">Not armed</span>
+                  )}
+                </td>
+                <td className="hk-numeric">{last?.rounds ?? ""}</td>
+                <td className="hk-numeric">{last?.openFindings ?? ""}</td>
+                <td>{last ? formatUpdated(last.reviewedAt.toISOString(), now) : ""}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

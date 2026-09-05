@@ -31,7 +31,7 @@ Four faces, one voice. The visual tokens apply to the dashboard and any landing 
 ## Voice
 
 - Sentence case everywhere, including buttons, headings and table headers.
-- Human labels on every surface: "Must fix", "Should fix", "Optional", "Inherited"; "Ship", "Revise", "Hold". The wire keeps `must_fix` and friends; people never see snake_case.
+- Human labels on every surface: "Must fix", "Should fix", "Optional", "Inherited"; "Ship", "Mergeable", "Changes needed", "Blocked". The wire keeps `must_fix` and friends; people never see snake_case.
 - A review opens with the verdict and its one-line reason. No greeting, no praise, no summary of what the pull request does. Silence is the compliment.
 - No hedges. A finding states what breaks and what to do. "Might", "consider", "it seems", "perhaps" mark a claim that is not a finding.
 - Underlines exist only on links inside running text (prose, finding details, state sentences, help lines). Navigation, crumbs, table titles, the wordmark, menu items and buttons never underline, not even on hover; they shift color. The stylesheet enforces this through those classes, so a bare link on a page that is not restyled yet keeps its underline.
@@ -48,7 +48,7 @@ Four faces, one voice. The visual tokens apply to the dashboard and any landing 
 Design in monochrome on a warm neutral. Color is a secondary cue, always paired with a word or position, and the whole palette is neutrals plus red plus amber.
 
 - Neutrals: warm paper and graphite. Light ground `#f7f6f3`, dark ground `#131211`, never true black or pure white.
-- Red (`--hk-must`) only for: the "Must fix" label, the "Hold" verdict word, and a failed run.
+- Red (`--hk-must`) only for: the "Must fix" label, the "Blocked" verdict word, and a failed run.
 - Amber (`--hk-warn`) only for states that need the user to act: runner offline, pull requests waiting.
 - No green. A posted review, a passing verdict, an online runner are the normal state and stay neutral.
 - No blue. Focus rings use the foreground color.
@@ -107,7 +107,7 @@ One bar, 44px, with a hairline beneath it, on every page. Signed in: the wordmar
 
 ### Dashboard lists
 
-A list is a table at compact size. Text columns left, numbers right, header alignment matches its cells. The title is the link; hover shifts its color, never underlines. First column is the arm circle. A cell that needs a second line (repo under a title) stacks it as metadata, never as a second column. Status is a word, colored only by the rules above. Rows for unarmed or closed pull requests dim to secondary text. No row hover surfaces, no zebra stripes.
+A list is a table at compact size. Text columns left, numbers right, header alignment matches its cells. The title is the link; hover shifts its color, never underlines. First column is the arm circle, which is the arm and disarm button; its filled or hollow state is the only indicator. Status is one word: Armed, Queued, Waiting with runner offline in amber, Reviewing with the shimmer, Run failed in red, or the verdict word. A cell that needs a second line (repo under a title) stacks it as metadata, never as a second column. Status is a word, colored only by the rules above. Rows for unarmed or closed pull requests dim to secondary text. No row hover surfaces, no zebra stripes.
 
 ### Dashboard detail pages
 
