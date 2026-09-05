@@ -49,6 +49,7 @@ function deps(
       url: "https://github.com/o/r/pull/1#pullrequestreview-9",
       id: "9",
     })),
+    updateReview: vi.fn(async () => {}),
   };
   const harness: HarnessSpec = {
     name: "fake",

@@ -9,7 +9,8 @@ import {
   type RunResultReport,
   type RunResultStatus,
 } from "@hawkeye/core";
-import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import {
   armedPr,
@@ -69,13 +70,24 @@ async function settingsFor(db: Db, userId: string): Promise<ClaimedJob["settings
 }
 
 async function previousRoundFor(db: Db, armedPrId: string): Promise<ClaimedJob["previousRound"]> {
+  const own = alias(armedPr, "own");
   const [latest] = await db
     .select({ headSha: job.headSha, result: run.result })
     .from(run)
     .innerJoin(job, eq(job.id, run.jobId))
     .innerJoin(reviewPosted, eq(reviewPosted.runId, run.id))
-    .where(and(eq(job.armedPrId, armedPrId), eq(run.status, "ok")))
-    .orderBy(desc(run.startedAt))
+    .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
+    .innerJoin(own, eq(own.id, armedPrId))
+    .where(
+      and(
+        eq(armedPr.owner, own.owner),
+        eq(armedPr.repo, own.repo),
+        eq(armedPr.number, own.number),
+        eq(run.status, "ok"),
+        isNotNull(reviewPosted.githubReviewId),
+      ),
+    )
+    .orderBy(desc(reviewPosted.postedAt))
     .limit(1);
   if (!latest?.result) return undefined;
   const byId = new Map<string, PriorFinding>();
@@ -95,13 +107,14 @@ async function previousRoundFor(db: Db, armedPrId: string): Promise<ClaimedJob["
     .select()
     .from(finding)
     .where(and(eq(finding.armedPrId, armedPrId), isNull(finding.resolvedSha)));
+  // Finding rows written before migration 0007 carry no detail.
   for (const row of open) {
     if (byId.has(row.stableId)) continue;
     byId.set(row.stableId, {
       id: row.stableId,
       severity: row.severity,
       claim: row.claim,
-      detail: row.claim,
+      detail: row.detail ?? row.claim,
       ...(row.path === null ? {} : { path: row.path }),
       ...(row.line === null ? {} : { line: row.line }),
     });
@@ -309,6 +322,7 @@ export async function recordResult(
   if (!target) throw new Error(`run ${runId} has no armed pull request`);
   const posted = await postReviewForRun(deps, {
     runId,
+    jobId: completed.jobId,
     armedPr: target.armedPr,
     headSha: target.headSha,
     result,
@@ -331,6 +345,7 @@ export async function recordResult(
     armedPrId: target.armedPr.id,
     headSha: target.headSha,
     findings: result.findings,
+    ...(result.priorFindings === undefined ? {} : { priorFindings: result.priorFindings }),
     jobId: completed.jobId,
   }).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);

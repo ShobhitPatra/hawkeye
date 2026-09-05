@@ -67,6 +67,12 @@ export interface GitHubClient {
     review: RenderedReview,
     token: string,
   ): Promise<{ url: string; id: string }>;
+  updateReview(
+    reference: PullRequestReference,
+    reviewId: string,
+    body: string,
+    token: string,
+  ): Promise<void>;
   listInstallationRepositories(token: string): Promise<InstallationRepository[]>;
   listOpenPullRequestsByAuthor(
     token: string,
@@ -99,6 +105,8 @@ function nextLink(header: string | null): string | undefined {
 
 const DEFAULT_API_BASE = "https://api.github.com";
 
+const REQUEST_TIMEOUT_MS = 30_000;
+
 async function sendGitHubRequest(
   fetchImpl: typeof fetch,
   method: string,
@@ -108,6 +116,7 @@ async function sendGitHubRequest(
 ): Promise<{ payload: unknown; response: Response }> {
   const response = await fetchImpl(url, {
     method,
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     headers: {
       Authorization: auth,
       Accept: "application/vnd.github+json",
@@ -333,6 +342,9 @@ export function createGitHubClient(input: {
       if (typeof posted.id !== "number")
         throw new Error(`GitHub POST ${path} returned no review id`);
       return { url: posted.html_url, id: String(posted.id) };
+    },
+    async updateReview(reference, reviewId, body, token) {
+      await request("PUT", `${pulls(reference)}/reviews/${reviewId}`, bearer(token), { body });
     },
     async listInstallationRepositories(token) {
       return paginate("/installation/repositories", token, (payload) =>

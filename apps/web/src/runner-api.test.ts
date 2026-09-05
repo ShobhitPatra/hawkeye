@@ -28,6 +28,7 @@ function createGitHub(): GitHubClient {
       url: "https://github.com/octo/a/pull/1#pullrequestreview-9",
       id: "9",
     })),
+    updateReview: unsupported(),
     listInstallationRepositories: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
   };
@@ -229,6 +230,51 @@ describe("claimJob", () => {
     });
   });
 
+  it("returns the pull request's last posted round to a sibling arm", async () => {
+    const firstRunId = await claimedRunId();
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${firstRunId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: {
+          ...reviewResult,
+          findings: [{ severity: "should_fix", claim: "Leaks a handle", detail: "Close it." }],
+        },
+      }),
+      { db, github },
+      firstRunId,
+    );
+    await db.insert(schema.user).values({ id: "user-2", name: "other", email: "x@example.com" });
+    const [sibling] = await db
+      .insert(schema.armedPr)
+      .values({ userId: "user-2", installationId: "10", owner: "octo", repo: "a", number: 1 })
+      .returning();
+    const other = await createRunnerToken(db, { userId: "user-2", name: "desk" });
+    await enqueueJob(db, {
+      armedPrId: sibling!.id,
+      headSha: "c".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: new Date(now.getTime() - 60_000),
+    });
+
+    const response = await claimJob(
+      request("/api/runner/jobs", { bearer: other.token }),
+      claimDeps(),
+    );
+
+    expect((await response.json()).previousRound).toEqual({
+      headSha: "a".repeat(40),
+      findings: [
+        {
+          id: findingId(undefined, "Leaks a handle"),
+          severity: "should_fix",
+          claim: "Leaks a handle",
+          detail: "Close it.",
+        },
+      ],
+    });
+  });
+
   it("returns no previous round when no review was posted", async () => {
     const firstRunId = await claimedRunId();
     github.postReview = vi.fn(async () => {
@@ -282,6 +328,16 @@ describe("claimJob", () => {
       line: 5,
       firstSeenSha: "9".repeat(40),
     });
+    await db.insert(schema.finding).values({
+      armedPrId: "armed-1",
+      stableId: findingId("c.txt", "No docs"),
+      severity: "optional",
+      claim: "No docs",
+      detail: "Document the flag.",
+      path: "c.txt",
+      line: 1,
+      firstSeenSha: "9".repeat(40),
+    });
     await enqueue();
 
     const response = await claimJob(request("/api/runner/jobs"), claimDeps());
@@ -302,6 +358,14 @@ describe("claimJob", () => {
         detail: "Missing tests",
         path: "b.txt",
         line: 5,
+      },
+      {
+        id: findingId("c.txt", "No docs"),
+        severity: "optional",
+        claim: "No docs",
+        detail: "Document the flag.",
+        path: "c.txt",
+        line: 1,
       },
     ]);
   });
@@ -582,6 +646,62 @@ describe("recordResult", () => {
     });
   });
 
+  it("resolves findings the result reports addressed even when repeated", async () => {
+    const leak = {
+      path: "a.txt",
+      line: 2,
+      severity: "should_fix",
+      claim: "Leaks a handle",
+      detail: "Close it.",
+    };
+    const firstRunId = await claimedRunId();
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${firstRunId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: { ...reviewResult, verdict: "changes_needed", findings: [leak] },
+      }),
+      { db, github },
+      firstRunId,
+    );
+    await enqueueJob(db, {
+      armedPrId: "armed-1",
+      headSha: "c".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: new Date(now.getTime() - 60_000),
+    });
+    const claim = await claimJob(request("/api/runner/jobs"), claimDeps());
+    const secondRunId = (await claim.json()).job.runId as string;
+    github.updateReview = vi.fn(async () => {});
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${secondRunId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: {
+          ...reviewResult,
+          verdict: "changes_needed",
+          findings: [leak],
+          priorFindings: [
+            { id: findingId("a.txt", "Leaks a handle"), status: "addressed", note: "closed" },
+          ],
+        },
+      }),
+      { db, github },
+      secondRunId,
+    );
+
+    expect(await response.json()).toEqual({
+      ok: true,
+      posted: "posted",
+      findings: { created: 0, updated: 1, resolved: 1 },
+    });
+    expect(github.updateReview).toHaveBeenCalledTimes(1);
+    const [row] = await db.select().from(schema.finding);
+    expect(row?.resolvedSha).toBe("c".repeat(40));
+    expect(row?.detail).toBe("Close it.");
+  });
+
   it("does not post twice for the same head", async () => {
     const firstRunId = await claimedRunId();
     await recordResult(
@@ -653,7 +773,7 @@ describe("recordResult", () => {
       transaction: {
         value: (...args: Parameters<typeof db.transaction>) => {
           transactions += 1;
-          if (transactions > 1) throw new Error("db gone");
+          if (transactions > 2) throw new Error("db gone");
           return db.transaction(...args);
         },
       },
@@ -789,7 +909,11 @@ describe("recordResult", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, posted: "posted", findings: "superseded" });
+    expect(await response.json()).toEqual({
+      ok: true,
+      posted: "superseded",
+      findings: "superseded",
+    });
     expect(await db.select().from(schema.finding)).toHaveLength(0);
   });
 

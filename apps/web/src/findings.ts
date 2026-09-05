@@ -1,5 +1,6 @@
-import { type Finding, findingId } from "@hawkeye/core";
-import { and, eq, isNull, notInArray, sql } from "drizzle-orm";
+import { type Finding, findingId, type PriorFindingReport } from "@hawkeye/core";
+import { and, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import { armedPr, finding, job } from "./db/schema";
 
@@ -7,9 +8,9 @@ export type RecordFindingsInput = {
   armedPrId: string;
   headSha: string;
   findings: Finding[];
+  priorFindings?: PriorFindingReport[];
   jobId: string;
 };
-type Transaction = Parameters<Parameters<Db["transaction"]>[0]>[0];
 export type RecordedFindings = { created: number; updated: number; resolved: number };
 
 export async function recordFindings(
@@ -36,6 +37,7 @@ export async function recordFindings(
             stableId,
             severity: entry.severity,
             claim: entry.claim,
+            detail: entry.detail,
             path: entry.path ?? null,
             line: entry.line ?? null,
             firstSeenSha: headSha,
@@ -46,6 +48,7 @@ export async function recordFindings(
           set: {
             severity: sql`excluded.severity`,
             claim: sql`excluded.claim`,
+            detail: sql`excluded.detail`,
             path: sql`excluded.path`,
             line: sql`excluded.line`,
             resolvedSha: null,
@@ -57,6 +60,24 @@ export async function recordFindings(
         if (row.inserted) counts.created += 1;
         else counts.updated += 1;
       }
+    }
+
+    const reportedClosed = (input.priorFindings ?? [])
+      .filter((prior) => prior.status !== "open")
+      .map((prior) => prior.id);
+    if (reportedClosed.length > 0) {
+      const closed = await tx
+        .update(finding)
+        .set({ resolvedSha: headSha })
+        .where(
+          and(
+            eq(finding.armedPrId, armedPrId),
+            isNull(finding.resolvedSha),
+            inArray(finding.stableId, reportedClosed),
+          ),
+        )
+        .returning({ id: finding.id });
+      counts.resolved += closed.length;
     }
 
     const stableIds = [...byStableId.keys()];
@@ -71,20 +92,22 @@ export async function recordFindings(
         ),
       )
       .returning({ id: finding.id });
-    counts.resolved = resolved.length;
+    counts.resolved += resolved.length;
     return counts;
   });
 }
 
-async function supersededBy(tx: Transaction, armedPrId: string, jobId: string): Promise<boolean> {
-  const [newer] = await tx
+async function supersededBy(db: Db, armedPrId: string, jobId: string): Promise<boolean> {
+  const own = alias(job, "own");
+  const [newer] = await db
     .select({ id: job.id })
     .from(job)
+    .innerJoin(own, eq(own.id, jobId))
     .where(
       and(
         eq(job.armedPrId, armedPrId),
         eq(job.state, "done"),
-        sql`(${job.createdAt}, ${job.id}) > (select created_at, id from ${job} own where own.id = ${jobId})`,
+        sql`(${job.createdAt}, ${job.id}) > (${own.createdAt}, ${own.id})`,
       ),
     )
     .limit(1);
