@@ -9,9 +9,9 @@ export function shortSha(sha: string): string {
 
 export function formatVerdict(run: Pick<PullRequestRun, "verdict" | "reportedVerdict">): string {
   if (!run.verdict) return "";
-  const verdict = run.verdict.replaceAll("_", " ");
+  const verdict = verdictLabel(run.verdict);
   if (run.reportedVerdict && run.reportedVerdict !== run.verdict)
-    return `${verdict} (reported ${run.reportedVerdict.replaceAll("_", " ")})`;
+    return `${verdict} (reported ${verdictLabel(run.reportedVerdict)})`;
   return verdict;
 }
 
