@@ -33,7 +33,7 @@ export type PullRequestFinding = {
   resolvedSha: string | null;
 };
 
-function userArmsOf(input: PullRequestCoordinates) {
+export function userArmsOf(input: PullRequestCoordinates) {
   return and(
     eq(armedPr.userId, input.userId),
     eq(armedPr.owner, input.owner),

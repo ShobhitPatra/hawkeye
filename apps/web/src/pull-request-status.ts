@@ -3,6 +3,7 @@ import { and, count, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { armedPullRequestKey } from "./arming";
 import type { Db } from "./db/client";
 import { armedPr, finding, job, reviewPosted, run } from "./db/schema";
+import { userArmsOf } from "./runs";
 
 export type LastReview = {
   verdict: Verdict;
@@ -38,15 +39,6 @@ export async function listPullRequestStatuses(
   return new Map(entries);
 }
 
-function everyArmOf(arm: Arm) {
-  return and(
-    eq(armedPr.userId, arm.userId),
-    eq(armedPr.owner, arm.owner),
-    eq(armedPr.repo, arm.repo),
-    eq(armedPr.number, arm.number),
-  );
-}
-
 async function statusOf(db: Db, arm: Arm): Promise<PullRequestStatus> {
   const [openJobs, lastReview, latestRun] = await Promise.all([
     db
@@ -59,7 +51,7 @@ async function statusOf(db: Db, arm: Arm): Promise<PullRequestStatus> {
       .from(run)
       .innerJoin(job, eq(job.id, run.jobId))
       .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
-      .where(everyArmOf(arm))
+      .where(userArmsOf(arm))
       .orderBy(desc(run.startedAt))
       .limit(1),
   ]);
@@ -80,7 +72,7 @@ async function lastReviewOf(db: Db, arm: Arm): Promise<LastReview | undefined> {
     .innerJoin(job, eq(job.id, run.jobId))
     .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
     .innerJoin(reviewPosted, eq(reviewPosted.runId, run.id))
-    .where(and(everyArmOf(arm), eq(run.status, "ok"), isNotNull(reviewPosted.githubReviewId)))
+    .where(and(userArmsOf(arm), eq(run.status, "ok"), isNotNull(reviewPosted.githubReviewId)))
     .orderBy(desc(run.endedAt));
   const latest = posted[0];
   if (!latest?.result || !latest.endedAt) return undefined;
@@ -88,7 +80,7 @@ async function lastReviewOf(db: Db, arm: Arm): Promise<LastReview | undefined> {
     .select({ openFindings: count() })
     .from(finding)
     .innerJoin(armedPr, eq(armedPr.id, finding.armedPrId))
-    .where(and(everyArmOf(arm), isNull(finding.resolvedSha)));
+    .where(and(userArmsOf(arm), isNull(finding.resolvedSha)));
   return {
     verdict: latest.result.verdict,
     rounds: posted.length,
