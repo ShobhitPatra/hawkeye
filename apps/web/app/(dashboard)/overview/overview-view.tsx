@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { formatUpdated } from "@/format-updated";
-import { dayKey, type Overview, type Totals } from "@/overview";
+import { dayKey, type Overview, type Totals, yearDays } from "@/overview";
 import { verdictLabel } from "@/run-format";
 import type { RunnerStatus } from "@/runner-status";
 
-const DAY = 24 * 60 * 60 * 1000;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function hoursAndMinutes(seconds: number): string {
@@ -19,14 +18,6 @@ function level(count: number): number {
   if (count <= 2) return 2;
   if (count <= 3) return 3;
   return 4;
-}
-
-function yearDays(now: Date): Date[] {
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const start = new Date(today.getTime() - (52 * 7 - 1) * DAY);
-  const offset = start.getUTCDay();
-  const first = new Date(start.getTime() - offset * DAY);
-  return Array.from({ length: 52 * 7 }, (_, index) => new Date(first.getTime() + index * DAY));
 }
 
 export function OverviewView({
@@ -90,11 +81,11 @@ export function OverviewView({
           </div>
           <div className="hk-heat-key" aria-hidden="true">
             <span>Fewer</span>
-            <i />
-            <i style={{ background: "var(--hk-bg-3)" }} />
-            <i style={{ background: "var(--hk-fg-3)" }} />
-            <i style={{ background: "var(--hk-fg-2)" }} />
-            <i style={{ background: "var(--hk-fg)" }} />
+            <i data-level={0} />
+            <i data-level={1} />
+            <i data-level={2} />
+            <i data-level={3} />
+            <i data-level={4} />
             <span>More</span>
           </div>
         </div>

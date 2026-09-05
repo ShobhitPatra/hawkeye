@@ -2,7 +2,7 @@ import type { ReviewResult } from "@hawkeye/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
-import { dayKey, loadOverview } from "./overview";
+import { dayKey, loadOverview, yearDays } from "./overview";
 import { createRunnerToken } from "./runner-tokens";
 import { createTestDb, seedArmedPullRequest } from "./test/pglite";
 
@@ -160,6 +160,15 @@ describe("loadOverview", () => {
 
     expect((await loadOverview(db, "user-1", now)).allTime.reviews).toBe(0);
     expect((await loadOverview(db, "user-2", now)).allTime.reviews).toBe(1);
+  });
+
+  it("lays out 52 whole weeks that end on the Saturday of the current week", () => {
+    const days = yearDays(new Date("2026-09-08T15:00:00Z"));
+    expect(days).toHaveLength(364);
+    expect(days[0]?.getUTCDay()).toBe(0);
+    expect(dayKey(days[0]!)).toBe("2025-09-14");
+    expect(dayKey(days.at(-1)!)).toBe("2026-09-12");
+    expect(days.some((day) => dayKey(day) === "2026-09-08")).toBe(true);
   });
 
   it("keys days by UTC date", () => {

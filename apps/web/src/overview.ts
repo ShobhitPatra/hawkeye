@@ -41,6 +41,15 @@ const EMPTY: Totals = {
   seconds: 0,
 };
 
+const DAY = 24 * 60 * 60 * 1000;
+
+export function yearDays(now: Date): Date[] {
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const last = new Date(today.getTime() + (6 - today.getUTCDay()) * DAY);
+  const first = new Date(last.getTime() - (52 * 7 - 1) * DAY);
+  return Array.from({ length: 52 * 7 }, (_, index) => new Date(first.getTime() + index * DAY));
+}
+
 export function dayKey(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
@@ -51,7 +60,7 @@ export async function loadOverview(db: Db, userId: string, now: Date): Promise<O
     findingRows(db, userId),
   ]);
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const yearStart = new Date(now.getTime() - 364 * 24 * 60 * 60 * 1000);
+  const yearStart = yearDays(now)[0]!;
 
   const reviewsByDay = new Map<string, number>();
   for (const review of reviews) {
