@@ -2,7 +2,8 @@ import Link from "next/link";
 import { getDb } from "@/db";
 import { formatUpdated } from "@/format-updated";
 import { findRunnerLogin, sweepRunnerLogins } from "@/runner-login";
-import { describeRunnerStatus, runnerStatus } from "@/runner-status";
+import { requestRunnerStatus } from "@/request-runner-status";
+import { describeRunnerStatus } from "@/runner-status";
 import { requireSession } from "@/session";
 import { siteUrl } from "@/site-url";
 import { ApproveLoginForm } from "./approve-login-form";
@@ -18,7 +19,7 @@ export default async function ConnectPage({
   );
   const pending = code ? await findRunnerLogin(getDb(), { code }) : undefined;
   await sweepRunnerLogins(getDb());
-  const status = await runnerStatus(getDb(), session.user.id);
+  const status = await requestRunnerStatus(session.user.id);
 
   return (
     <main>

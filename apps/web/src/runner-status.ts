@@ -33,5 +33,5 @@ export async function runnerStatus(
 }
 
 export function describeRunnerStatus(status: RunnerStatus): string {
-  return status.online ? "Runner online" : `Runner offline · ${status.waitingJobs} waiting`;
+  return status.online ? "Runner online" : `Runner offline, ${status.waitingJobs} waiting`;
 }
