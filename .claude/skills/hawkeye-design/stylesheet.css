@@ -200,7 +200,8 @@
   line-height: var(--hk-leading-metadata);
   color: var(--hk-fg-2);
 }
-.hk-label {
+.hk-label,
+.hk-steps > li::before {
   font-size: 11px;
   line-height: 16px;
   font-weight: var(--hk-weight-semibold);
@@ -574,12 +575,6 @@
 .hk-steps > li::before {
   counter-increment: step;
   content: "Step " counter(step);
-  font-size: 11px;
-  line-height: 16px;
-  font-weight: var(--hk-weight-semibold);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--hk-fg-3);
   padding-top: var(--hk-space-1);
 }
 .hk-step-body {
