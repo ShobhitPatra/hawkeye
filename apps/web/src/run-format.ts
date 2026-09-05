@@ -1,3 +1,4 @@
+import type { Verdict } from "@hawkeye/core";
 import type { PullRequestFinding, PullRequestRun } from "./runs";
 
 const MAX_ERROR_LENGTH = 120;
@@ -29,4 +30,15 @@ export function formatError(error: string | undefined): string {
 export function formatFindingLocation(finding: Pick<PullRequestFinding, "path" | "line">): string {
   if (!finding.path) return "";
   return finding.line === null ? ` (${finding.path})` : ` (${finding.path}:${finding.line})`;
+}
+
+const VERDICT_LABELS: Record<Verdict, string> = {
+  ship: "Ship",
+  mergeable: "Mergeable",
+  changes_needed: "Changes needed",
+  blocked: "Blocked",
+};
+
+export function verdictLabel(verdict: Verdict): string {
+  return VERDICT_LABELS[verdict];
 }
