@@ -60,11 +60,3 @@ export async function disarmPullRequest(
     .returning();
   return disarmed;
 }
-
-export async function listArmedPullRequests(db: Db, userId: string): Promise<Set<string>> {
-  const rows = await db
-    .select({ owner: armedPr.owner, repo: armedPr.repo, number: armedPr.number })
-    .from(armedPr)
-    .where(and(eq(armedPr.userId, userId), isNull(armedPr.disarmedAt)));
-  return new Set(rows.map(armedPullRequestKey));
-}
