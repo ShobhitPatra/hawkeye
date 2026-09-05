@@ -152,8 +152,3 @@ export async function findArmedPullRequest(
     ? { id: row.id, installationId: row.installationId, armed: row.disarmedAt === null }
     : undefined;
 }
-
-export async function hasArmedPullRequest(db: Db, input: PullRequestCoordinates): Promise<boolean> {
-  const [row] = await db.select({ id: armedPr.id }).from(armedPr).where(userArmsOf(input)).limit(1);
-  return row !== undefined;
-}

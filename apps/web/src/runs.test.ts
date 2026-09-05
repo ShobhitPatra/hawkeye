@@ -3,12 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
 import { createRunnerToken } from "./runner-tokens";
-import {
-  findArmedPullRequest,
-  hasArmedPullRequest,
-  listFindingsForPullRequest,
-  listRunsForPullRequest,
-} from "./runs";
+import { findArmedPullRequest, listFindingsForPullRequest, listRunsForPullRequest } from "./runs";
 import { createTestDb, seedArmedPullRequest } from "./test/pglite";
 
 const coordinates = { userId: "user-1", owner: "octo", repo: "repo", number: 7 };
@@ -102,7 +97,7 @@ describe("listRunsForPullRequest", () => {
     expect(runs[0]?.endedAt).toBeUndefined();
   });
 
-  it("extracts verdict and reportedVerdict from the stored result", async () => {
+  it("extracts verdict, summary, lenses and the runner name from the stored result", async () => {
     const jobId = (await seedJob("armed-1")).id;
     await seedRun(jobId, { status: "ok", result, turns: 12, error: "late" });
 
@@ -110,9 +105,21 @@ describe("listRunsForPullRequest", () => {
     expect(row).toMatchObject({
       verdict: "changes_needed",
       reportedVerdict: "mergeable",
+      summary: "needs work",
+      lenses: result.lenses,
+      runnerName: "laptop",
       turns: 12,
       error: "late",
     });
+  });
+
+  it("carries no result fields for a run without a result", async () => {
+    const jobId = (await seedJob("armed-1")).id;
+    await seedRun(jobId);
+    const [row] = await listRunsForPullRequest(db, coordinates);
+    expect(row).not.toHaveProperty("verdict");
+    expect(row).not.toHaveProperty("summary");
+    expect(row).not.toHaveProperty("lenses");
   });
 
   it("composes the review url only when a review was posted", async () => {
@@ -212,19 +219,6 @@ describe("findArmedPullRequest", () => {
     await db.update(schema.armedPr).set({ disarmedAt: new Date() });
     expect(await findArmedPullRequest(db, coordinates)).toMatchObject({ armed: false });
     expect(await findArmedPullRequest(db, { ...coordinates, number: 99 })).toBeUndefined();
-  });
-});
-
-describe("hasArmedPullRequest", () => {
-  it("finds active and disarmed arms of the user only", async () => {
-    await expect(hasArmedPullRequest(db, coordinates)).resolves.toBe(true);
-    await expect(hasArmedPullRequest(db, { ...coordinates, number: 8 })).resolves.toBe(false);
-    await expect(hasArmedPullRequest(db, { ...coordinates, userId: "user-2" })).resolves.toBe(
-      false,
-    );
-
-    await db.update(schema.armedPr).set({ disarmedAt: new Date() });
-    await expect(hasArmedPullRequest(db, coordinates)).resolves.toBe(true);
   });
 });
 
