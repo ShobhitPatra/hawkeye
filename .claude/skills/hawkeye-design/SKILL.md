@@ -66,7 +66,7 @@ Design in monochrome on a warm neutral. Color is a secondary cue, always paired 
 
 ### The mark
 
-A hawk in profile, in flight: one raised wing, a body line ending in a beak, a short tail, and a dot for the eye, facing right. Drawn on a 24 grid at stroke 1.5, the same weight as the interface icons (`mark.svg`). It is monochrome and takes the current color. It lives where there is no room for words: the GitHub App avatar (`avatar-light.svg`, one fixed image on the light palette, since GitHub does not follow the page theme), the favicon (`favicon.svg`, swaps stroke with the system theme), and the README header and social card in a lockup with the bird before the wordmark. It never sits beside the wordmark in the top bar and never replaces the arm circle. Do not fill it, add color, mirror it, or redraw it at another stroke.
+A hawk in profile, in flight: one raised wing, a body line ending in a beak, a short tail, and a dot for the eye, facing right. Drawn on a 24 grid at stroke 1.5, the same weight as the interface icons (`mark.svg`). It is monochrome and takes the current color. It lives where there is no room for words: the GitHub App avatar (`avatar-light.svg`, one fixed image on the light palette, since GitHub does not follow the page theme), the favicon (`favicon.svg`, swaps stroke with the system theme; the app serves its own copies from `apps/web/public/`, regenerated from this file whenever the mark changes), and the README header and social card in a lockup with the bird before the wordmark. It never sits beside the wordmark in the top bar and never replaces the arm circle. Do not fill it, add color, mirror it, or redraw it at another stroke.
 
 ### Spacing and shape
 
