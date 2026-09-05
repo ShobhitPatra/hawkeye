@@ -4,7 +4,7 @@ import { createGitHubAppClient } from "@/github/app";
 import { listPullRequestStatuses } from "@/pull-request-status";
 import { listUserOpenPullRequests } from "@/pull-requests";
 import { formatUpdated } from "@/format-updated";
-import { runnerStatus } from "@/runner-status";
+import { requestRunnerStatus } from "@/request-runner-status";
 import { requireSession } from "@/session";
 import { PullRequestTable } from "./pull-request-table";
 
@@ -33,7 +33,7 @@ export default async function PullRequestsPage() {
       { userId: session.user.id, login },
     ),
     listPullRequestStatuses(db, session.user.id),
-    runnerStatus(db, session.user.id),
+    requestRunnerStatus(session.user.id),
   ]);
   const now = Date.now();
   const reviewing = [...statuses.values()].filter((status) => status.kind === "reviewing").length;
