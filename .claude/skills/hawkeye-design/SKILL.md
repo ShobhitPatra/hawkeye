@@ -159,7 +159,7 @@ Verdict: `hk-verdict[data-verdict]`, `hk-verdict-word`, `hk-verdict-why`.
 
 Margin column: `hk-margin`, `hk-entry[data-severity]`, `hk-gutter`, `hk-severity[data-severity]`, `hk-lens`, `hk-entry-body`, `hk-claim`, `hk-path` (wrap the text in `<bdi>`), `hk-detail`, `hk-group-heading`.
 
-Controls: `hk-button[data-variant="primary"]`, `hk-arm[data-armed]`, `hk-input`, `hk-textarea`, `hk-choice`, `hk-field`, `hk-field-wide`, `hk-form-row`, `hk-action-row`, `hk-help`, `hk-link` (kept for compatibility; a bare link already underlines).
+Controls: `hk-button[data-variant="primary"]`, `hk-arm[data-armed]`, `hk-input`, `hk-textarea`, `hk-choice`, `hk-field`, `hk-field-wide`, `hk-form-row`, `hk-action-row`, `hk-help`, `hk-link` (on an `<a>` inside `hk-root` only: forces the underline back inside any context that removes it, the top bar, navigation, crumbs, tables and the menu; a bare link in running text already underlines).
 
 Code and sections: `hk-code`, `hk-code-row`, `hk-section`.
 
