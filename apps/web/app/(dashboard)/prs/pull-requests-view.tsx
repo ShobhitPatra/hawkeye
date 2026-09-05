@@ -63,7 +63,7 @@ export function PullRequestsView({
 
       {pullRequests.length === 0 ? (
         <div className="hk-state">
-          <p>No open pull requests in the repos this app is installed on.</p>
+          <p>No open pull requests of yours in the repos this app is installed on.</p>
           <p>
             <a href="https://github.com/settings/installations">
               Install the GitHub App on another repo
@@ -83,7 +83,7 @@ export function PullRequestsView({
       {failures.map((failure) => (
         <div className="hk-state" key={failure.installationId}>
           <p>GitHub did not answer for installation {failure.installationId}.</p>
-          <p>Nothing was lost. {failure.message}</p>
+          <p>Its pull requests are missing from this list. {failure.message}</p>
         </div>
       ))}
     </main>
