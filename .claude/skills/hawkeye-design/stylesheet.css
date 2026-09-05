@@ -848,16 +848,20 @@ button.hk-arm::before {
   background: var(--hk-bg-2);
   min-width: 0;
 }
-.hk-heat-grid > i[data-level="1"] {
+.hk-heat-grid > i[data-level="1"],
+.hk-heat-key > i[data-level="1"] {
   background: var(--hk-bg-3);
 }
-.hk-heat-grid > i[data-level="2"] {
+.hk-heat-grid > i[data-level="2"],
+.hk-heat-key > i[data-level="2"] {
   background: var(--hk-fg-3);
 }
-.hk-heat-grid > i[data-level="3"] {
+.hk-heat-grid > i[data-level="3"],
+.hk-heat-key > i[data-level="3"] {
   background: var(--hk-fg-2);
 }
-.hk-heat-grid > i[data-level="4"] {
+.hk-heat-grid > i[data-level="4"],
+.hk-heat-key > i[data-level="4"] {
   background: var(--hk-fg);
 }
 .hk-heat-key {
