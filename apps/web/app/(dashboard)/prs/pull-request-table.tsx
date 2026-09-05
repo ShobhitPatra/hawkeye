@@ -52,12 +52,13 @@ export function PullRequestTable({
   pullRequests,
   statuses,
   runnerOnline,
+  now,
 }: {
   pullRequests: ListedPullRequest[];
   statuses: Map<string, PullRequestStatus>;
   runnerOnline: boolean;
+  now: number;
 }) {
-  const now = Date.now();
   return (
     <div className="hk-table-wrap">
       <table className="hk-table">
