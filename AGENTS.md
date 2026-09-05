@@ -10,6 +10,7 @@ workspace/         local-only scratch, ADRs, agent-skill config (gitignored)
 packages/core      review contract, harness interface, render, dedupe, posting
 packages/runner    hawkeye CLI (daemon in milestone 2)
 apps/web           Next.js control plane (Drizzle + Postgres)
+.claude/skills     agent skills; hawkeye-design carries the design system (SKILL.md, stylesheet.css, the mark)
 ```
 
 ## Commands
