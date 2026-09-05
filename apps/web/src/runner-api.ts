@@ -107,6 +107,7 @@ async function previousRoundFor(db: Db, armedPrId: string): Promise<ClaimedJob["
     .select()
     .from(finding)
     .where(and(eq(finding.armedPrId, armedPrId), isNull(finding.resolvedSha)));
+  // Finding rows written before migration 0007 carry no detail.
   for (const row of open) {
     if (byId.has(row.stableId)) continue;
     byId.set(row.stableId, {

@@ -163,24 +163,17 @@ export async function postReviewForRun(
       .limit(1);
     if (postedForHead) return "already-posted" as const;
     if (await newerHeadStarted(tx, armedPr, input.jobId)) return "superseded" as const;
-    const [inserted] = await tx
-      .insert(reviewPosted)
-      .values({ runId: input.runId, armedPrId: armedPr.id, headSha, githubReviewId: null })
-      .returning({ id: reviewPosted.id });
-    if (!inserted) throw new Error("the review reservation was not inserted");
-    return inserted;
-  });
-  if (typeof reservation === "string") return reservation;
-  const record = (githubReviewId: string) =>
-    db.update(reviewPosted).set({ githubReviewId }).where(eq(reviewPosted.id, reservation.id));
-  const release = () => db.delete(reviewPosted).where(eq(reviewPosted.id, reservation.id));
-
-  let githubWrote = false;
-  try {
-    const token = await github.installationTokenById(armedPr.installationId);
-    const living = await livingReviewFor(db, armedPr);
-
-    if (!living) {
+    const living = await livingReviewFor(tx, armedPr);
+    if (living) {
+      const [inserted] = await tx
+        .insert(reviewPosted)
+        .values({ runId: input.runId, armedPrId: armedPr.id, headSha, githubReviewId: null })
+        .returning({ id: reviewPosted.id });
+      if (!inserted) throw new Error("the review reservation was not inserted");
+      return { id: inserted.id, living };
+    }
+    try {
+      const token = await github.installationTokenById(armedPr.installationId);
       const render = (commentable: Map<string, Set<number>>) =>
         renderReview({
           result: input.result,
@@ -196,11 +189,24 @@ export async function postReviewForRun(
         renderBodyOnly: () => render(new Map()),
         log,
       });
-      githubWrote = true;
-      await record(posted.id);
-      return "posted";
+      await tx
+        .insert(reviewPosted)
+        .values({ runId: input.runId, armedPrId: armedPr.id, headSha, githubReviewId: posted.id });
+      return "posted" as const;
+    } catch (error) {
+      return { failed: error instanceof Error ? error.message : String(error) };
     }
+  });
+  if (typeof reservation === "string") return reservation;
+  if ("failed" in reservation) return failRun(deps, input.runId, reservation.failed);
+  const { living } = reservation;
+  const record = (githubReviewId: string) =>
+    db.update(reviewPosted).set({ githubReviewId }).where(eq(reviewPosted.id, reservation.id));
+  const release = () => db.delete(reviewPosted).where(eq(reviewPosted.id, reservation.id));
 
+  let githubWrote = false;
+  try {
+    const token = await github.installationTokenById(armedPr.installationId);
     const { previousIds, priorClaims } = await previousRoundFindings(db, armedPr);
     const rounds = await roundsFor(db, armedPr, input.runId);
     const render = (map: Map<string, Set<number>>) =>
@@ -250,13 +256,20 @@ export async function postReviewForRun(
     if (!supplementalPosted) await record(living.githubReviewId);
     return "posted";
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    log(`review not posted for run ${input.runId}: ${message}`);
     if (!githubWrote) await release();
-    await db
-      .update(run)
-      .set({ error: `post: ${message}` })
-      .where(eq(run.id, input.runId));
-    return "failed";
+    return failRun(deps, input.runId, error instanceof Error ? error.message : String(error));
   }
+}
+
+async function failRun(
+  deps: ReviewPostingDeps,
+  runId: string,
+  message: string,
+): Promise<ReviewPostingOutcome> {
+  deps.log?.(`review not posted for run ${runId}: ${message}`);
+  await deps.db
+    .update(run)
+    .set({ error: `post: ${message}` })
+    .where(eq(run.id, runId));
+  return "failed";
 }
