@@ -136,7 +136,7 @@
 .hk-menu-panel a {
   text-decoration: none;
 }
-a.hk-link {
+.hk-root a.hk-link {
   text-decoration: underline;
   text-underline-offset: 0.15em;
 }
