@@ -34,7 +34,7 @@ Four faces, one voice. The visual tokens apply to the dashboard and any landing 
 - Human labels on every surface: "Must fix", "Should fix", "Optional", "Inherited"; "Ship", "Revise", "Hold". The wire keeps `must_fix` and friends; people never see snake_case.
 - A review opens with the verdict and its one-line reason. No greeting, no praise, no summary of what the pull request does. Silence is the compliment.
 - No hedges. A finding states what breaks and what to do. "Might", "consider", "it seems", "perhaps" mark a claim that is not a finding.
-- Underlines exist only on links inside running text (prose, finding details, state sentences, help lines). Navigation, crumbs, table titles, the wordmark and buttons never underline, not even on hover; they shift color.
+- Underlines exist only on links inside running text (prose, finding details, state sentences, help lines). Navigation, crumbs, table titles, the wordmark, menu items and buttons never underline, not even on hover; they shift color. The stylesheet enforces this through those classes, so a bare link on a page that is not restyled yet keeps its underline.
 - Controls say what happens: "Arm", "Re-review", "Start the runner". After the action, the state word changes; no toast that restates it.
 - State sentences say what is true and what to do next: "Runner offline. 3 pull requests are waiting and will be reviewed when it reconnects."
 - Errors say what went wrong, that nothing was lost when that is true, and the next step. No apologies.
@@ -57,7 +57,7 @@ Design in monochrome on a warm neutral. Color is a secondary cue, always paired 
 
 ### Typography
 
-- IBM Plex Sans for everything read. IBM Plex Mono for paths, SHAs, pull request numbers, finding ids, durations, turn counts, the wordmark, and any identifier a person might copy. Set only the identifier in mono, never the sentence around it.
+- IBM Plex Sans for everything read. IBM Plex Mono for paths, SHAs, pull request numbers, finding ids, durations, turn counts, the wordmark, and any identifier a person might copy. Set only the identifier in mono, never the sentence around it. The stylesheet reads the faces from `--font-plex-sans` and `--font-plex-mono` when the host defines them (the Next app does, through `next/font`) and falls back to the installed family names otherwise.
 - Seven sizes and no others: metadata 12, compact 13, body 15, lede 17, heading 20, title 24, display 32. Lists and tables run at compact; detail pages and prose at body. One more, headline 44, exists for the landing page's first sentence and nowhere else.
 - Three weights: regular 400, medium 500 for headings, claims and emphasis, semibold 600 for the verdict word and severity labels. Never bold a whole sentence.
 - Prose measures 60 to 68 characters. Rewrite before shrinking.
@@ -151,7 +151,7 @@ Tokens are `--hk-*`, classes are `hk-*`, both from `stylesheet.css` beside this 
 
 Roots and shell: `hk-root`, `hk-topbar[data-sticky]`, `hk-wordmark`, `hk-nav`, `hk-topbar-end`, `hk-account-name`, `hk-account-initial`, `hk-menu` (a `<details>`), `hk-menu-panel`, `hk-menu-who`, `hk-menu-row`, `hk-progress`, `hk-page`.
 
-Type roles: `hk-link` (opt-in underline outside prose), `hk-headline` (landing only), `hk-display`, `hk-title`, `hk-heading`, `hk-lede`, `hk-body`, `hk-compact`, `hk-metadata`, `hk-label`, `hk-mono`, `hk-numeric`, `hk-muted`, `hk-prose`, `hk-visually-hidden`.
+Type roles: `hk-headline` (landing only), `hk-display`, `hk-title`, `hk-heading`, `hk-lede`, `hk-body`, `hk-compact`, `hk-metadata`, `hk-label`, `hk-mono`, `hk-numeric`, `hk-muted`, `hk-prose`, `hk-visually-hidden`.
 
 Page header: `hk-crumb`, `hk-crumb-sep`, `hk-header`, `hk-title-row`, `hk-actions`, `hk-meta`.
 
@@ -159,7 +159,7 @@ Verdict: `hk-verdict[data-verdict]`, `hk-verdict-word`, `hk-verdict-why`.
 
 Margin column: `hk-margin`, `hk-entry[data-severity]`, `hk-gutter`, `hk-severity[data-severity]`, `hk-lens`, `hk-entry-body`, `hk-claim`, `hk-path` (wrap the text in `<bdi>`), `hk-detail`, `hk-group-heading`.
 
-Controls: `hk-button[data-variant="primary"]`, `hk-arm[data-armed]`, `hk-input`, `hk-textarea`, `hk-choice`, `hk-field`, `hk-field-wide`, `hk-form-row`, `hk-action-row`, `hk-help`.
+Controls: `hk-button[data-variant="primary"]`, `hk-arm[data-armed]`, `hk-input`, `hk-textarea`, `hk-choice`, `hk-field`, `hk-field-wide`, `hk-form-row`, `hk-action-row`, `hk-help`, `hk-link` (kept for compatibility; a bare link already underlines).
 
 Code and sections: `hk-code`, `hk-code-row`, `hk-section`.
 
