@@ -1,8 +1,7 @@
-import type { PullRequestReference } from "@hawkeye/core";
-import { SEVERITIES, type Severity } from "@hawkeye/core";
+import { type Lens, type PullRequestReference, SEVERITIES, type Severity } from "@hawkeye/core";
 import Link from "next/link";
 import { formatUpdated } from "@/format-updated";
-import { formatDuration, shortSha, verdictLabel } from "@/run-format";
+import { formatDuration, formatError, runFailureLabel, shortSha, verdictLabel } from "@/run-format";
 import type { ArmedPullRequestSummary, PullRequestFinding, PullRequestRun } from "@/runs";
 import { armAction, disarmAction } from "../../../actions";
 
@@ -13,7 +12,7 @@ const SEVERITY_LABELS: Record<Severity, string> = {
   inherited: "Inherited",
 };
 
-const LENS_LABELS: Record<string, string> = {
+const LENS_LABELS: Record<Lens, string> = {
   intent: "Intent",
   behavior: "Behavior",
   blast_radius: "Blast radius",
@@ -146,8 +145,8 @@ export function PullRequestView({
             <span className="hk-status" data-state="failed">
               Run failed
             </span>{" "}
-            {formatUpdated(latest.startedAt.toISOString(), now)}: {latest.status}
-            {latest.error ? `. ${latest.error}` : "."}
+            {formatUpdated(latest.startedAt.toISOString(), now)}: {runFailureLabel(latest.status)}
+            {latest.error ? `. ${formatError(latest.error)}` : "."}
           </p>
           <p>The pull request was not touched. The next push queues a new review.</p>
         </div>
@@ -244,7 +243,7 @@ export function PullRequestView({
               <tbody>
                 {lastReview.lenses.map((lens) => (
                   <tr key={lens.name}>
-                    <td>{LENS_LABELS[lens.name] ?? lens.name}</td>
+                    <td>{LENS_LABELS[lens.name]}</td>
                     <td>{lens.assessment}</td>
                   </tr>
                 ))}

@@ -1,18 +1,10 @@
 import type { Verdict } from "@hawkeye/core";
-import type { PullRequestFinding, PullRequestRun } from "./runs";
+import type { PullRequestRun } from "./runs";
 
 const MAX_ERROR_LENGTH = 120;
 
 export function shortSha(sha: string): string {
   return sha.slice(0, 7);
-}
-
-export function formatVerdict(run: Pick<PullRequestRun, "verdict" | "reportedVerdict">): string {
-  if (!run.verdict) return "";
-  const verdict = verdictLabel(run.verdict);
-  if (run.reportedVerdict && run.reportedVerdict !== run.verdict)
-    return `${verdict} (reported ${verdictLabel(run.reportedVerdict)})`;
-  return verdict;
 }
 
 export function formatDuration(run: Pick<PullRequestRun, "startedAt" | "endedAt">): string {
@@ -27,11 +19,6 @@ export function formatError(error: string | undefined): string {
   return error.length > MAX_ERROR_LENGTH ? `${error.slice(0, MAX_ERROR_LENGTH)}…` : error;
 }
 
-export function formatFindingLocation(finding: Pick<PullRequestFinding, "path" | "line">): string {
-  if (!finding.path) return "";
-  return finding.line === null ? ` (${finding.path})` : ` (${finding.path}:${finding.line})`;
-}
-
 const VERDICT_LABELS: Record<Verdict, string> = {
   ship: "Ship",
   mergeable: "Mergeable",
@@ -41,4 +28,16 @@ const VERDICT_LABELS: Record<Verdict, string> = {
 
 export function verdictLabel(verdict: Verdict): string {
   return VERDICT_LABELS[verdict];
+}
+
+const RUN_FAILURE_LABELS: Record<Exclude<PullRequestRun["status"], "running" | "ok">, string> = {
+  "max-turns": "hit the turn limit",
+  timeout: "ran out of time",
+  error: "the harness failed",
+  "invalid-output": "returned a result Hawkeye could not read",
+};
+
+export function runFailureLabel(status: PullRequestRun["status"]): string {
+  if (status === "running" || status === "ok") throw new Error(`${status} is not a failure`);
+  return RUN_FAILURE_LABELS[status];
 }
