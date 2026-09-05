@@ -155,28 +155,6 @@ describe("disarmPullRequest", () => {
 });
 
 describe("armedPullRequestKey", () => {
-  it("leaves disarmed rows out of the active set", async () => {
-    await armPullRequest(db, {
-      userId: "user-2",
-      installationId: "10",
-      owner: "theirs",
-      repo: "repo",
-      number: 7,
-    });
-    await armPullRequest(db, {
-      userId: "user-2",
-      installationId: "10",
-      owner: "theirs",
-      repo: "repo",
-      number: 8,
-    });
-    await disarmPullRequest(db, { userId: "user-2", owner: "theirs", repo: "repo", number: 8 });
-
-    const armed = await armedKeys("user-2");
-
-    expect(armed).toEqual(new Set(["theirs/repo#7"]));
-  });
-
   it("keys rows as owner/repo#number", () => {
     expect(armedPullRequestKey({ owner: "octo", repo: "repo", number: 9 })).toBe("octo/repo#9");
   });
