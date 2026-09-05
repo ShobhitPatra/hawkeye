@@ -3,6 +3,7 @@ import { formatUpdated } from "@/format-updated";
 import { dayKey, type Overview, type Totals, yearDays } from "@/overview";
 import { verdictLabel } from "@/run-format";
 import type { RunnerStatus } from "@/runner-status";
+import { RunnerSentence } from "../runner-sentence";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -41,7 +42,7 @@ export function OverviewView({
     <main className="hk-page hk-overview">
       <div className="hk-header">
         <h1 className="hk-title">Overview</h1>
-        <RunnerSentence runner={runner} now={now} empty={empty} />
+        {empty ? <EmptySentence /> : <RunnerSentence runner={runner} now={now.getTime()} />}
       </div>
 
       <Figures allTime={overview.allTime} thisMonth={overview.thisMonth} />
@@ -148,48 +149,13 @@ export function OverviewView({
   );
 }
 
-function RunnerSentence({
-  runner,
-  now,
-  empty,
-}: {
-  runner: RunnerStatus;
-  now: Date;
-  empty: boolean;
-}) {
-  if (empty)
-    return (
-      <div className="hk-state">
-        <p>Nothing reviewed yet.</p>
-        <p>
-          <Link href="/connect">Connect a runner</Link> and{" "}
-          <Link href="/prs">arm a pull request</Link>. The first review shows up here.
-        </p>
-      </div>
-    );
-  if (runner.online)
-    return (
-      <div className="hk-state">
-        <p>Runner online.</p>
-      </div>
-    );
+function EmptySentence() {
   return (
     <div className="hk-state">
+      <p>Nothing reviewed yet.</p>
       <p>
-        Runner{" "}
-        <span className="hk-status" data-state="attention">
-          offline
-        </span>
-        .
-        {runner.waitingJobs > 0
-          ? ` ${runner.waitingJobs} pull request${runner.waitingJobs === 1 ? " is" : "s are"} waiting and will be reviewed when it reconnects.`
-          : " Nothing is waiting."}
-      </p>
-      <p>
-        {runner.lastSeenAt && (
-          <>Last heartbeat {formatUpdated(runner.lastSeenAt.toISOString(), now.getTime())}. </>
-        )}
-        <Link href="/runners">Runners</Link>
+        <Link href="/connect">Connect a runner</Link> and{" "}
+        <Link href="/prs">arm a pull request</Link>. The first review shows up here.
       </p>
     </div>
   );

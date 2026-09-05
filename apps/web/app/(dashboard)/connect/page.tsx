@@ -1,12 +1,11 @@
-import Link from "next/link";
 import { getDb } from "@/db";
 import { formatUpdated } from "@/format-updated";
 import { findRunnerLogin, sweepRunnerLogins } from "@/runner-login";
 import { requestRunnerStatus } from "@/request-runner-status";
-import { describeRunnerStatus } from "@/runner-status";
 import { requireSession } from "@/session";
 import { siteUrl } from "@/site-url";
-import { ApproveLoginForm } from "./approve-login-form";
+import { ApproveLoginForm, type LoginCodeState } from "./approve-login-form";
+import { ConnectView } from "./connect-view";
 
 export default async function ConnectPage({
   searchParams,
@@ -17,31 +16,30 @@ export default async function ConnectPage({
   const session = await requireSession(
     code ? `/connect?code=${encodeURIComponent(code)}` : "/connect",
   );
-  const pending = code ? await findRunnerLogin(getDb(), { code }) : undefined;
-  await sweepRunnerLogins(getDb());
-  const status = await requestRunnerStatus(session.user.id);
+  const db = getDb();
+  const login = code ? await findRunnerLogin(db, { code }) : undefined;
+  await sweepRunnerLogins(db);
+  const runner = await requestRunnerStatus(session.user.id);
+  const now = Date.now();
+
+  const codeState: LoginCodeState | undefined = !code
+    ? undefined
+    : !login || login.state === "expired"
+      ? { state: "expired" }
+      : login.state === "pending"
+        ? {
+            state: "pending",
+            runnerName: login.runnerName,
+            requested: formatUpdated(login.createdAt.toISOString(), now),
+          }
+        : { state: "approved", runnerName: login.runnerName };
 
   return (
-    <main>
-      <h1>Connect a runner</h1>
-      <p>On the machine that holds your Claude Code login, run:</p>
-      <pre>
-        <code>npx hawkeye-review runner login --url {siteUrl()}</code>
-      </pre>
-      <p>Then type the code it shows and approve it.</p>
-      {pending &&
-        (pending.state === "pending" ? (
-          <p>
-            Requested {formatUpdated(pending.createdAt.toISOString(), Date.now())} by a runner named{" "}
-            <code>{pending.runnerName}</code>. Approve it only if that is your machine.
-          </p>
-        ) : (
-          <p>This code is {pending.state}.</p>
-        ))}
-      <ApproveLoginForm />
-      <h2>Runner status</h2>
-      <p>{describeRunnerStatus(status)}</p>
-      <Link href="/runners">Runners</Link>
-    </main>
+    <ConnectView
+      controlPlaneUrl={siteUrl()}
+      approve={<ApproveLoginForm {...(codeState ? { code: codeState } : {})} />}
+      runner={runner}
+      now={now}
+    />
   );
 }

@@ -165,7 +165,7 @@ Margin column: `hk-margin`, `hk-entry[data-severity]`, `hk-gutter`, `hk-severity
 
 Controls: `hk-button[data-variant="primary"]`, `hk-arm[data-armed]`, `hk-input`, `hk-textarea`, `hk-choice`, `hk-field`, `hk-field-wide`, `hk-form-row`, `hk-action-row`, `hk-help`, `hk-link` (on an `<a>` inside `hk-root` only: forces the underline back inside any context that removes it, the top bar, navigation, crumbs, tables and the menu; a bare link in running text already underlines).
 
-Code and sections: `hk-code`, `hk-code-row`, `hk-section`.
+Code and sections: `hk-code`, `hk-code-row`, `hk-section`, `hk-steps` (an `<ol>` whose items carry `hk-step-body`).
 
 Status words: `hk-status[data-state="attention" | "failed" | "running"]`.
 
