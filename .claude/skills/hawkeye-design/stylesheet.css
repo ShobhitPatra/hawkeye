@@ -947,6 +947,9 @@ button.hk-arm::before {
 .hk-table tr[data-dim="true"] .hk-cell-stack > .hk-metadata {
   color: var(--hk-fg-3);
 }
+.hk-table td.hk-numeric .hk-actions {
+  justify-content: flex-end;
+}
 .hk-table td.hk-cell-arm {
   width: 8px;
   padding-right: var(--hk-space-3);
