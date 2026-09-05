@@ -36,15 +36,15 @@ function StatusWord({
           Run failed
         </span>
       );
-    case "reviewed":
+    case "reviewed": {
+      const verdict = status.last?.verdict;
+      if (!verdict) return <span className="hk-status">Reviewed</span>;
       return (
-        <span
-          className="hk-status"
-          data-state={status.verdict === "blocked" ? "failed" : undefined}
-        >
-          {verdictLabel(status.verdict)}
+        <span className="hk-status" data-state={verdict === "blocked" ? "failed" : undefined}>
+          {verdictLabel(verdict)}
         </span>
       );
+    }
   }
 }
 
@@ -83,8 +83,7 @@ export function PullRequestTable({
             const status = statuses.get(armedPullRequestKey(pullRequest));
             const isArmed = status !== undefined;
             const pageHref = `/prs/${pullRequest.owner}/${pullRequest.repo}/${pullRequest.number}`;
-            const reviewedAt =
-              status && "reviewedAt" in status && status.reviewedAt ? status.reviewedAt : undefined;
+            const last = status?.last;
             return (
               <tr key={pullRequest.htmlUrl} data-dim={isArmed ? undefined : "true"}>
                 <td className="hk-cell-arm">
@@ -123,11 +122,9 @@ export function PullRequestTable({
                     <span className="hk-status">Not armed</span>
                   )}
                 </td>
-                <td className="hk-numeric">{status && "rounds" in status ? status.rounds : ""}</td>
-                <td className="hk-numeric">
-                  {status?.kind === "reviewed" ? status.openFindings : ""}
-                </td>
-                <td>{reviewedAt ? formatUpdated(reviewedAt.toISOString(), now) : ""}</td>
+                <td className="hk-numeric">{last?.rounds ?? ""}</td>
+                <td className="hk-numeric">{last?.openFindings ?? ""}</td>
+                <td>{last ? formatUpdated(last.reviewedAt.toISOString(), now) : ""}</td>
               </tr>
             );
           })}

@@ -36,7 +36,42 @@ async function seedJob(overrides: Partial<typeof schema.job.$inferInsert> = {}) 
 }
 
 async function seedRun(jobId: string, overrides: Partial<typeof schema.run.$inferInsert> = {}) {
-  await db.insert(schema.run).values({ jobId, runnerId, ...overrides });
+  const [row] = await db
+    .insert(schema.run)
+    .values({ jobId, runnerId, ...overrides })
+    .returning();
+  return row!;
+}
+
+let heads = 0;
+
+async function seedPostedReview(
+  verdict: ReviewResult["verdict"],
+  endedAt: Date,
+  armedPrId = "armed-1",
+) {
+  heads += 1;
+  const seededJob = await seedJob({
+    armedPrId,
+    notBefore: endedAt,
+    headSha: heads.toString(16).padStart(40, "0"),
+  });
+  const seededRun = await seedRun(seededJob.id, {
+    status: "ok",
+    result: { ...result, verdict },
+    endedAt,
+  });
+  await db.insert(schema.reviewPosted).values({
+    runId: seededRun.id,
+    armedPrId,
+    headSha: seededJob.headSha,
+    githubReviewId: `review-${seededRun.id}`,
+  });
+  return endedAt;
+}
+
+async function statusOf(userId = "user-1") {
+  return (await listPullRequestStatuses(db, userId)).get(key);
 }
 
 beforeEach(async () => {
@@ -47,22 +82,31 @@ beforeEach(async () => {
 
 describe("listPullRequestStatuses", () => {
   it("reports an armed pull request with no job as armed", async () => {
-    expect((await listPullRequestStatuses(db, "user-1")).get(key)).toEqual({ kind: "armed" });
+    expect(await statusOf()).toEqual({ kind: "armed" });
   });
 
-  it("follows the latest job through queued and claimed", async () => {
+  it("follows an open job through queued and claimed", async () => {
     await seedJob({ state: "queued" });
-    expect((await listPullRequestStatuses(db, "user-1")).get(key)).toEqual({ kind: "queued" });
-    await db.update(schema.job).set({ state: "claimed", updatedAt: new Date() });
-    expect((await listPullRequestStatuses(db, "user-1")).get(key)).toEqual({ kind: "reviewing" });
+    expect(await statusOf()).toEqual({ kind: "queued" });
+    await db.update(schema.job).set({ state: "claimed" });
+    expect(await statusOf()).toEqual({ kind: "reviewing" });
   });
 
-  it("reports the verdict, round count, open findings and end time of the latest completed run", async () => {
-    const first = await seedJob({ notBefore: new Date(Date.now() - 60_000) });
-    await seedRun(first.id, { status: "ok", result, endedAt: new Date(Date.now() - 50_000) });
-    const second = await seedJob();
-    const endedAt = new Date();
-    await seedRun(second.id, { status: "ok", result: { ...result, verdict: "ship" }, endedAt });
+  it("prefers a job queued during a review over the finished review", async () => {
+    await seedJob({ state: "queued", notBefore: new Date(Date.now() - 120_000) });
+    const reviewedAt = await seedPostedReview("ship", new Date());
+
+    expect(await statusOf()).toEqual({
+      kind: "queued",
+      last: { verdict: "ship", rounds: 1, openFindings: 0, reviewedAt },
+    });
+  });
+
+  it("counts only posted reviews as rounds and reports the latest one", async () => {
+    await seedPostedReview("changes_needed", new Date(Date.now() - 90_000));
+    const timedOut = await seedJob({ state: "failed" });
+    await seedRun(timedOut.id, { status: "timeout", endedAt: new Date(Date.now() - 60_000) });
+    const reviewedAt = await seedPostedReview("ship", new Date());
     await db.insert(schema.finding).values([
       {
         armedPrId: "armed-1",
@@ -81,24 +125,27 @@ describe("listPullRequestStatuses", () => {
       },
     ]);
 
-    expect((await listPullRequestStatuses(db, "user-1")).get(key)).toEqual({
+    expect(await statusOf()).toEqual({
       kind: "reviewed",
-      verdict: "ship",
-      rounds: 2,
-      openFindings: 1,
-      reviewedAt: endedAt,
+      last: { verdict: "ship", rounds: 2, openFindings: 1, reviewedAt },
     });
   });
 
-  it("reports a run that did not complete as failed", async () => {
-    const done = await seedJob({ state: "failed" });
-    const endedAt = new Date();
-    await seedRun(done.id, { status: "timeout", endedAt });
-    expect((await listPullRequestStatuses(db, "user-1")).get(key)).toEqual({
+  it("reports a failed latest run while keeping the last posted review", async () => {
+    const reviewedAt = await seedPostedReview("ship", new Date(Date.now() - 60_000));
+    const failed = await seedJob({ state: "failed" });
+    await seedRun(failed.id, { status: "timeout", endedAt: new Date() });
+
+    expect(await statusOf()).toEqual({
       kind: "failed",
-      rounds: 1,
-      reviewedAt: endedAt,
+      last: { verdict: "ship", rounds: 1, openFindings: 0, reviewedAt },
     });
+  });
+
+  it("reports a failed first run with nothing to carry", async () => {
+    const failed = await seedJob({ state: "failed" });
+    await seedRun(failed.id, { status: "error", endedAt: new Date() });
+    expect(await statusOf()).toEqual({ kind: "failed" });
   });
 
   it("ignores disarmed pull requests and other users", async () => {
