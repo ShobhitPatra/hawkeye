@@ -1,5 +1,5 @@
 import type { Verdict } from "@hawkeye/core";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
 import { armedPullRequestKey } from "./arming";
 import type { Db } from "./db/client";
 import { armedPr, finding, job, run } from "./db/schema";
@@ -19,9 +19,10 @@ export async function listPullRequestStatuses(
     .select({ id: armedPr.id, owner: armedPr.owner, repo: armedPr.repo, number: armedPr.number })
     .from(armedPr)
     .where(and(eq(armedPr.userId, userId), isNull(armedPr.disarmedAt)));
-  const statuses = new Map<string, PullRequestStatus>();
-  for (const arm of arms) statuses.set(armedPullRequestKey(arm), await statusOf(db, arm.id));
-  return statuses;
+  const entries = await Promise.all(
+    arms.map(async (arm) => [armedPullRequestKey(arm), await statusOf(db, arm.id)] as const),
+  );
+  return new Map(entries);
 }
 
 async function statusOf(db: Db, armedPrId: string): Promise<PullRequestStatus> {
@@ -47,15 +48,15 @@ async function statusOf(db: Db, armedPrId: string): Promise<PullRequestStatus> {
   if (!latest || latest.status !== "ok" || !latest.result || !latest.endedAt)
     return { kind: "failed", rounds, ...(latest?.endedAt ? { reviewedAt: latest.endedAt } : {}) };
 
-  const openFindings = await db
-    .select({ id: finding.id })
+  const [open] = await db
+    .select({ openFindings: count() })
     .from(finding)
     .where(and(eq(finding.armedPrId, armedPrId), isNull(finding.resolvedSha)));
   return {
     kind: "reviewed",
     verdict: latest.result.verdict,
     rounds,
-    openFindings: openFindings.length,
+    openFindings: open?.openFindings ?? 0,
     reviewedAt: latest.endedAt,
   };
 }

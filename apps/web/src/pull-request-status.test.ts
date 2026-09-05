@@ -102,6 +102,16 @@ describe("listPullRequestStatuses", () => {
   });
 
   it("ignores disarmed pull requests and other users", async () => {
+    await db
+      .insert(schema.user)
+      .values({ id: "user-2", name: "hubot", email: "h@example.com" })
+      .onConflictDoNothing();
+    await seedArmedPullRequest(db, { armedPrId: "armed-2", userId: "user-2", number: 8 });
+    await seedJob({ armedPrId: "armed-2", state: "queued" });
+
+    expect([...(await listPullRequestStatuses(db, "user-1")).keys()]).toEqual([key]);
+    expect([...(await listPullRequestStatuses(db, "user-2")).keys()]).toEqual(["octo/repo#8"]);
+
     await db.update(schema.armedPr).set({ disarmedAt: new Date() });
     expect((await listPullRequestStatuses(db, "user-1")).size).toBe(0);
   });
