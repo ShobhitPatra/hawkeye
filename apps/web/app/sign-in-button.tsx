@@ -2,7 +2,7 @@
 
 import { authClient } from "@/auth-client";
 
-export function SignInButton({ callbackURL = "/prs" }: { callbackURL?: string }) {
+export function SignInButton({ callbackURL = "/overview" }: { callbackURL?: string }) {
   return (
     <button
       type="button"

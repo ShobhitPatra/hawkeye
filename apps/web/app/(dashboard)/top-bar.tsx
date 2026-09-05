@@ -13,7 +13,7 @@ export function TopBar({
   const initial = user.name.slice(0, 1).toUpperCase();
   return (
     <header className="hk-topbar" data-sticky>
-      <Link className="hk-wordmark" href="/prs">
+      <Link className="hk-wordmark" href="/overview">
         hawkeye
       </Link>
       <NavLinks />

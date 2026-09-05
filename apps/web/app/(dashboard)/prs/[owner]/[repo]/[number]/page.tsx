@@ -3,6 +3,7 @@ import { parsePullRequestParams } from "@/arm-input";
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
 import { findArmedPullRequest, listFindingsForPullRequest, listRunsForPullRequest } from "@/runs";
+import { pullRequestTitles, titleKey } from "@/pull-request-titles";
 import { requireSession } from "@/session";
 import { PullRequestView } from "./pull-request-view";
 
@@ -23,12 +24,15 @@ export default async function PullRequestPage({
   const arm = await findArmedPullRequest(db, coordinates);
   if (!arm) notFound();
 
-  const [runs, findings, title] = await Promise.all([
+  const [runs, findings, titles] = await Promise.all([
     listRunsForPullRequest(db, coordinates),
     listFindingsForPullRequest(db, coordinates),
-    pullRequestTitle(arm.installationId, reference),
+    pullRequestTitles(createGitHubAppClient({ fetch }), [
+      { ...reference, installationId: arm.installationId },
+    ]),
   ]);
 
+  const title = titles.get(titleKey(reference));
   return (
     <PullRequestView
       reference={reference}
@@ -39,17 +43,4 @@ export default async function PullRequestPage({
       now={Date.now()}
     />
   );
-}
-
-async function pullRequestTitle(
-  installationId: string,
-  reference: { owner: string; repo: string; number: number },
-): Promise<string | undefined> {
-  try {
-    const github = createGitHubAppClient({ fetch });
-    const token = await github.installationTokenById(installationId);
-    return (await github.pullRequest(reference, token)).title;
-  } catch {
-    return undefined;
-  }
 }
