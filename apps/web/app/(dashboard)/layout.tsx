@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
-import { getDb } from "@/db";
-import { runnerStatus } from "@/runner-status";
-import { requireSession } from "@/session";
+import { requestRunnerStatus } from "@/request-runner-status";
+import { getSession } from "@/session";
 import { TopBar } from "./top-bar";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
-  const session = await requireSession();
-  const runner = await runnerStatus(getDb(), session.user.id);
+  const session = await getSession();
+  if (!session) return children;
+  const runner = await requestRunnerStatus(session.user.id);
   return (
     <>
       <TopBar user={session.user} runner={runner} />

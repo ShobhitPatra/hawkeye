@@ -10,7 +10,7 @@ export default async function HomePage({
 }) {
   const session = await getSession();
   const returnTo = localPath((await searchParams).returnTo);
-  if (session) redirect(returnTo ?? "/prs");
+  if (session) redirect(returnTo && returnTo !== "/" ? returnTo : "/prs");
   return (
     <main>
       <h1>Hawkeye</h1>

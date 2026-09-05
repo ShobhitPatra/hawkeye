@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { RunnerStatus } from "@/runner-status";
+import { describeRunnerStatus, type RunnerStatus } from "@/runner-status";
 import { NavLinks } from "./nav-links";
 import { SignOutButton } from "./sign-out-button";
 
@@ -20,7 +20,7 @@ export function TopBar({
       <div className="hk-topbar-end">
         {!runner.online && runner.waitingJobs > 0 && (
           <Link className="hk-status" data-state="attention" href="/runners">
-            Runner offline, {runner.waitingJobs} waiting
+            {describeRunnerStatus(runner)}
           </Link>
         )}
         <details className="hk-menu">
