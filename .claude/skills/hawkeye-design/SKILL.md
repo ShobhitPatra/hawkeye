@@ -66,7 +66,7 @@ Design in monochrome on a warm neutral. Color is a secondary cue, always paired 
 
 ### The mark
 
-A hawk in profile, in flight: one raised wing, a body line ending in a beak, a short tail, and a dot for the eye, facing right. Drawn on a 24 grid at stroke 1.5, the same weight as the interface icons (`mark.svg`). It is monochrome and takes the current color. It lives where there is no room for words: the GitHub App avatar (`avatar-light.svg`, one fixed image on the light palette, since GitHub does not follow the page theme), the favicon (`favicon.svg`, swaps stroke with the system theme), and the README header and social card in a lockup with the bird before the wordmark. It never sits beside the wordmark in the top bar and never replaces the arm circle. Do not fill it, add color, mirror it, or redraw it at another stroke.
+A hawk in profile, in flight: one raised wing, a body line ending in a beak, a short tail, and a dot for the eye, facing right. Drawn on a 24 grid at stroke 1.5, the same weight as the interface icons (`mark.svg`). It is monochrome and takes the current color. It lives where there is no room for words: the GitHub App avatar (`avatar-light.svg`, one fixed image on the light palette, since GitHub does not follow the page theme), the favicon (`favicon.svg`, swaps stroke with the system theme; the app serves its own copies from `apps/web/public/`, regenerated from this file whenever the mark changes), and the README header and social card in a lockup with the bird before the wordmark. It never sits beside the wordmark in the top bar and never replaces the arm circle. Do not fill it, add color, mirror it, or redraw it at another stroke.
 
 ### Spacing and shape
 
@@ -159,7 +159,7 @@ Verdict: `hk-verdict[data-verdict]`, `hk-verdict-word`, `hk-verdict-why`.
 
 Margin column: `hk-margin`, `hk-entry[data-severity]`, `hk-gutter`, `hk-severity[data-severity]`, `hk-lens`, `hk-entry-body`, `hk-claim`, `hk-path` (wrap the text in `<bdi>`), `hk-detail`, `hk-group-heading`.
 
-Controls: `hk-button[data-variant="primary"]`, `hk-arm[data-armed]`, `hk-input`, `hk-textarea`, `hk-choice`, `hk-field`, `hk-field-wide`, `hk-form-row`, `hk-action-row`, `hk-help`, `hk-link` (kept for compatibility; a bare link already underlines).
+Controls: `hk-button[data-variant="primary"]`, `hk-arm[data-armed]`, `hk-input`, `hk-textarea`, `hk-choice`, `hk-field`, `hk-field-wide`, `hk-form-row`, `hk-action-row`, `hk-help`, `hk-link` (on an `<a>` inside `hk-root` only: forces the underline back inside any context that removes it, the top bar, navigation, crumbs, tables and the menu; a bare link in running text already underlines).
 
 Code and sections: `hk-code`, `hk-code-row`, `hk-section`.
 
