@@ -103,7 +103,11 @@ Confirming an action is a state word changing, with at most a 160ms color transi
 
 ### Top bar
 
-One bar, 44px, with a hairline beneath it, on every page. Signed in: the wordmark, then Pull requests, Runners, Settings, then at the right an amber runner status only when a runner has waiting jobs, and the account name. The name opens a menu (`hk-menu`) holding the theme choice, the installation link and sign out, so Settings stays about review behavior. No avatar. The bar is sticky on dashboard pages and scrolls away on the landing. The current page is the foreground color; nothing is underlined. Under 760px the three words stay inline, the name collapses to its initial and the status word hides. Signed out: the wordmark, Source, and a Sign in button.
+One bar, 44px, with a hairline beneath it, on every page. Signed in: the wordmark, then Overview, Pull requests, Runners, Settings, then at the right an amber runner status only when a runner has waiting jobs, and the account name. The name opens a menu (`hk-menu`) holding the theme choice, the installation link and sign out, so Settings stays about review behavior. No avatar. The bar is sticky on dashboard pages and scrolls away on the landing. The current page is the foreground color; nothing is underlined. Under 760px the four words stay inline, the name collapses to its initial and the status word hides. Signed out: the wordmark, Source, and a Sign in button.
+
+### Overview
+
+The signed-in root. It answers, in order: is the runner up and is anything waiting (one state sentence under the title); what has Hawkeye done (five figures in a row, each with a hairline above, the all-time number at title size and this month beneath as metadata: reviews, pull requests reviewed, findings raised with how many addressed, must-fix caught, cost as hours and minutes with turns beneath); the last year (a 52 by 7 grid of days, one cell per day, four neutral steps, a native title per cell, no color and no motion); recent reviews (five rows in the list style, linking to the detail pages). Sections sit 48px apart. A new account sees zeros, an empty grid and one sentence: "Nothing reviewed yet. Connect a runner and arm a pull request." Pull requests merged after a review joins the figures once the close webhook records it.
 
 ### Dashboard lists
 
@@ -115,7 +119,7 @@ Top to bottom: crumb; title row with Arm and Re-review at the right; meta line; 
 
 ### Landing
 
-The root route for a signed-out visitor. It is for someone who just read a Hawkeye comment on a pull request, then for someone who followed a link. It must prove the reviews are worth reading before it says what they cost. The headline block comes first, then the hero: one figure of two connected panels, the pull request row from the dashboard above and the real review comment from Hawkeye's own repository below, rendered as GitHub renders it. Never a constructed example, screenshot or video. The landing owns two motion exceptions beyond the system's: the hero plays once on load (the row flips from Armed to Reviewing with the shimmer, the comment arrives verdict first, the row settles on the verdict and cost) with a Replay control, and one word in the headline rotates between the harnesses. Reduced motion shows the finished state and the first word. Then three sections, each headed by the visitor's question: what happens when you push (five steps in a row, each carrying what does not leave the machine), what it costs (one sentence), how to start. Proof is the repository link and a link to the real pull request. Primary action is "Sign in with GitHub"; the mono `npx hawkeye-review prepare <pr-url>` line beside it is the no-account path; self-hosting is a footer link. Under two screens on a laptop. Same rules as every other surface, plus the headline size. Signing in lands on the pull request list, which is the dashboard home; a signed-in visit to the root route redirects there, and the wordmark in the top bar links there.
+The root route for a signed-out visitor. It is for someone who just read a Hawkeye comment on a pull request, then for someone who followed a link. It must prove the reviews are worth reading before it says what they cost. The headline block comes first, then the hero: one figure of two connected panels, the pull request row from the dashboard above and the real review comment from Hawkeye's own repository below, rendered as GitHub renders it. Never a constructed example, screenshot or video. The landing owns two motion exceptions beyond the system's: the hero plays once on load (the row flips from Armed to Reviewing with the shimmer, the comment arrives verdict first, the row settles on the verdict and cost) with a Replay control, and one word in the headline rotates between the harnesses. Reduced motion shows the finished state and the first word. Then three sections, each headed by the visitor's question: what happens when you push (five steps in a row, each carrying what does not leave the machine), what it costs (one sentence), how to start. Proof is the repository link and a link to the real pull request. Primary action is "Sign in with GitHub"; the mono `npx hawkeye-review prepare <pr-url>` line beside it is the no-account path; self-hosting is a footer link. Under two screens on a laptop. Same rules as every other surface, plus the headline size. Signing in lands on the Overview, which is the signed-in root; the wordmark in the top bar links there.
 
 ### Settings
 
@@ -164,6 +168,8 @@ Controls: `hk-button[data-variant="primary"]`, `hk-arm[data-armed]`, `hk-input`,
 Code and sections: `hk-code`, `hk-code-row`, `hk-section`.
 
 Status words: `hk-status[data-state="attention" | "failed" | "running"]`.
+
+Figures and the year grid: `hk-figures`, `hk-figure`, `hk-figure-label`, `hk-figure-value`, `hk-figure-note`, `hk-heat`, `hk-heat-months`, `hk-heat-grid` (cells are `<i data-level="0..4" title>`), `hk-heat-key` (swatches are `<i data-level>` too).
 
 Tables: `hk-table-header`, `hk-table-wrap`, `hk-table`, `hk-numeric`, `hk-cell-arm`, `hk-cell-stack`, `tr[data-dim]`.
 
