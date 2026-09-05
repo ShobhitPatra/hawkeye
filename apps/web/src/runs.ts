@@ -1,7 +1,7 @@
-import { SEVERITIES, type Severity, type Verdict } from "@hawkeye/core";
+import { SEVERITIES, type ReviewResult, type Severity, type Verdict } from "@hawkeye/core";
 import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "./db/client";
-import { armedPr, finding, job, reviewPosted, run } from "./db/schema";
+import { armedPr, finding, job, reviewPosted, run, runner } from "./db/schema";
 
 export type PullRequestCoordinates = {
   userId: string;
@@ -21,12 +21,16 @@ export type PullRequestRun = {
   error?: string;
   headSha: string;
   reviewUrl?: string;
+  summary?: string;
+  lenses?: ReviewResult["lenses"];
+  runnerName?: string;
 };
 
 export type PullRequestFinding = {
   stableId: string;
   severity: Severity;
   claim: string;
+  detail: string | null;
   path: string | null;
   line: number | null;
   firstSeenSha: string;
@@ -57,10 +61,12 @@ export async function listRunsForPullRequest(
       result: run.result,
       headSha: job.headSha,
       githubReviewId: reviewPosted.githubReviewId,
+      runnerName: runner.name,
     })
     .from(run)
     .innerJoin(job, eq(job.id, run.jobId))
     .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
+    .innerJoin(runner, eq(runner.id, run.runnerId))
     .leftJoin(reviewPosted, eq(reviewPosted.runId, run.id))
     .where(userArmsOf(input))
     .orderBy(desc(run.startedAt));
@@ -71,7 +77,10 @@ export async function listRunsForPullRequest(
     turns: row.turns,
     startedAt: row.startedAt,
     headSha: row.headSha,
-    ...(row.result ? { verdict: row.result.verdict } : {}),
+    runnerName: row.runnerName,
+    ...(row.result
+      ? { verdict: row.result.verdict, summary: row.result.summary, lenses: row.result.lenses }
+      : {}),
     ...(row.result?.reportedVerdict ? { reportedVerdict: row.result.reportedVerdict } : {}),
     ...(row.endedAt ? { endedAt: row.endedAt } : {}),
     ...(row.error ? { error: row.error } : {}),
@@ -92,6 +101,7 @@ export async function listFindingsForPullRequest(
       stableId: finding.stableId,
       severity: finding.severity,
       claim: finding.claim,
+      detail: finding.detail,
       path: finding.path,
       line: finding.line,
       firstSeenSha: finding.firstSeenSha,
@@ -122,7 +132,23 @@ export async function listFindingsForPullRequest(
   );
 }
 
-export async function hasArmedPullRequest(db: Db, input: PullRequestCoordinates): Promise<boolean> {
-  const [row] = await db.select({ id: armedPr.id }).from(armedPr).where(userArmsOf(input)).limit(1);
-  return row !== undefined;
+export type ArmedPullRequestSummary = { id: string; installationId: string; armed: boolean };
+
+export async function findArmedPullRequest(
+  db: Db,
+  input: PullRequestCoordinates,
+): Promise<ArmedPullRequestSummary | undefined> {
+  const [row] = await db
+    .select({
+      id: armedPr.id,
+      installationId: armedPr.installationId,
+      disarmedAt: armedPr.disarmedAt,
+    })
+    .from(armedPr)
+    .where(userArmsOf(input))
+    .orderBy(desc(armedPr.armedAt))
+    .limit(1);
+  return row
+    ? { id: row.id, installationId: row.installationId, armed: row.disarmedAt === null }
+    : undefined;
 }
