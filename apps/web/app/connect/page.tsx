@@ -40,7 +40,9 @@ export default async function ConnectPage({
       <ApproveLoginForm />
       <h2>Runner status</h2>
       <p>{describeRunnerStatus(status)}</p>
-      <Link href="/runners">Runners</Link>
+      <Link className="hk-link" href="/runners">
+        Runners
+      </Link>
     </main>
   );
 }

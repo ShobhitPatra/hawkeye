@@ -32,7 +32,7 @@ export function PullRequestTable({
             <tr key={pullRequest.htmlUrl}>
               <td>
                 {isArmed ? (
-                  <Link href={pageHref}>
+                  <Link className="hk-link" href={pageHref}>
                     {pullRequest.owner}/{pullRequest.repo}
                   </Link>
                 ) : (
@@ -41,13 +41,17 @@ export function PullRequestTable({
               </td>
               <td>
                 {isArmed ? (
-                  <Link href={pageHref}>#{pullRequest.number}</Link>
+                  <Link className="hk-link" href={pageHref}>
+                    #{pullRequest.number}
+                  </Link>
                 ) : (
                   `#${pullRequest.number}`
                 )}
               </td>
               <td>
-                <a href={pullRequest.htmlUrl}>{pullRequest.title}</a>
+                <a className="hk-link" href={pullRequest.htmlUrl}>
+                  {pullRequest.title}
+                </a>
                 {isArmed && <span> armed</span>}
               </td>
               <td>{pullRequest.headRef}</td>

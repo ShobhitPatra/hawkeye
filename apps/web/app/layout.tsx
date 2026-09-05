@@ -14,7 +14,10 @@ const plexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
 });
 
-export const metadata = { title: "Hawkeye", icons: { icon: favicon.src } };
+export const metadata = {
+  title: "Hawkeye",
+  icons: { icon: { url: favicon.src, type: "image/svg+xml" } },
+};
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

@@ -38,7 +38,9 @@ export default async function PullRequestsPage() {
         {!runner.online && (
           <>
             {" "}
-            <Link href="/connect">Connect a runner</Link>
+            <Link className="hk-link" href="/connect">
+              Connect a runner
+            </Link>
           </>
         )}
       </p>

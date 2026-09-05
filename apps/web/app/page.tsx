@@ -17,9 +17,15 @@ export default async function HomePage({
       <p>Personal code reviewer on your own plan.</p>
       {session ? (
         <>
-          <Link href="/prs">Pull requests</Link>
-          <Link href="/runners">Runners</Link>
-          <Link href="/connect">Connect a runner</Link>
+          <Link className="hk-link" href="/prs">
+            Pull requests
+          </Link>
+          <Link className="hk-link" href="/runners">
+            Runners
+          </Link>
+          <Link className="hk-link" href="/connect">
+            Connect a runner
+          </Link>
           <SignOutButton />
         </>
       ) : (
