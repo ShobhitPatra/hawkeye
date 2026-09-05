@@ -26,10 +26,11 @@ function client(overrides: Fakes = {}): GitHubClient {
 }
 
 describe("pullRequestTitles", () => {
-  it("fetches one token per installation and a title per pull request", async () => {
+  it("fetches one token per installation and each pull request once", async () => {
     const github = client();
-    const titles = await pullRequestTitles(github, references);
+    const titles = await pullRequestTitles(github, [...references, references[0]!]);
     expect(github.installationTokenById).toHaveBeenCalledTimes(2);
+    expect(github.pullRequest).toHaveBeenCalledTimes(3);
     expect(titles.get("octo/repo#2")).toBe("PR 2");
     expect(titles.get("hub/other#3")).toBe("PR 3");
   });

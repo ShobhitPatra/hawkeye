@@ -7,7 +7,10 @@ export async function pullRequestTitles(
   references: TitledReference[],
 ): Promise<Map<string, string>> {
   const byInstallation = new Map<string, TitledReference[]>();
+  const seen = new Set<string>();
   for (const reference of references) {
+    if (seen.has(titleKey(reference))) continue;
+    seen.add(titleKey(reference));
     const group = byInstallation.get(reference.installationId) ?? [];
     group.push(reference);
     byInstallation.set(reference.installationId, group);
