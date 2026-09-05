@@ -23,11 +23,7 @@ export function RunnerRow({ runner }: { runner: RunnerRowData }) {
           review it holds goes back to the queue.
         </td>
         <td className="hk-numeric">
-          <form
-            action={revokeRunnerAction}
-            className="hk-actions"
-            style={{ justifyContent: "flex-end" }}
-          >
+          <form action={revokeRunnerAction} className="hk-actions">
             <input type="hidden" name="runnerId" value={runner.id} />
             <button type="button" className="hk-button" onClick={() => setConfirming(false)}>
               Keep
