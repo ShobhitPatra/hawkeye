@@ -1,61 +1,35 @@
-import Link from "next/link";
 import { getDb } from "@/db";
 import { formatUpdated } from "@/format-updated";
+import { RUNNER_ONLINE_WINDOW_MS, reviewingByRunner } from "@/runner-status";
 import { listRunners } from "@/runner-tokens";
 import { requireSession } from "@/session";
+import { siteUrl } from "@/site-url";
 import { CreateRunnerForm } from "./create-runner-form";
-import { revokeRunnerAction } from "./actions";
-
-function formatTimestamp(value: Date | null, now: number) {
-  return value ? formatUpdated(value.toISOString(), now) : "never";
-}
+import type { RunnerRowData } from "./runner-row";
+import { RunnersView } from "./runners-view";
 
 export default async function RunnersPage() {
   const session = await requireSession();
-  const runners = await listRunners(getDb(), session.user.id);
+  const db = getDb();
+  const [runners, reviewing] = await Promise.all([
+    listRunners(db, session.user.id),
+    reviewingByRunner(db, session.user.id),
+  ]);
   const now = Date.now();
 
-  return (
-    <main>
-      <h1>Runners</h1>
-      <p>A runner polls for review jobs with its own token. The token is shown once.</p>
-      <p>
-        <Link href="/connect">Connect a runner</Link> from the command line instead.
-      </p>
-      <CreateRunnerForm />
-      {runners.length === 0 ? (
-        <p>No runners yet</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Created</th>
-              <th>Last seen</th>
-              <th>State</th>
-              <th>Token</th>
-            </tr>
-          </thead>
-          <tbody>
-            {runners.map((runner) => (
-              <tr key={runner.id}>
-                <td>{runner.name}</td>
-                <td>{formatTimestamp(runner.createdAt, now)}</td>
-                <td>{formatTimestamp(runner.lastSeenAt, now)}</td>
-                <td>{runner.revokedAt ? "revoked" : "active"}</td>
-                <td>
-                  {runner.revokedAt ? null : (
-                    <form action={revokeRunnerAction}>
-                      <input type="hidden" name="runnerId" value={runner.id} />
-                      <button type="submit">Revoke</button>
-                    </form>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </main>
-  );
+  const rows: RunnerRowData[] = runners.map((runner) => {
+    const current = reviewing.get(runner.id);
+    const online =
+      runner.lastSeenAt !== null && now - runner.lastSeenAt.getTime() <= RUNNER_ONLINE_WINDOW_MS;
+    return {
+      id: runner.id,
+      name: runner.name,
+      state: runner.revokedAt ? "revoked" : current ? "reviewing" : online ? "online" : "offline",
+      ...(current ? { reviewing: `${current.owner}/${current.repo} #${current.number}` } : {}),
+      lastSeen: runner.lastSeenAt ? formatUpdated(runner.lastSeenAt.toISOString(), now) : "never",
+      created: formatUpdated(runner.createdAt.toISOString(), now),
+    };
+  });
+
+  return <RunnersView runners={rows} create={<CreateRunnerForm controlPlaneUrl={siteUrl()} />} />;
 }

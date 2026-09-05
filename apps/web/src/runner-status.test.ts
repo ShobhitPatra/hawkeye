@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
 import { enqueueJob } from "./jobs";
-import { RUNNER_ONLINE_WINDOW_MS, runnerStatus } from "./runner-status";
+import { RUNNER_ONLINE_WINDOW_MS, reviewingByRunner, runnerStatus } from "./runner-status";
 import { createRunnerToken, revokeRunnerToken } from "./runner-tokens";
 import { createTestDb, seedArmedPullRequest } from "./test/pglite";
 
@@ -79,5 +79,33 @@ describe("runnerStatus", () => {
 
     expect((await runnerStatus(db, "user-1", now)).waitingJobs).toBe(1);
     expect((await runnerStatus(db, "user-2", now)).waitingJobs).toBe(1);
+  });
+});
+
+describe("reviewingByRunner", () => {
+  it("maps each runner to the pull request of the job it holds, for the user only", async () => {
+    await seedArmedPullRequest(db);
+    await seedArmedPullRequest(db, { armedPrId: "armed-2", userId: "user-2", number: 9 });
+    const mine = await createRunnerToken(db, { userId: "user-1", name: "laptop" });
+    const idle = await createRunnerToken(db, { userId: "user-1", name: "vps" });
+    const theirs = await createRunnerToken(db, { userId: "user-2", name: "theirs" });
+    const seed = async (armedPrId: string, runnerId: string, state: "claimed" | "done") => {
+      const job = await enqueueJob(db, {
+        armedPrId,
+        headSha: "a".repeat(40),
+        baseSha: "b".repeat(40),
+        notBefore: now,
+      });
+      await db
+        .update(schema.job)
+        .set({ state, claimedByRunnerId: runnerId, claimedAt: now })
+        .where(eq(schema.job.id, job.id));
+    };
+    await seed("armed-1", mine.runner.id, "claimed");
+    await seed("armed-2", theirs.runner.id, "claimed");
+
+    const reviewing = await reviewingByRunner(db, "user-1");
+    expect([...reviewing]).toEqual([[mine.runner.id, { owner: "octo", repo: "repo", number: 7 }]]);
+    expect(reviewing.has(idle.runner.id)).toBe(false);
   });
 });

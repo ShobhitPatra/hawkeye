@@ -2,27 +2,29 @@
 
 import { useActionState } from "react";
 import { type CreateRunnerState, createRunnerAction } from "./actions";
+import { TokenShown } from "./token-shown";
 
-export function CreateRunnerForm() {
+export function CreateRunnerForm({ controlPlaneUrl }: { controlPlaneUrl: string }) {
   const [state, formAction, pending] = useActionState<CreateRunnerState, FormData>(
     createRunnerAction,
     {},
   );
 
+  if (state.token) return <TokenShown token={state.token} controlPlaneUrl={controlPlaneUrl} />;
   return (
-    <>
-      <form action={formAction}>
-        <input name="name" placeholder="laptop" aria-label="Runner name" />
-        <button type="submit" disabled={pending}>
-          Create runner
+    <div className="hk-section">
+      <form action={formAction} className="hk-form-row">
+        <input
+          className="hk-input"
+          name="name"
+          placeholder="Runner name, for example vps-hetzner"
+          aria-label="Runner name"
+        />
+        <button type="submit" className="hk-button" disabled={pending}>
+          Create
         </button>
       </form>
-      {state.error && <p>{state.error}</p>}
-      {state.token && (
-        <p>
-          Copy this token now, it is shown once: <code>{state.token}</code>
-        </p>
-      )}
-    </>
+      {state.error && <p className="hk-compact hk-muted">{state.error}</p>}
+    </div>
   );
 }
