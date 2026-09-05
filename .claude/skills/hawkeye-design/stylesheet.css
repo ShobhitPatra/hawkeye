@@ -609,7 +609,13 @@
 }
 button.hk-arm {
   cursor: pointer;
+  position: relative;
   transition: background-color var(--hk-duration) var(--hk-ease);
+}
+button.hk-arm::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
 }
 .hk-arm[data-armed="true"] {
   background: var(--hk-fg);
