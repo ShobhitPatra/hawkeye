@@ -37,8 +37,7 @@ function StatusWord({
         </span>
       );
     case "reviewed": {
-      const verdict = status.last?.verdict;
-      if (!verdict) return <span className="hk-status">Reviewed</span>;
+      const { verdict } = status.last;
       return (
         <span className="hk-status" data-state={verdict === "blocked" ? "failed" : undefined}>
           {verdictLabel(verdict)}
@@ -83,7 +82,7 @@ export function PullRequestTable({
             const status = statuses.get(armedPullRequestKey(pullRequest));
             const isArmed = status !== undefined;
             const pageHref = `/prs/${pullRequest.owner}/${pullRequest.repo}/${pullRequest.number}`;
-            const last = status?.last;
+            const last = status && status.kind !== "armed" ? status.last : undefined;
             return (
               <tr key={pullRequest.htmlUrl} data-dim={isArmed ? undefined : "true"}>
                 <td className="hk-cell-arm">

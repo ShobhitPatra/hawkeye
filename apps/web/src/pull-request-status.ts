@@ -11,37 +11,55 @@ export type LastReview = {
   reviewedAt: Date;
 };
 
-export type PullRequestStatus = {
-  kind: "armed" | "queued" | "reviewing" | "failed" | "reviewed";
-  last?: LastReview;
-};
+export type PullRequestStatus =
+  | { kind: "armed" }
+  | { kind: "queued" | "reviewing" | "failed"; last?: LastReview }
+  | { kind: "reviewed"; last: LastReview };
+
+type Arm = { id: string; userId: string; owner: string; repo: string; number: number };
 
 export async function listPullRequestStatuses(
   db: Db,
   userId: string,
 ): Promise<Map<string, PullRequestStatus>> {
   const arms = await db
-    .select({ id: armedPr.id, owner: armedPr.owner, repo: armedPr.repo, number: armedPr.number })
+    .select({
+      id: armedPr.id,
+      userId: armedPr.userId,
+      owner: armedPr.owner,
+      repo: armedPr.repo,
+      number: armedPr.number,
+    })
     .from(armedPr)
     .where(and(eq(armedPr.userId, userId), isNull(armedPr.disarmedAt)));
   const entries = await Promise.all(
-    arms.map(async (arm) => [armedPullRequestKey(arm), await statusOf(db, arm.id)] as const),
+    arms.map(async (arm) => [armedPullRequestKey(arm), await statusOf(db, arm)] as const),
   );
   return new Map(entries);
 }
 
-async function statusOf(db: Db, armedPrId: string): Promise<PullRequestStatus> {
+function everyArmOf(arm: Arm) {
+  return and(
+    eq(armedPr.userId, arm.userId),
+    eq(armedPr.owner, arm.owner),
+    eq(armedPr.repo, arm.repo),
+    eq(armedPr.number, arm.number),
+  );
+}
+
+async function statusOf(db: Db, arm: Arm): Promise<PullRequestStatus> {
   const [openJobs, lastReview, latestRun] = await Promise.all([
     db
       .select({ state: job.state })
       .from(job)
-      .where(and(eq(job.armedPrId, armedPrId), inArray(job.state, ["queued", "claimed"]))),
-    lastReviewOf(db, armedPrId),
+      .where(and(eq(job.armedPrId, arm.id), inArray(job.state, ["queued", "claimed"]))),
+    lastReviewOf(db, arm),
     db
       .select({ status: run.status })
       .from(run)
       .innerJoin(job, eq(job.id, run.jobId))
-      .where(eq(job.armedPrId, armedPrId))
+      .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
+      .where(everyArmOf(arm))
       .orderBy(desc(run.startedAt))
       .limit(1),
   ]);
@@ -55,26 +73,22 @@ async function statusOf(db: Db, armedPrId: string): Promise<PullRequestStatus> {
   return { kind: "reviewed", last: lastReview };
 }
 
-async function lastReviewOf(db: Db, armedPrId: string): Promise<LastReview | undefined> {
+async function lastReviewOf(db: Db, arm: Arm): Promise<LastReview | undefined> {
   const posted = await db
     .select({ result: run.result, endedAt: run.endedAt })
     .from(run)
     .innerJoin(job, eq(job.id, run.jobId))
+    .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
     .innerJoin(reviewPosted, eq(reviewPosted.runId, run.id))
-    .where(
-      and(
-        eq(job.armedPrId, armedPrId),
-        eq(run.status, "ok"),
-        isNotNull(reviewPosted.githubReviewId),
-      ),
-    )
+    .where(and(everyArmOf(arm), eq(run.status, "ok"), isNotNull(reviewPosted.githubReviewId)))
     .orderBy(desc(run.endedAt));
   const latest = posted[0];
   if (!latest?.result || !latest.endedAt) return undefined;
   const [open] = await db
     .select({ openFindings: count() })
     .from(finding)
-    .where(and(eq(finding.armedPrId, armedPrId), isNull(finding.resolvedSha)));
+    .innerJoin(armedPr, eq(armedPr.id, finding.armedPrId))
+    .where(and(everyArmOf(arm), isNull(finding.resolvedSha)));
   return {
     verdict: latest.result.verdict,
     rounds: posted.length,

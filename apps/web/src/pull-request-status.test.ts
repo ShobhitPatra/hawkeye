@@ -131,6 +131,25 @@ describe("listPullRequestStatuses", () => {
     });
   });
 
+  it("keeps counting across a disarm and re-arm of the same pull request", async () => {
+    await seedPostedReview("changes_needed", new Date(Date.now() - 60_000));
+    await db.update(schema.armedPr).set({ disarmedAt: new Date() });
+    await seedArmedPullRequest(db, { armedPrId: "armed-again" });
+    await db.insert(schema.finding).values({
+      armedPrId: "armed-1",
+      stableId: "f1",
+      severity: "must_fix",
+      claim: "a",
+      firstSeenSha: "a".repeat(40),
+    });
+    const reviewedAt = await seedPostedReview("ship", new Date(), "armed-again");
+
+    expect(await statusOf()).toEqual({
+      kind: "reviewed",
+      last: { verdict: "ship", rounds: 2, openFindings: 1, reviewedAt },
+    });
+  });
+
   it("reports a failed latest run while keeping the last posted review", async () => {
     const reviewedAt = await seedPostedReview("ship", new Date(Date.now() - 60_000));
     const failed = await seedJob({ state: "failed" });
