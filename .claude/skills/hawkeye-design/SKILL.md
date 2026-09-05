@@ -103,11 +103,11 @@ Confirming an action is a state word changing, with at most a 160ms color transi
 
 ### Top bar
 
-One bar, 44px, with a hairline beneath it, on every page. Signed in: the wordmark, then Overview, Pull requests, Runners, Settings, then at the right an amber runner status only when a runner has waiting jobs, and the account name. The name opens a menu (`hk-menu`) holding the theme choice, the installation link and sign out, so Settings stays about review behavior. No avatar. The bar is sticky on dashboard pages and scrolls away on the landing. The current page is the foreground color; nothing is underlined. Under 760px the three words stay inline, the name collapses to its initial and the status word hides. Signed out: the wordmark, Source, and a Sign in button.
+One bar, 44px, with a hairline beneath it, on every page. Signed in: the wordmark, then Overview, Pull requests, Runners, Settings, then at the right an amber runner status only when a runner has waiting jobs, and the account name. The name opens a menu (`hk-menu`) holding the theme choice, the installation link and sign out, so Settings stays about review behavior. No avatar. The bar is sticky on dashboard pages and scrolls away on the landing. The current page is the foreground color; nothing is underlined. Under 760px the four words stay inline, the name collapses to its initial and the status word hides. Signed out: the wordmark, Source, and a Sign in button.
 
 ### Overview
 
-The signed-in root. It answers, in order: is the runner up and is anything waiting (one state sentence under the title); what has Hawkeye done (five figures in a row, each with a hairline above, the all-time number at title size and this month beneath as metadata: reviews, pull requests reviewed, findings raised with how many addressed, must-fix caught, cost as minutes and turns); the last year (a 52 by 7 grid of days, one cell per day, four neutral steps, a native title per cell, no color and no motion); recent reviews (five rows in the list style, linking to the detail pages). Sections sit 48px apart. A new account sees zeros, an empty grid and one sentence: "Nothing reviewed yet. Connect a runner and arm a pull request." Pull requests merged after a review joins the figures once the close webhook records it.
+The signed-in root. It answers, in order: is the runner up and is anything waiting (one state sentence under the title); what has Hawkeye done (five figures in a row, each with a hairline above, the all-time number at title size and this month beneath as metadata: reviews, pull requests reviewed, findings raised with how many addressed, must-fix caught, cost as hours and minutes with turns beneath); the last year (a 52 by 7 grid of days, one cell per day, four neutral steps, a native title per cell, no color and no motion); recent reviews (five rows in the list style, linking to the detail pages). Sections sit 48px apart. A new account sees zeros, an empty grid and one sentence: "Nothing reviewed yet. Connect a runner and arm a pull request." Pull requests merged after a review joins the figures once the close webhook records it.
 
 ### Dashboard lists
 
@@ -169,7 +169,7 @@ Code and sections: `hk-code`, `hk-code-row`, `hk-section`.
 
 Status words: `hk-status[data-state="attention" | "failed" | "running"]`.
 
-Figures and the year grid: `hk-figures`, `hk-figure`, `hk-figure-label`, `hk-figure-value`, `hk-figure-note`, `hk-heat`, `hk-heat-months`, `hk-heat-grid` (cells are `<i data-level="0..4" title>`), `hk-heat-key`.
+Figures and the year grid: `hk-figures`, `hk-figure`, `hk-figure-label`, `hk-figure-value`, `hk-figure-note`, `hk-heat`, `hk-heat-months`, `hk-heat-grid` (cells are `<i data-level="0..4" title>`), `hk-heat-key` (swatches are `<i data-level>` too).
 
 Tables: `hk-table-header`, `hk-table-wrap`, `hk-table`, `hk-numeric`, `hk-cell-arm`, `hk-cell-stack`, `tr[data-dim]`.
 
