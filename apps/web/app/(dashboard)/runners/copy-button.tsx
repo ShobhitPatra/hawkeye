@@ -9,7 +9,11 @@ export function CopyButton({ text }: { text: string }) {
       type="button"
       className="hk-button"
       onClick={async () => {
-        await navigator.clipboard.writeText(text);
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch {
+          return;
+        }
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       }}

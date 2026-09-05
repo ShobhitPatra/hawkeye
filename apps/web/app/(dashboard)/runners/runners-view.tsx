@@ -44,7 +44,7 @@ export function RunnersView({ runners, create }: { runners: RunnerRowData[]; cre
             </thead>
             <tbody>
               {runners.map((runner) => (
-                <RunnerRow key={runner.id} runner={runner} />
+                <RunnerRow key={`${runner.id}:${runner.state}`} runner={runner} />
               ))}
             </tbody>
           </table>

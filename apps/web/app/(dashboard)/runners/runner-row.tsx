@@ -53,7 +53,9 @@ export function RunnerRow({ runner }: { runner: RunnerRowData }) {
         ) : runner.state === "online" ? (
           <span className="hk-status">Online</span>
         ) : runner.state === "offline" ? (
-          <span className="hk-status">Offline</span>
+          <span className="hk-status" data-state="attention">
+            Offline
+          </span>
         ) : (
           <span className="hk-status">Revoked</span>
         )}
