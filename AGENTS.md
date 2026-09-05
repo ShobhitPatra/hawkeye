@@ -10,12 +10,12 @@ workspace/         local-only scratch, ADRs, agent-skill config (gitignored)
 packages/core      review contract, harness interface, render, dedupe, posting
 packages/runner    hawkeye CLI (daemon in milestone 2)
 apps/web           Next.js control plane (Drizzle + Postgres)
-.claude/skills     agent skills; hawkeye-design carries the design system (SKILL.md, stylesheet.css, the mark)
+.claude/skills     agent skills; hawkeye-design carries the design system (SKILL.md, stylesheet.css, the mark) and is a build input of apps/web, which imports its stylesheet and favicon
 ```
 
 ## Commands
 
-pnpm install · pnpm lint (oxlint) · pnpm format (oxfmt; run before every commit) · pnpm typecheck · pnpm test (vitest) · pnpm build (tsup). CI (`.github/workflows/ci.yml`) runs install, lint, format:check, typecheck, test and build on every PR and push to main. Scope to one package with pnpm --filter <name>. Control plane: `pnpm --filter web dev|build|db:generate|db:migrate|auth:generate`, `docker compose up -d --wait db` (local Postgres).
+pnpm install · pnpm lint (oxlint) · pnpm format (oxfmt; run before every commit) · pnpm typecheck · pnpm test (vitest) · pnpm build (tsup). CI (`.github/workflows/ci.yml`) runs install, lint, format:check, typecheck, test and build on every PR and push to main. Scope to one package with pnpm --filter <name>. Control plane: `pnpm --filter web dev|build|db:generate|db:migrate|auth:generate`, `docker compose up -d --wait db` (local Postgres). The web build fetches IBM Plex from Google Fonts through next/font, so it needs network access.
 
 ## Rules
 
