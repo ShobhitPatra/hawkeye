@@ -3,7 +3,12 @@
 import { useActionState } from "react";
 import { type ApproveRunnerLoginState, approveRunnerLoginAction } from "./actions";
 
-export function ApproveLoginForm() {
+export type LoginCodeState =
+  | { state: "pending"; runnerName: string; requested: string }
+  | { state: "approved"; runnerName: string }
+  | { state: "expired" };
+
+export function ApproveLoginForm({ code }: { code?: LoginCodeState }) {
   const [state, formAction, pending] = useActionState<ApproveRunnerLoginState, FormData>(
     approveRunnerLoginAction,
     {},
@@ -34,6 +39,24 @@ export function ApproveLoginForm() {
         </button>
       </form>
       {state.error && <p className="hk-compact">{state.error}</p>}
+      {code?.state === "pending" && (
+        <p className="hk-compact hk-muted">
+          Requested {code.requested} by a runner named{" "}
+          <span className="hk-mono">{code.runnerName}</span>. Approve it only if that is your
+          machine.
+        </p>
+      )}
+      {code?.state === "approved" && (
+        <p className="hk-compact hk-muted">
+          This code was already approved for <span className="hk-mono">{code.runnerName}</span>.
+        </p>
+      )}
+      {code?.state === "expired" && (
+        <p className="hk-compact">
+          This code is not pending. Codes last ten minutes; run the login command again for a new
+          one.
+        </p>
+      )}
     </>
   );
 }

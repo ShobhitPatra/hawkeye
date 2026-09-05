@@ -4,7 +4,7 @@ import { findRunnerLogin, sweepRunnerLogins } from "@/runner-login";
 import { requestRunnerStatus } from "@/request-runner-status";
 import { requireSession } from "@/session";
 import { siteUrl } from "@/site-url";
-import { ApproveLoginForm } from "./approve-login-form";
+import { ApproveLoginForm, type LoginCodeState } from "./approve-login-form";
 import { ConnectView } from "./connect-view";
 
 export default async function ConnectPage({
@@ -22,23 +22,24 @@ export default async function ConnectPage({
   const runner = await requestRunnerStatus(session.user.id);
   const now = Date.now();
 
+  const codeState: LoginCodeState | undefined = !code
+    ? undefined
+    : !login || login.state === "expired"
+      ? { state: "expired" }
+      : login.state === "pending"
+        ? {
+            state: "pending",
+            runnerName: login.runnerName,
+            requested: formatUpdated(login.createdAt.toISOString(), now),
+          }
+        : { state: "approved", runnerName: login.runnerName };
+
   return (
     <ConnectView
       controlPlaneUrl={siteUrl()}
-      {...(login
-        ? {
-            pending: {
-              runnerName: login.runnerName,
-              state: login.state,
-              requested: formatUpdated(login.createdAt.toISOString(), now),
-            },
-          }
-        : {})}
-      approve={<ApproveLoginForm />}
+      approve={<ApproveLoginForm {...(codeState ? { code: codeState } : {})} />}
       runner={runner}
-      {...(runner.lastSeenAt
-        ? { lastSeen: formatUpdated(runner.lastSeenAt.toISOString(), now) }
-        : {})}
+      now={now}
     />
   );
 }
