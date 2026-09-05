@@ -130,14 +130,14 @@
 }
 .hk-nav a,
 .hk-topbar-end a,
-.hk-wordmark,
+a.hk-wordmark,
 .hk-crumb a,
 .hk-table a,
-.hk-button,
+a.hk-button,
 .hk-menu-panel a {
   text-decoration: none;
 }
-.hk-link {
+a.hk-link {
   text-decoration: underline;
   text-underline-offset: 0.15em;
 }
