@@ -955,6 +955,18 @@
 /* One breakpoint */
 
 @media (max-width: 760px) {
+  .hk-topbar-end .hk-account-name {
+    display: none;
+  }
+  .hk-topbar-end .hk-account-initial {
+    display: inline;
+  }
+  .hk-topbar .hk-status {
+    display: none;
+  }
+  .hk-nav {
+    gap: var(--hk-space-3);
+  }
   .hk-headline {
     font-size: var(--hk-type-display);
     line-height: var(--hk-leading-display);
