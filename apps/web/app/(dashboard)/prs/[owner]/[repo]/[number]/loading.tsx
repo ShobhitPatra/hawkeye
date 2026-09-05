@@ -7,12 +7,6 @@ export default function Loading() {
       <div className="hk-state">
         <p>Fetching the review.</p>
       </div>
-      <div className="hk-skeleton" data-rows aria-hidden="true">
-        <span />
-        <span />
-        <span />
-        <span />
-      </div>
     </main>
   );
 }
