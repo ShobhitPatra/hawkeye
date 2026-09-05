@@ -20,10 +20,7 @@ export default async function RunnersPage() {
       <h1>Runners</h1>
       <p>A runner polls for review jobs with its own token. The token is shown once.</p>
       <p>
-        <Link className="hk-link" href="/connect">
-          Connect a runner
-        </Link>{" "}
-        from the command line instead.
+        <Link href="/connect">Connect a runner</Link> from the command line instead.
       </p>
       <CreateRunnerForm />
       {runners.length === 0 ? (

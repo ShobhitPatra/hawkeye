@@ -67,13 +67,7 @@ export default async function PullRequestRunsPage({
                 <td>{run.turns}</td>
                 <td>{formatDuration(run)}</td>
                 <td>{formatError(run.error)}</td>
-                <td>
-                  {run.reviewUrl && (
-                    <a className="hk-link" href={run.reviewUrl}>
-                      review
-                    </a>
-                  )}
-                </td>
+                <td>{run.reviewUrl && <a href={run.reviewUrl}>review</a>}</td>
               </tr>
             ))}
           </tbody>

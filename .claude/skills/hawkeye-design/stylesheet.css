@@ -125,14 +125,18 @@
 }
 .hk-root a {
   color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+.hk-nav a,
+.hk-topbar-end a,
+.hk-wordmark,
+.hk-crumb a,
+.hk-table a,
+.hk-button,
+.hk-menu-panel a {
   text-decoration: none;
 }
-.hk-prose a,
-.hk-detail a,
-.hk-state a,
-.hk-help a,
-.hk-lede a,
-.hk-body a,
 .hk-link {
   text-decoration: underline;
   text-underline-offset: 0.15em;
