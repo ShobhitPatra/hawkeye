@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
 import { createRunnerToken } from "./runner-tokens";
-import { hasArmedPullRequest, listFindingsForPullRequest, listRunsForPullRequest } from "./runs";
+import {
+  findArmedPullRequest,
+  hasArmedPullRequest,
+  listFindingsForPullRequest,
+  listRunsForPullRequest,
+} from "./runs";
 import { createTestDb, seedArmedPullRequest } from "./test/pglite";
 
 const coordinates = { userId: "user-1", owner: "octo", repo: "repo", number: 7 };
@@ -188,11 +193,25 @@ describe("listFindingsForPullRequest", () => {
       stableId: "f-optional",
       severity: "optional",
       claim: "an optional",
+      detail: null,
       path: "a.txt",
       line: 3,
       firstSeenSha: headSha,
       resolvedSha: null,
     });
+  });
+});
+
+describe("findArmedPullRequest", () => {
+  it("returns the latest arm with its installation and whether it is active", async () => {
+    expect(await findArmedPullRequest(db, coordinates)).toEqual({
+      id: "armed-1",
+      installationId: "10",
+      armed: true,
+    });
+    await db.update(schema.armedPr).set({ disarmedAt: new Date() });
+    expect(await findArmedPullRequest(db, coordinates)).toMatchObject({ armed: false });
+    expect(await findArmedPullRequest(db, { ...coordinates, number: 99 })).toBeUndefined();
   });
 });
 
