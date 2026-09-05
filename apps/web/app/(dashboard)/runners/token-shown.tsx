@@ -1,7 +1,7 @@
 import { CopyButton } from "./copy-button";
 
 export function TokenShown({ token, controlPlaneUrl }: { token: string; controlPlaneUrl: string }) {
-  const command = `npx hawkeye-review runner --url ${controlPlaneUrl} --token ${token}`;
+  const command = `npx hawkeye-review runner login --url ${controlPlaneUrl} --token ${token}`;
   return (
     <div className="hk-section">
       <div className="hk-code-row">
@@ -15,6 +15,9 @@ export function TokenShown({ token, controlPlaneUrl }: { token: string; controlP
         <pre className="hk-code">{command}</pre>
         <CopyButton text={command} />
       </div>
+      <p className="hk-compact hk-muted">
+        Then start it with <span className="hk-mono">npx hawkeye-review runner</span>.
+      </p>
     </div>
   );
 }
