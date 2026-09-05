@@ -4,8 +4,10 @@
 :root {
   color-scheme: light dark;
 
-  --hk-font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --hk-font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --hk-font-sans:
+    var(--font-plex-sans, "IBM Plex Sans"), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --hk-font-mono:
+    var(--font-plex-mono, "IBM Plex Mono"), ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --hk-bg: #f7f6f3;
   --hk-bg-2: #efede8;

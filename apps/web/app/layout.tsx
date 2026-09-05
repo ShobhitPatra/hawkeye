@@ -1,9 +1,24 @@
 import type { ReactNode } from "react";
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import "../../../.claude/skills/hawkeye-design/stylesheet.css";
+
+const plexSans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-sans",
+});
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-plex-mono",
+});
+
 export const metadata = { title: "Hawkeye" };
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" className={`${plexSans.variable} ${plexMono.variable}`}>
+      <body className="hk-root">{children}</body>
     </html>
   );
 }
