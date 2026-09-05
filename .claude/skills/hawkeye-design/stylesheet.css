@@ -556,6 +556,39 @@
   grid-column: 1 / -1;
 }
 
+/* Steps: a numbered sequence in the margin column */
+
+.hk-steps {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hk-space-5);
+  counter-reset: step;
+}
+.hk-steps > li {
+  display: grid;
+  grid-template-columns: var(--hk-gutter-width) minmax(0, 1fr);
+  gap: var(--hk-space-1) var(--hk-space-4);
+}
+.hk-steps > li::before {
+  counter-increment: step;
+  content: "Step " counter(step);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: var(--hk-weight-semibold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--hk-fg-3);
+  padding-top: var(--hk-space-1);
+}
+.hk-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hk-space-2);
+  min-width: 0;
+}
+
 /* Controls */
 
 .hk-button {
@@ -1106,7 +1139,8 @@ button.hk-arm::before {
   .hk-page {
     padding: var(--hk-space-5) var(--hk-space-4) var(--hk-space-7);
   }
-  .hk-entry {
+  .hk-entry,
+  .hk-steps > li {
     grid-template-columns: 1fr;
     gap: var(--hk-space-1);
   }

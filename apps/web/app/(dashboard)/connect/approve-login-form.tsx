@@ -9,23 +9,31 @@ export function ApproveLoginForm() {
     {},
   );
 
-  if (state.runnerName) {
+  if (state.runnerName)
     return (
-      <p>
-        Runner <strong>{state.runnerName}</strong> connected. Go back to your terminal.
-      </p>
+      <div className="hk-state">
+        <p>
+          Runner <span className="hk-mono">{state.runnerName}</span> connected.
+        </p>
+        <p>Go back to your terminal; it is already polling.</p>
+      </div>
     );
-  }
 
   return (
     <>
-      <form action={formAction}>
-        <input name="code" placeholder="XXXX-XXXX" aria-label="Login code" autoComplete="off" />
-        <button type="submit" disabled={pending}>
+      <form action={formAction} className="hk-form-row">
+        <input
+          className="hk-input hk-mono"
+          name="code"
+          placeholder="XXXX-XXXX"
+          aria-label="Login code"
+          autoComplete="off"
+        />
+        <button type="submit" className="hk-button" data-variant="primary" disabled={pending}>
           Approve
         </button>
       </form>
-      {state.error && <p>{state.error}</p>}
+      {state.error && <p className="hk-compact">{state.error}</p>}
     </>
   );
 }
