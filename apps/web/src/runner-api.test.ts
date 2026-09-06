@@ -619,6 +619,12 @@ describe("recordResult", () => {
     expect(reference).toEqual({ owner: "octo", repo: "a", number: 1 });
     expect(token).toBe("ghs_token");
     expect(review.body).toContain(`<!-- hawkeye: head=${"a".repeat(40)} -->`);
+    expect(github.createCommitStatus).toHaveBeenLastCalledWith(
+      { owner: "octo", repo: "a", number: 1 },
+      "a".repeat(40),
+      { state: "success", description: "Ship · 0 findings", context: "hawkeye" },
+      "ghs_token",
+    );
     expect(review.body.trimEnd().endsWith("on the author's own plan · round 1 · 1 turn")).toBe(
       true,
     );
@@ -937,6 +943,12 @@ describe("recordResult", () => {
       posted: "superseded",
       findings: "superseded",
     });
+    expect(github.createCommitStatus).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.any(String),
+      { state: "success", description: "Superseded by a newer push", context: "hawkeye" },
+      "ghs_token",
+    );
     expect(await db.select().from(schema.finding)).toHaveLength(0);
   });
 

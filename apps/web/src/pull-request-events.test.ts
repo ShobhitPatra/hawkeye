@@ -39,7 +39,7 @@ function fakeGitHub(overrides: Partial<GitHubClient> = {}): GitHubClient {
     reviews: unsupported(),
     postReview: unsupported(),
     updateReview: unsupported(),
-    createCommitStatus: vi.fn(async () => {}),
+    createCommitStatus: unsupported(),
     listInstallationRepositories: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
     ...overrides,
