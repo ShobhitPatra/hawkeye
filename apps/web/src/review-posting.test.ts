@@ -51,6 +51,7 @@ function createGitHub(): GitHubClient {
       id: "9",
     })),
     updateReview: unsupported(),
+    createCommitStatus: vi.fn(async () => {}),
     listInstallationRepositories: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
   };

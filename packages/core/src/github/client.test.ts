@@ -209,6 +209,27 @@ describe("createGitHubClient", () => {
     expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ body: "new body" });
     expect((calls[0]!.init.headers as Record<string, string>).Authorization).toBe("Bearer t");
   });
+  it("posts a commit status on the head under the given context", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      "POST /repos/o/r/statuses/abc123": () => ({ json: { id: 1 } }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(
+      client.createCommitStatus(
+        ref,
+        "abc123",
+        { state: "pending", description: "Reviewing on laptop", context: "hawkeye" },
+        "t",
+      ),
+    ).resolves.toBeUndefined();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.init.method).toBe("POST");
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({
+      state: "pending",
+      description: "Reviewing on laptop",
+      context: "hawkeye",
+    });
+  });
   it("throws a typed error when the review update fails", async () => {
     const { fetchImpl } = fakeFetch({
       "PUT /repos/o/r/pulls/5/reviews/9": () => ({ status: 422, json: { message: "nope" } }),

@@ -53,6 +53,7 @@ function fakeGitHub(
     reviews: unsupported(),
     postReview: unsupported(),
     updateReview: unsupported(),
+    createCommitStatus: unsupported(),
   };
   return {
     github,

@@ -2,7 +2,7 @@ export {
   parsePullRequestReference,
   type PullRequestReference,
 } from "./github/pull-request-reference.js";
-export { createGitHubClient, type GitHubClient } from "./github/client.js";
+export { createGitHubClient, type CommitStatus, type GitHubClient } from "./github/client.js";
 export { GitHubRequestError, fetchPullRequestDetails, fetchLinkedIssue } from "./github/client.js";
 export type {
   InstallationRepository,

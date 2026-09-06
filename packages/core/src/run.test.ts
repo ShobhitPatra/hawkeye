@@ -50,6 +50,7 @@ function deps(
       id: "9",
     })),
     updateReview: vi.fn(async () => {}),
+    createCommitStatus: vi.fn(async () => {}),
   };
   const harness: HarnessSpec = {
     name: "fake",

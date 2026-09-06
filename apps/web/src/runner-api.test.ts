@@ -29,6 +29,7 @@ function createGitHub(): GitHubClient {
       id: "9",
     })),
     updateReview: unsupported(),
+    createCommitStatus: vi.fn(async () => {}),
     listInstallationRepositories: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
   };
@@ -118,9 +119,28 @@ describe("claimJob", () => {
     expect(body.installationToken).toBe("ghs_token");
     expect(body.settings).toEqual({ maxTurns: 40, wallClockMinutes: 15 });
     expect(github.installationTokenById).toHaveBeenCalledWith("10");
+    expect(github.createCommitStatus).toHaveBeenCalledWith(
+      { owner: "octo", repo: "a", number: 1 },
+      "a".repeat(40),
+      { state: "pending", description: "Reviewing on laptop", context: "hawkeye" },
+      "ghs_token",
+    );
 
     const [run] = await db.select().from(schema.run).where(eq(schema.run.id, body.job.runId));
     expect(run).toMatchObject({ jobId: queued.id, runnerId, status: "running" });
+  });
+
+  it("still claims when the commit status cannot be set", async () => {
+    await enqueue();
+    github.createCommitStatus = vi.fn(async () => {
+      throw new Error("Resource not accessible by integration");
+    });
+    const log = vi.fn();
+
+    const response = await claimJob(request("/api/runner/jobs"), { ...claimDeps(), log });
+
+    expect(response.status).toBe(200);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("commit status not set"));
   });
 
   it("releases the job when the installation token cannot be minted", async () => {
@@ -599,6 +619,12 @@ describe("recordResult", () => {
     expect(reference).toEqual({ owner: "octo", repo: "a", number: 1 });
     expect(token).toBe("ghs_token");
     expect(review.body).toContain(`<!-- hawkeye: head=${"a".repeat(40)} -->`);
+    expect(github.createCommitStatus).toHaveBeenLastCalledWith(
+      { owner: "octo", repo: "a", number: 1 },
+      "a".repeat(40),
+      { state: "success", description: "Ship · 0 findings", context: "hawkeye" },
+      "ghs_token",
+    );
     expect(review.body.trimEnd().endsWith("on the author's own plan · round 1 · 1 turn")).toBe(
       true,
     );
@@ -917,6 +943,12 @@ describe("recordResult", () => {
       posted: "superseded",
       findings: "superseded",
     });
+    expect(github.createCommitStatus).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.any(String),
+      { state: "success", description: "Superseded by a newer push", context: "hawkeye" },
+      "ghs_token",
+    );
     expect(await db.select().from(schema.finding)).toHaveLength(0);
   });
 
@@ -954,6 +986,12 @@ describe("recordResult", () => {
 
     expect(github.postReview).not.toHaveBeenCalled();
     expect(await db.select().from(schema.reviewPosted)).toHaveLength(0);
+    expect(github.createCommitStatus).toHaveBeenCalledWith(
+      { owner: "octo", repo: "a", number: 1 },
+      "a".repeat(40),
+      { state: "success", description: "Review did not complete", context: "hawkeye" },
+      "ghs_token",
+    );
   });
 
   it("fails the job for a non-ok status", async () => {
