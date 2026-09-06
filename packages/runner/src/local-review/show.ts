@@ -12,7 +12,8 @@ export async function showRound(
   directory: string,
   warn: (line: string) => void = () => {},
 ): Promise<string> {
-  const { result, meta, rounds, priorClaims } = await loadRound(directory, warn);
+  const { result, meta, priorClaims } = await loadRound(directory, warn);
+  const rounds = await roundsOf(dirname(directory), warn);
   return renderReviewText({ result, meta, rounds, priorClaims });
 }
 
@@ -66,7 +67,13 @@ async function loadRound(directory: string, warn: (line: string) => void) {
       warn(
         `prior finding ${prior.id} is reported open but not repeated in findings; the verdict ignores it`,
       );
-  const pullRequestDir = dirname(directory);
+  return { result, meta, priorClaims };
+}
+
+async function roundsOf(
+  pullRequestDir: string,
+  warn: (line: string) => void,
+): Promise<RoundSummary[]> {
   const rounds: RoundSummary[] = [];
   for (const name of await listRounds(pullRequestDir)) {
     const roundDir = join(pullRequestDir, name);
@@ -89,5 +96,5 @@ async function loadRound(directory: string, warn: (line: string) => void) {
       startedAt: siblingMeta.startedAt,
     });
   }
-  return { result, meta, rounds, priorClaims };
+  return rounds;
 }

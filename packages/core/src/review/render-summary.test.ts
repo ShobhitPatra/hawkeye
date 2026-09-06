@@ -72,6 +72,10 @@ describe("renderReviewSummary", () => {
       ].join("\n"),
     );
   });
+  it("omits the round when the caller has none", () => {
+    const text = renderReviewSummary({ result: { ...base(), findings: [] }, turns: 3 });
+    expect(text.endsWith("\n0 findings · 3 turns")).toBe(true);
+  });
   it("applies the style hooks to the verdict, the must-fix label and dim lines", () => {
     const style = {
       verdict: (text: string) => `<v>${text}</v>`,

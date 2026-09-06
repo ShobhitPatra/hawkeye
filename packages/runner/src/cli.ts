@@ -111,6 +111,10 @@ export function createProgram(io: {
         let runDirectory: string | undefined;
         let log = io.stderr;
         try {
+          if (options.full && !options.dryRun)
+            throw new Error(
+              "--full applies only with --dry-run; a posted review is read on GitHub",
+            );
           const maxTurns = positiveInteger("--max-turns", options.maxTurns);
           const wallClockMinutes = positiveInteger(
             "--wall-clock-minutes",
@@ -179,7 +183,6 @@ export function createProgram(io: {
                 ? `${outcome.review.body}\n\n${outcome.review.comments.map((c) => `--- ${c.path}:${c.line}\n${c.body}`).join("\n\n")}`
                 : `${renderReviewSummary({
                     result: outcome.result,
-                    meta: { round: 1 },
                     turns: outcome.turns,
                     resultPath: outcome.reviewPath,
                     ...(io.style === undefined ? {} : { style: io.style }),

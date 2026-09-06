@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { loadContractOverride } from "./cli.js";
+import { createProgram, loadContractOverride } from "./cli.js";
 
 const missing = async (path: string) => {
   throw Object.assign(new Error(`ENOENT: ${path}`), { code: "ENOENT" });
@@ -95,5 +95,24 @@ describe("loadContractOverride", () => {
         },
       }),
     ).rejects.toThrow("cannot read contract at /denied.md");
+  });
+});
+
+describe("review", () => {
+  it("rejects --full without --dry-run before touching anything", async () => {
+    const stderr = vi.fn();
+    const exitCode = process.exitCode;
+    await createProgram({ stdout: vi.fn(), stderr }).parseAsync([
+      "node",
+      "hawkeye",
+      "review",
+      "octo/repo#1",
+      "--full",
+    ]);
+    expect(stderr).toHaveBeenCalledWith(
+      "error: --full applies only with --dry-run; a posted review is read on GitHub",
+    );
+    expect(process.exitCode).toBe(1);
+    process.exitCode = exitCode;
   });
 });

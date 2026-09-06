@@ -10,7 +10,7 @@ export type ReviewTextStyle = {
 
 export type RenderSummaryInput = {
   result: ReviewResult;
-  meta: { round: number };
+  meta?: { round: number };
   turns?: number;
   priorClaims?: Record<string, string>;
   resultPath?: string;
@@ -66,7 +66,7 @@ export function renderReviewSummary(input: RenderSummaryInput): string {
   const count = result.findings.length;
   const facts = [
     `${count} finding${count === 1 ? "" : "s"}`,
-    `round ${input.meta.round}`,
+    ...(input.meta === undefined ? [] : [`round ${input.meta.round}`]),
     ...(input.turns === undefined ? [] : [`${input.turns} turn${input.turns === 1 ? "" : "s"}`]),
   ];
   lines.push("", facts.join(" · "));
