@@ -145,7 +145,9 @@ Middle dots separate inline facts. Ids stay visible because `hawkeye-review dism
 
 ### The CLI
 
-Plain text is the contract; color is decoration that must be removable. On a TTY without `NO_COLOR`: the verdict word bold, "Must fix" red, paths and ids in dim. Nothing else. Group headings are the human labels. Lines wrap at the terminal, never hard-wrapped.
+Plain text is the contract; color is decoration that must be removable. On a TTY without `NO_COLOR`: the verdict word bold, "Must fix" red, paths and ids in dim. Nothing else. Lines wrap at the terminal, never hard-wrapped.
+
+The terminal is not where a review is read; the review lives on GitHub or in the round's result file. A command that ends in a verdict prints the verdict word, its reason, then one line per finding in the margin column as text: the severity label in a 12-column gutter, the claim beside it, and the path, line and finding id in dim on the next line. Prior findings follow as `Prior` lines with id, status and note. Then a facts line (finding count, then round and turns when known, middle dots between) and a dim line naming the full review. Details, lenses and the rounds table print only with `--full`.
 
 ### Loading, empty and failed
 

@@ -13,12 +13,14 @@ import {
   HAWKEYE_REPOSITORY_URL,
   parsePullRequestReference,
   readRepositoryRules,
+  renderReviewSummary,
+  type ReviewTextStyle,
   runReview,
 } from "@hawkeye/core";
 import { expandHome, loadConfig } from "./config.js";
 import { describePreparedRound, prepareRound } from "./local-review/prepare.js";
 import { dismissFinding, withdrawDismissal } from "./local-review/rounds.js";
-import { showRound } from "./local-review/show.js";
+import { showRound, summarizeRound } from "./local-review/show.js";
 import { resolveGitHubToken } from "./local-review/token.js";
 import { createRunDirectory } from "./run-directory.js";
 import { createControlPlaneClient } from "./runner/client.js";
@@ -74,6 +76,7 @@ export async function loadContractOverride(input: {
 export function createProgram(io: {
   stdout(line: string): void;
   stderr(line: string): void;
+  style?: ReviewTextStyle;
 }): Command {
   const program = new Command("hawkeye")
     .version(packageJson.version)
@@ -83,6 +86,7 @@ export function createProgram(io: {
     .command("review")
     .argument("<pull-request>", "https://github.com/owner/repo/pull/N or owner/repo#N")
     .option("--dry-run", "render the review and print it without posting", false)
+    .option("--full", "with --dry-run, print the whole review as it would be posted", false)
     .option("--force", "review even if this head sha was already reviewed", false)
     .option("--max-turns <n>", "assistant turn limit", "40")
     .option("--wall-clock-minutes <n>", "wall clock limit in minutes", "15")
@@ -96,6 +100,7 @@ export function createProgram(io: {
         pullRequest: string,
         options: {
           dryRun: boolean;
+          full: boolean;
           force: boolean;
           maxTurns: string;
           wallClockMinutes: string;
@@ -106,6 +111,10 @@ export function createProgram(io: {
         let runDirectory: string | undefined;
         let log = io.stderr;
         try {
+          if (options.full && !options.dryRun)
+            throw new Error(
+              "--full applies only with --dry-run; a posted review is read on GitHub",
+            );
           const maxTurns = positiveInteger("--max-turns", options.maxTurns);
           const wallClockMinutes = positiveInteger(
             "--wall-clock-minutes",
@@ -170,7 +179,14 @@ export function createProgram(io: {
             );
           if (outcome.kind === "dry-run")
             io.stdout(
-              `${outcome.review.body}\n\n${outcome.review.comments.map((c) => `--- ${c.path}:${c.line}\n${c.body}`).join("\n\n")}`,
+              options.full
+                ? `${outcome.review.body}\n\n${outcome.review.comments.map((c) => `--- ${c.path}:${c.line}\n${c.body}`).join("\n\n")}`
+                : `${renderReviewSummary({
+                    result: outcome.result,
+                    turns: outcome.turns,
+                    resultPath: outcome.reviewPath,
+                    ...(io.style === undefined ? {} : { style: io.style }),
+                  })}\nNot posted: dry run.`,
             );
           if (outcome.kind === "posted")
             io.stdout(`posted ${outcome.findings} finding(s): ${outcome.url}`);
@@ -327,14 +343,17 @@ export function createProgram(io: {
 
   program
     .command("show")
-    .description("print the review written into a prepared round")
+    .description("print the verdict and findings of a prepared round")
     .argument("<round-dir>", "round directory printed by prepare")
-    .action(async (roundDirectory: string) => {
+    .option("--full", "print the whole review: details, prior findings, lenses and rounds", false)
+    .action(async (roundDirectory: string, options: { full: boolean }) => {
       try {
+        const directory = expandHome(roundDirectory, homedir());
+        const warn = (line: string) => io.stderr(`warning: ${line}`);
         io.stdout(
-          await showRound(expandHome(roundDirectory, homedir()), (line) =>
-            io.stderr(`warning: ${line}`),
-          ),
+          options.full
+            ? await showRound(directory, warn)
+            : await summarizeRound(directory, warn, io.style),
         );
       } catch (error) {
         io.stderr(`error: ${(error as Error).message}`);

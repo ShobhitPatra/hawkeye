@@ -77,4 +77,9 @@ export {
 } from "./contract/prompt.js";
 export { fetchMergeBase } from "./github/client.js";
 export { renderReviewText, type RenderTextInput, type RoundSummary } from "./review/render-text.js";
+export {
+  renderReviewSummary,
+  type RenderSummaryInput,
+  type ReviewTextStyle,
+} from "./review/render-summary.js";
 export { removeTrustedConfig } from "./worktree/trusted-files.js";

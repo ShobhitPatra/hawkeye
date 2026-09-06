@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { findingId } from "@hawkeye/core";
-import { showRound } from "./show.js";
+import { showRound, summarizeRound } from "./show.js";
 
 const LENSES = ["intent", "behavior", "blast_radius", "verification", "fit", "hygiene"];
 const meta = {
@@ -38,6 +38,27 @@ describe("showRound", () => {
         "Rounds:\n- round 3 · ccccccc · mergeable · 2026-08-26T10:00:00.000Z (this review)",
       ),
     ).toBe(true);
+  });
+  it("summarizes a round as the verdict, one line per finding and the result path", async () => {
+    const directory = await roundWith({
+      verdict: "ship",
+      summary: "- fine",
+      lenses: LENSES.map((name) => ({ name, assessment: "ok" })),
+      findings: [{ severity: "optional", claim: "Nit", detail: "small", path: "a.ts", line: 4 }],
+    });
+    const text = await summarizeRound(directory, undefined, { dim: (line) => `<${line}>` });
+    expect(text).toBe(
+      [
+        "Mergeable",
+        "- fine",
+        "",
+        "Optional    Nit",
+        `            <a.ts:4 · ${findingId("a.ts", "Nit")}>`,
+        "",
+        "1 finding · round 3",
+        `<Full review: ${join(directory, "result.json")}>`,
+      ].join("\n"),
+    );
   });
   it("lists every round of the pull request, pending ones without a verdict", async () => {
     const directory = await roundWith({
