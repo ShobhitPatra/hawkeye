@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LENSES, type ReviewResult, VERDICTS } from "../contract/schema.js";
-import { renderReview } from "./render.js";
+import { footerLines, renderReview } from "./render.js";
 
 const base = (): ReviewResult => ({
   verdict: "changes_needed",
@@ -37,29 +37,31 @@ describe("renderReview", () => {
   it("puts the marker first and the credit footer last", () => {
     const r = renderReview(input());
     expect(r.body.startsWith(`<!-- hawkeye: head=${"a".repeat(40)} -->`)).toBe(true);
-    expect(r.body.trimEnd().endsWith("on the author's own plan.")).toBe(true);
+    expect(r.body.trimEnd().endsWith("on the author's own plan")).toBe(true);
     expect(r.body).toContain("https://github.com/ShobhitPatra/hawkeye");
   });
-  it("renders the verdict as a heading above the summary", () => {
+  it("renders the verdict word as a level-three heading above the summary", () => {
     const r = renderReview(input());
-    expect(r.body).toContain("# <small>Verdict:</small> **CHANGES NEEDED**");
-    expect(r.body.indexOf("# <small>Verdict:</small> **CHANGES NEEDED**")).toBeLessThan(
-      r.body.indexOf("Mostly fine."),
-    );
+    expect(r.body).toContain("\n### Changes needed\n\nMostly fine.");
   });
-  it("renders every verdict as a heading without underscores", () => {
+  it("renders every verdict as its human label", () => {
+    const labels: Record<(typeof VERDICTS)[number], string> = {
+      ship: "Ship",
+      mergeable: "Mergeable",
+      changes_needed: "Changes needed",
+      blocked: "Blocked",
+    };
     for (const verdict of VERDICTS) {
       const i = input();
       i.result.verdict = verdict;
-      const heading = /^# <small>Verdict:<\/small> \*\*(.+)\*\*$/m.exec(renderReview(i).body)?.[1];
-      expect(heading).toBe(verdict.replaceAll("_", " ").toUpperCase());
+      expect(/^### (.+)$/m.exec(renderReview(i).body)?.[1]).toBe(labels[verdict]);
     }
   });
   it("orders marker, verdict, findings, lens details and footer", () => {
     const r = renderReview(input());
     const marker = r.body.indexOf("<!-- hawkeye:");
-    const verdict = r.body.indexOf("# <small>Verdict:</small>");
-    const findings = r.body.indexOf("## Findings");
+    const verdict = r.body.indexOf("### Changes needed");
+    const findings = r.body.indexOf("#### Must fix");
     const details = r.body.indexOf("<details>\n<summary>Review lenses</summary>");
     const footer = r.body.indexOf("Reviewed by [Hawkeye]");
     expect(marker).toBeLessThan(verdict);
@@ -73,23 +75,24 @@ describe("renderReview", () => {
       "<details>\n<summary>Review lenses</summary>\n\n| Lens | Assessment |\n|---|---|",
     );
     expect(r.body).toContain("\n\n</details>");
-    for (const lens of LENSES) expect(r.body).toContain(`| \`${lens}\` | ${lens} ok |`);
+    expect(r.body).toContain("| Blast radius | blast_radius ok |");
+    expect(r.body).not.toContain("`intent`");
   });
-  it("groups body findings by severity with hyphenated headings", () => {
+  it("groups body findings by severity under human labels in contract order", () => {
     const r = renderReview(input());
-    expect(r.body).toContain("### should-fix");
-    expect(r.body).toContain("### optional");
-    expect(r.body).toContain("### inherited");
-    expect(r.body.indexOf("### must-fix")).toBeLessThan(r.body.indexOf("### should-fix"));
-    expect(r.body.indexOf("### should-fix")).toBeLessThan(r.body.indexOf("### optional"));
-    expect(r.body.indexOf("### optional")).toBeLessThan(r.body.indexOf("### inherited"));
+    const at = (heading: string) => r.body.indexOf(`#### ${heading}`);
+    expect(at("Must fix")).toBeGreaterThan(0);
+    expect(at("Must fix")).toBeLessThan(at("Should fix"));
+    expect(at("Should fix")).toBeLessThan(at("Optional"));
+    expect(at("Optional")).toBeLessThan(at("Inherited"));
+    expect(r.body).not.toContain("must-fix");
   });
   it("anchors in-diff findings as comments with a suggestion fence", () => {
     const r = renderReview(input());
     expect(r.comments).toHaveLength(1);
     expect(r.comments[0]).toMatchObject({ path: "src/a.ts", line: 3, side: "RIGHT" });
     expect(r.comments[0]!.body).toContain("```suggestion\nconst y = x ?? 0;\n```");
-    expect(r.comments[0]!.body.startsWith("**must-fix** · Null deref")).toBe(true);
+    expect(r.comments[0]!.body.startsWith("**Must fix** · Null deref")).toBe(true);
   });
   it("forces RIGHT side even when the finding asks for LEFT", () => {
     const result = base();
@@ -97,27 +100,27 @@ describe("renderReview", () => {
     const r = renderReview({ ...input(), result });
     expect(r.comments[0]).toMatchObject({ path: "src/a.ts", line: 3, side: "RIGHT" });
   });
-  it("lists out-of-diff and unanchored findings in the body with their ids", () => {
+  it("lists a body finding as claim, location, detail and id", () => {
     const r = renderReview(input());
-    expect(r.body).toContain("Rename");
-    expect(r.body).toContain("src/a.ts:99");
-    expect(r.body).toContain("Global state");
-    expect(r.body).toMatch(/`[0-9a-f]{12}`/);
+    expect(r.body).toMatch(/- \*\*Rename\*\* `src\/a\.ts:99`\n  too short `[0-9a-f]{12}`\n/);
+    expect(r.body).toMatch(/- \*\*Global state\*\*\n  module singleton `[0-9a-f]{12}`/);
+    expect(r.body).not.toContain(" — ");
   });
-  it("lists an anchored finding in the body as a one-liner marked inline", () => {
+  it("lists an anchored finding in the body with the inline sentence instead of its detail", () => {
     const r = renderReview(input());
-    expect(r.body).toContain("### must-fix");
-    expect(r.body).toMatch(/- `[0-9a-f]{12}` \*\*Null deref\*\* — `src\/a\.ts:3` \(inline\)\n/);
+    expect(r.body).toMatch(
+      /- \*\*Null deref\*\* `src\/a\.ts:3`\n  Posted inline at the line\. `[0-9a-f]{12}`\n/,
+    );
     expect(r.body).not.toContain("x may be undefined");
     expect(r.comments).toHaveLength(1);
   });
-  it("keeps the findings section when every finding is anchored", () => {
+  it("keeps the severity group when every finding is anchored", () => {
     const i = input();
     i.result.findings = [i.result.findings[0]!];
     const r = renderReview(i);
-    expect(r.body).toContain("## Findings");
-    expect(r.body).toContain("(inline)");
-    expect(r.body).not.toContain("### should-fix");
+    expect(r.body).toContain("#### Must fix");
+    expect(r.body).toContain("Posted inline at the line.");
+    expect(r.body).not.toContain("#### Should fix");
   });
   it("collapses a body finding rationale under a why block", () => {
     const i = input();
@@ -141,7 +144,7 @@ describe("renderReview", () => {
     const i = input();
     i.result.findings[0]!.claim = "a\nb";
     const r = renderReview(i);
-    expect(r.comments[0]!.body.startsWith("**must-fix** · a b")).toBe(true);
+    expect(r.comments[0]!.body.startsWith("**Must fix** · a b")).toBe(true);
   });
   it("keeps a multi-line rationale inside the finding bullet", () => {
     const i = input();
@@ -170,10 +173,18 @@ describe("renderReview", () => {
     const r = renderReview(input());
     expect(r.comments[0]!.body).not.toContain("<summary>why</summary>");
   });
-  it("omits the findings section when there are none", () => {
+  it("renders no severity group when there are no findings", () => {
     const i = input();
     i.result.findings = [];
-    expect(renderReview(i).body).not.toContain("## Findings");
+    expect(renderReview(i).body).not.toContain("#### ");
+  });
+  it("appends round and turns to the footer when given", () => {
+    expect(footerLines("https://x", { round: 2, turns: 31 }).at(-1)).toBe(
+      "Reviewed by [Hawkeye](https://x) on the author's own plan · round 2 · 31 turns",
+    );
+    expect(footerLines("https://x").at(-1)).toBe(
+      "Reviewed by [Hawkeye](https://x) on the author's own plan",
+    );
   });
   it("keeps the lens table on one row per lens", () => {
     const i = input();
@@ -181,7 +192,7 @@ describe("renderReview", () => {
       l.name === "intent" ? { ...l, assessment: "line one\nline two | pipe" } : l,
     );
     const r = renderReview(i);
-    expect(r.body).toContain("| `intent` | line one line two \\| pipe |");
+    expect(r.body).toContain("| Intent | line one line two \\| pipe |");
     const lensRows = r.body
       .split("\n")
       .filter((line) => line.startsWith("| ") && line !== "| Lens | Assessment |");

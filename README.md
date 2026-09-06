@@ -94,7 +94,7 @@ job: (repo, pr, head sha, merge base sha, previously reviewed sha?, open finding
    · dedupe against findings already posted on this PR
    · resolved_ids from the model → reply "✓ addressed in <sha>" and resolve the thread
    · POST pulls/{n}/reviews as the bot identity, event COMMENT
-       body: verdict + all findings (anchored ones as one-liners) + collapsed lens table + credit footer
+       body: the verdict word as a heading, its one-line reason, findings grouped under Must fix / Should fix / Optional / Inherited (anchored ones say "Posted inline at the line"), prior findings, collapsed rounds and lens tables, and a credit footer with the round and turn count
        comments[]: line-anchored findings, ```suggestion``` when an exact fix exists
 ```
 

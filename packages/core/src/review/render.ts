@@ -1,6 +1,6 @@
 import { type Finding, type ReviewResult, SEVERITIES } from "../contract/schema.js";
 import { findingId } from "./finding-id.js";
-import { indentLines, SEVERITY_BADGE } from "./format.js";
+import { indentLines, LENS_LABELS, SEVERITY_LABELS, VERDICT_LABELS } from "./format.js";
 import { encodeMarker } from "./marker.js";
 
 export type ReviewComment = { path: string; line: number; side: "RIGHT" | "LEFT"; body: string };
@@ -16,6 +16,7 @@ export type RenderInput = {
   commentable: Map<string, Set<number>>;
   repositoryUrl: string;
 };
+export type FooterMeta = { round?: number; turns?: number };
 
 export function oneLine(text: string): string {
   return text.replace(/\r?\n/g, " ");
@@ -35,9 +36,14 @@ function collapsible(summary: string, content: string, indent: string): string[]
   ];
 }
 
+function location(finding: Finding): string {
+  if (finding.path === undefined) return "";
+  return ` \`${finding.path}${finding.line === undefined ? "" : `:${finding.line}`}\``;
+}
+
 function findingBody(finding: Finding): string {
   const parts = [
-    `**${SEVERITY_BADGE[finding.severity]}** · ${oneLine(finding.claim)}`,
+    `**${SEVERITY_LABELS[finding.severity]}** · ${oneLine(finding.claim)}`,
     "",
     finding.detail,
   ];
@@ -84,28 +90,26 @@ export function renderReviewSections({
   const lines: string[] = [
     encodeMarker(headSha),
     "",
-    `# <small>Verdict:</small> **${result.verdict.replaceAll("_", " ").toUpperCase()}**`,
+    `### ${VERDICT_LABELS[result.verdict]}`,
     "",
     result.summary,
   ];
 
-  if (result.findings.length > 0) {
-    lines.push("", "## Findings");
-    for (const severity of SEVERITIES) {
-      const group = result.findings.filter((f) => f.severity === severity);
-      if (group.length === 0) continue;
-      lines.push("", `### ${SEVERITY_BADGE[severity]}`);
-      for (const f of group) {
-        const location =
-          f.path === undefined ? "" : ` — \`${f.path}${f.line === undefined ? "" : `:${f.line}`}\``;
-        const headline = `- \`${findingId(f.path, f.claim)}\` **${oneLine(f.claim)}**${location}`;
-        if (anchored.has(f)) {
-          lines.push(`${headline} (inline)`);
-          continue;
-        }
-        lines.push(headline, ...indentLines(f.detail, "  "));
-        if (f.rationale !== undefined) lines.push("", ...collapsible("why", f.rationale, "  "));
+  for (const severity of SEVERITIES) {
+    const group = result.findings.filter((f) => f.severity === severity);
+    if (group.length === 0) continue;
+    lines.push("", `#### ${SEVERITY_LABELS[severity]}`, "");
+    for (const f of group) {
+      const id = `\`${findingId(f.path, f.claim)}\``;
+      lines.push(`- **${oneLine(f.claim)}**${location(f)}`);
+      if (anchored.has(f)) {
+        lines.push(`  Posted inline at the line. ${id}`);
+        continue;
       }
+      const detail = indentLines(f.detail, "  ");
+      detail[detail.length - 1] = `${detail[detail.length - 1]} ${id}`;
+      lines.push(...detail);
+      if (f.rationale !== undefined) lines.push("", ...collapsible("why", f.rationale, "  "));
     }
   }
 
@@ -122,13 +126,18 @@ export function lensTableLines(result: Pick<ReviewResult, "lenses">): string[] {
     "|---|---|",
   ];
   for (const lens of result.lenses)
-    lines.push(`| \`${lens.name}\` | ${tableCell(lens.assessment)} |`);
+    lines.push(`| ${LENS_LABELS[lens.name]} | ${tableCell(lens.assessment)} |`);
   lines.push("", "</details>");
   return lines;
 }
 
-export function footerLines(repositoryUrl: string): string[] {
-  return ["", "---", `Reviewed by [Hawkeye](${repositoryUrl}) on the author's own plan.`];
+export function footerLines(repositoryUrl: string, meta: FooterMeta = {}): string[] {
+  const facts = [
+    `Reviewed by [Hawkeye](${repositoryUrl}) on the author's own plan`,
+    ...(meta.round === undefined ? [] : [`round ${meta.round}`]),
+    ...(meta.turns === undefined ? [] : [`${meta.turns} turns`]),
+  ];
+  return ["", "---", facts.join(" · ")];
 }
 
 export function renderReview({

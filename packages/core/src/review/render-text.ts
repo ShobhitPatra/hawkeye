@@ -7,6 +7,7 @@ export type RoundSummary = {
   headSha: string;
   verdict: Verdict | "pending" | "invalid";
   startedAt: string;
+  turns?: number;
 };
 export type RenderTextInput = {
   result: ReviewResult;
