@@ -178,6 +178,17 @@ describe("renderReview", () => {
     i.result.findings = [];
     expect(renderReview(i).body).not.toContain("#### ");
   });
+  it("keeps the id inside the bullet when the detail ends with a newline", () => {
+    const i = input();
+    i.result.findings[1]!.detail = "para one.\n\npara two.\n";
+    const r = renderReview(i);
+    expect(r.body).toMatch(/  para one\.\n\n  para two\. `[0-9a-f]{12}`\n/);
+    expect(r.body).not.toMatch(/\n `[0-9a-f]{12}`/);
+  });
+  it("passes footer meta through renderReview", () => {
+    const r = renderReview({ ...input(), footer: { round: 1, turns: 12 } });
+    expect(r.body.trimEnd().endsWith("on the author's own plan · round 1 · 12 turns")).toBe(true);
+  });
   it("appends round and turns to the footer when given", () => {
     expect(footerLines("https://x", { round: 2, turns: 31 }).at(-1)).toBe(
       "Reviewed by [Hawkeye](https://x) on the author's own plan · round 2 · 31 turns",

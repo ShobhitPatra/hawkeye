@@ -10,13 +10,14 @@ export type RenderedReview = {
   body: string;
   comments: ReviewComment[];
 };
+export type FooterMeta = { round?: number; turns?: number };
 export type RenderInput = {
   result: ReviewResult;
   headSha: string;
   commentable: Map<string, Set<number>>;
   repositoryUrl: string;
+  footer?: FooterMeta;
 };
-export type FooterMeta = { round?: number; turns?: number };
 
 export function oneLine(text: string): string {
   return text.replace(/\r?\n/g, " ");
@@ -106,7 +107,7 @@ export function renderReviewSections({
         lines.push(`  Posted inline at the line. ${id}`);
         continue;
       }
-      const detail = indentLines(f.detail, "  ");
+      const detail = indentLines(f.detail.trimEnd(), "  ");
       detail[detail.length - 1] = `${detail[detail.length - 1]} ${id}`;
       lines.push(...detail);
       if (f.rationale !== undefined) lines.push("", ...collapsible("why", f.rationale, "  "));
@@ -145,9 +146,10 @@ export function renderReview({
   headSha,
   commentable,
   repositoryUrl,
+  footer,
 }: RenderInput): RenderedReview {
   const { lines, comments } = renderReviewSections({ result, headSha, commentable });
   lines.push(...lensTableLines(result));
-  lines.push(...footerLines(repositoryUrl));
+  lines.push(...footerLines(repositoryUrl, footer));
   return { event: "COMMENT", commit_id: headSha, body: lines.join("\n"), comments };
 }
