@@ -106,7 +106,7 @@ async function closePlaceholder(
       headSha,
       token: await deps.github.installationTokenById(armedPr.installationId),
       runId: input.runId,
-      livingReviewId: undefined,
+      livingReviewId: (await livingReviewFor(deps.db, armedPr))?.githubReviewId,
       placeholderReviewId: placeholder.githubReviewId,
       closing,
     });

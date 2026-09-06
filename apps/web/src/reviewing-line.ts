@@ -130,7 +130,7 @@ export async function clearReviewing(
 ): Promise<void> {
   const { github } = deps;
   try {
-    if (input.placeholderReviewId) {
+    if (input.placeholderReviewId && input.placeholderReviewId !== input.livingReviewId) {
       await github.updateReview(
         input.reference,
         input.placeholderReviewId,

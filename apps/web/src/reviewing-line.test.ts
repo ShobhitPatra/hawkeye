@@ -186,6 +186,26 @@ describe("markReviewing", () => {
 });
 
 describe("clearReviewing", () => {
+  it("leaves a reused placeholder alone once it is the living review", async () => {
+    const github = {
+      review: vi.fn(async () => ({ body: "### Ship\n" })),
+      updateReview: vi.fn(async () => {}),
+    } as unknown as GitHubClient;
+    await clearReviewing(
+      { db, github },
+      {
+        reference,
+        headSha: "a".repeat(40),
+        token: "t",
+        runId,
+        livingReviewId: "42",
+        placeholderReviewId: "42",
+        closing: "done",
+      },
+    );
+    expect(github.updateReview).not.toHaveBeenCalled();
+  });
+
   it("replaces a placeholder with the closing sentence", async () => {
     const github = { updateReview: vi.fn(async () => {}) } as unknown as GitHubClient;
     await clearReviewing(

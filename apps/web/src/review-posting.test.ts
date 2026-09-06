@@ -199,6 +199,21 @@ describe("postReviewForRun", () => {
     );
   });
 
+  it("does not close a reused placeholder that another run posted into", async () => {
+    github.review = vi.fn(async () => ({ body: "### Ship\n" }));
+    github.updateReview = vi.fn(async () => {});
+    await db.update(schema.run).set({ placeholderReviewId: "42" }).where(eq(schema.run.id, runId));
+    await db.insert(schema.reviewPosted).values({
+      runId,
+      armedPrId: armedPr.id,
+      headSha,
+      githubReviewId: "42",
+    });
+
+    await expect(post()).resolves.toBe("already-posted");
+    expect(github.updateReview).not.toHaveBeenCalled();
+  });
+
   it("closes a round-one placeholder when a newer round is already done", async () => {
     github.updateReview = vi.fn(async () => {});
     await db.update(schema.run).set({ placeholderReviewId: "42" }).where(eq(schema.run.id, runId));
