@@ -193,6 +193,9 @@ describe("renderReview", () => {
     expect(footerLines("https://x", { round: 2, turns: 31 }).at(-1)).toBe(
       "Reviewed by [Hawkeye](https://x) on the author's own plan · round 2 · 31 turns",
     );
+    expect(footerLines("https://x", { round: 1, turns: 1 }).at(-1)).toBe(
+      "Reviewed by [Hawkeye](https://x) on the author's own plan · round 1 · 1 turn",
+    );
     expect(footerLines("https://x").at(-1)).toBe(
       "Reviewed by [Hawkeye](https://x) on the author's own plan",
     );

@@ -136,7 +136,7 @@ export function footerLines(repositoryUrl: string, meta: FooterMeta = {}): strin
   const facts = [
     `Reviewed by [Hawkeye](${repositoryUrl}) on the author's own plan`,
     ...(meta.round === undefined ? [] : [`round ${meta.round}`]),
-    ...(meta.turns === undefined ? [] : [`${meta.turns} turns`]),
+    ...(meta.turns === undefined ? [] : [`${meta.turns} turn${meta.turns === 1 ? "" : "s"}`]),
   ];
   return ["", "---", facts.join(" · ")];
 }
