@@ -23,7 +23,7 @@ import { describePreparedRound, prepareRound } from "./local-review/prepare.js";
 import { dismissFinding, withdrawDismissal } from "./local-review/rounds.js";
 import { showRound, summarizeRound } from "./local-review/show.js";
 import { resolveGitHubToken } from "./local-review/token.js";
-import { reviewProgress } from "./review-outcome.js";
+import { reviewProgress } from "./review-progress.js";
 import { createRunDirectory } from "./run-directory.js";
 import type { ProgressLine } from "./terminal.js";
 import { createControlPlaneClient } from "./runner/client.js";

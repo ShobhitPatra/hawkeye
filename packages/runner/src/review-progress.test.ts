@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { reviewProgress, reviewProgressLine } from "./review-outcome.js";
+import { reviewProgress, reviewProgressLine } from "./review-progress.js";
 
 describe("reviewProgressLine", () => {
   it("names the subject, turns and elapsed time", () => {
