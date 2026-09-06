@@ -96,6 +96,7 @@ job: (repo, pr, head sha, merge base sha, previously reviewed sha?, open finding
    · POST pulls/{n}/reviews as the bot identity, event COMMENT
        body: the verdict word as a heading, its one-line reason, findings grouped under Must fix / Should fix / Optional / Inherited (anchored ones say "Posted inline at the line"), prior findings, collapsed rounds and lens tables, and a credit footer with the round and turn count
        comments[]: line-anchored findings, ```suggestion``` when an exact fix exists
+   · at claim time the living review shows "Reviewing on <runner>" (an animated badge served at `/status/reviewing`) and when it started; the first round posts that as a placeholder review that the result then fills. A run that fails or is superseded replaces the line with one sentence
    · commit status `hawkeye` on the head: pending "Reviewing on <runner>" from the moment the job is claimed, then success with the verdict and finding count; a run that fails ends it as success "Review did not complete" (never failure or error: the status informs, it never blocks)
 ```
 

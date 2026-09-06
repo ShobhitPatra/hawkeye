@@ -209,6 +209,13 @@ describe("createGitHubClient", () => {
     expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ body: "new body" });
     expect((calls[0]!.init.headers as Record<string, string>).Authorization).toBe("Bearer t");
   });
+  it("fetches one review's body", async () => {
+    const { fetchImpl } = fakeFetch({
+      "GET /repos/o/r/pulls/5/reviews/9": () => ({ json: { id: 9, body: "hello" } }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(client.review(ref, "9", "t")).resolves.toEqual({ body: "hello" });
+  });
   it("posts a commit status on the head under the given context", async () => {
     const { fetchImpl, calls } = fakeFetch({
       "POST /repos/o/r/statuses/abc123": () => ({ json: { id: 1 } }),

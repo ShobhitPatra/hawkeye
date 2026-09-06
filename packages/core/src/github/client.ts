@@ -74,6 +74,11 @@ export interface GitHubClient {
     status: CommitStatus,
     token: string,
   ): Promise<void>;
+  review(
+    reference: PullRequestReference,
+    reviewId: string,
+    token: string,
+  ): Promise<{ body: string }>;
   updateReview(
     reference: PullRequestReference,
     reviewId: string,
@@ -357,6 +362,14 @@ export function createGitHubClient(input: {
         bearer(token),
         status,
       );
+    },
+    async review(reference, reviewId, token) {
+      const found = await request<{ body?: unknown }>(
+        "GET",
+        `${pulls(reference)}/reviews/${reviewId}`,
+        bearer(token),
+      );
+      return { body: typeof found.body === "string" ? found.body : "" };
     },
     async updateReview(reference, reviewId, body, token) {
       await request("PUT", `${pulls(reference)}/reviews/${reviewId}`, bearer(token), { body });

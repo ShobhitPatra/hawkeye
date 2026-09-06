@@ -139,7 +139,7 @@ Markdown, in this order and nothing else:
 4. `<details>` for the rounds table and for the review lenses table.
 5. The footer line crediting Hawkeye, with round and turn count.
 
-While a review is running, the living review exists already and its body is one line, "Reviewing on shobhit-fedora. Started 2 minutes ago.", posted when the runner claims the job and replaced by the result. A commit status on the head accompanies it: pending with "Reviewing on shobhit-fedora" while running, then success with the verdict and count ("Revise · 4 findings"). A run that fails ends the status as success with "Review did not complete" and keeps the detail in the dashboard; the status is never failure or error, because Hawkeye has opinions, not authority.
+While a review is running, the living review opens with a shimmering "Reviewing on shobhit-fedora" badge (an animated SVG the control plane serves, mid-tone text with no tile so it reads on both GitHub themes) and "Started 03:47 UTC. This comment is replaced when the review lands." The block is added when the runner claims the job and replaced by the result; a first round posts it as a placeholder review that the result fills. A run that fails or is superseded replaces the block with one plain sentence. A commit status on the head accompanies it: pending with "Reviewing on shobhit-fedora" while running, then success with the verdict and count ("Revise · 4 findings"). A run that fails ends the status as success with "Review did not complete" and keeps the detail in the dashboard; the status is never failure or error, because Hawkeye has opinions, not authority.
 
 Middle dots separate inline facts. Ids stay visible because `hawkeye-review dismiss` takes them.
 

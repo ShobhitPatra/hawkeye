@@ -28,7 +28,8 @@ function createGitHub(): GitHubClient {
       url: "https://github.com/octo/a/pull/1#pullrequestreview-9",
       id: "9",
     })),
-    updateReview: unsupported(),
+    updateReview: vi.fn(async () => {}),
+    review: vi.fn(async () => ({ body: "" })),
     createCommitStatus: vi.fn(async () => {}),
     listInstallationRepositories: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
@@ -82,7 +83,14 @@ function enqueue(notBefore = new Date(now.getTime() - 60_000)) {
 const instantPoll = { intervalMs: 0, totalMs: 0 };
 
 function claimDeps(overrides: Partial<Parameters<typeof claimJob>[1]> = {}) {
-  return { db, github, now: () => now, poll: instantPoll, ...overrides };
+  return {
+    db,
+    github,
+    now: () => now,
+    poll: instantPoll,
+    controlPlaneUrl: "https://hawkeye.test",
+    ...overrides,
+  };
 }
 
 describe("claimJob", () => {
@@ -128,6 +136,84 @@ describe("claimJob", () => {
 
     const [run] = await db.select().from(schema.run).where(eq(schema.run.id, body.job.runId));
     expect(run).toMatchObject({ jobId: queued.id, runnerId, status: "running" });
+  });
+
+  it("posts a reviewing placeholder at claim time when nothing is posted yet", async () => {
+    await enqueue();
+    const response = await claimJob(request("/api/runner/jobs"), claimDeps());
+    const body = await response.json();
+    const [reference, review] = (github.postReview as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(reference).toEqual({ owner: "octo", repo: "a", number: 1 });
+    expect(review.comments).toEqual([]);
+    expect(review.body).toContain(
+      "![Reviewing on laptop](https://hawkeye.test/status/reviewing?runner=laptop)",
+    );
+    expect(review.body).toContain("This comment is replaced when the review lands.");
+    const [run] = await db.select().from(schema.run).where(eq(schema.run.id, body.job.runId));
+    expect(run?.placeholderReviewId).toBe("9");
+  });
+
+  it("prepends the reviewing line to the living review on a later claim", async () => {
+    const firstRunId = await claimedRunId();
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${firstRunId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: reviewResult,
+      }),
+      { db, github },
+      firstRunId,
+    );
+    github.review = vi.fn(async () => ({ body: "<!-- hawkeye: head=aaa -->\n\n### Ship\n" }));
+    (github.updateReview as ReturnType<typeof vi.fn>).mockClear();
+    (github.postReview as ReturnType<typeof vi.fn>).mockClear();
+    await enqueueJob(db, {
+      armedPrId: "armed-1",
+      headSha: "b".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: new Date(now.getTime() - 60_000),
+    });
+
+    await claimJob(request("/api/runner/jobs"), claimDeps());
+
+    expect(github.postReview).not.toHaveBeenCalled();
+    const [, reviewId, body] = (github.updateReview as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(reviewId).toBe("9");
+    expect(body.startsWith("<!-- hawkeye: reviewing -->")).toBe(true);
+    expect(body).toContain("Reviewing on laptop");
+    expect(body.endsWith("<!-- hawkeye: head=aaa -->\n\n### Ship\n")).toBe(true);
+  });
+
+  it("reuses the closed placeholder on the next claim after a failed round", async () => {
+    const firstRunId = await claimedRunId();
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${firstRunId}/result`, {
+        status: "error",
+        turns: 1,
+        error: "boom",
+      }),
+      { db, github },
+      firstRunId,
+    );
+    (github.updateReview as ReturnType<typeof vi.fn>).mockClear();
+    (github.postReview as ReturnType<typeof vi.fn>).mockClear();
+    await enqueueJob(db, {
+      armedPrId: "armed-1",
+      headSha: "b".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: new Date(now.getTime() - 60_000),
+    });
+
+    const response = await claimJob(request("/api/runner/jobs"), claimDeps());
+    const body = await response.json();
+
+    expect(github.postReview).not.toHaveBeenCalled();
+    const [, reviewId, reviewBody] = (github.updateReview as ReturnType<typeof vi.fn>).mock
+      .calls[0]!;
+    expect(reviewId).toBe("9");
+    expect(reviewBody).toContain("Reviewing on laptop");
+    const [run] = await db.select().from(schema.run).where(eq(schema.run.id, body.job.runId));
+    expect(run?.placeholderReviewId).toBe("9");
   });
 
   it("still claims when the commit status cannot be set", async () => {
@@ -297,8 +383,8 @@ describe("claimJob", () => {
 
   it("returns no previous round when no review was posted", async () => {
     const firstRunId = await claimedRunId();
-    github.postReview = vi.fn(async () => {
-      throw new Error("GitHub POST failed: 500");
+    github.updateReview = vi.fn(async () => {
+      throw new Error("GitHub PUT failed: 500");
     });
     await recordResult(
       jsonRequest(`/api/runner/runs/${firstRunId}/result`, {
@@ -614,20 +700,22 @@ describe("recordResult", () => {
       findings: { created: 0, updated: 0, resolved: 0 },
     });
     expect(github.installationTokenById).toHaveBeenCalledWith("10");
-    const [reference, review, token] = (github.postReview as ReturnType<typeof vi.fn>).mock
-      .calls[0]!;
+    const [, placeholder] = (github.postReview as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(placeholder.body).toContain("Reviewing on laptop");
+    const [reference, reviewId, body, usedToken] = (github.updateReview as ReturnType<typeof vi.fn>)
+      .mock.calls[0]!;
     expect(reference).toEqual({ owner: "octo", repo: "a", number: 1 });
-    expect(token).toBe("ghs_token");
-    expect(review.body).toContain(`<!-- hawkeye: head=${"a".repeat(40)} -->`);
+    expect(reviewId).toBe("9");
+    expect(usedToken).toBe("ghs_token");
+    expect(body).toContain(`<!-- hawkeye: head=${"a".repeat(40)} -->`);
+    expect(body).not.toContain("hawkeye: reviewing");
     expect(github.createCommitStatus).toHaveBeenLastCalledWith(
       { owner: "octo", repo: "a", number: 1 },
       "a".repeat(40),
       { state: "success", description: "Ship · 0 findings", context: "hawkeye" },
       "ghs_token",
     );
-    expect(review.body.trimEnd().endsWith("on the author's own plan · round 1 · 1 turn")).toBe(
-      true,
-    );
+    expect(body.trimEnd().endsWith("on the author's own plan · round 1 · 1 turn")).toBe(true);
     const [row] = await db.select().from(schema.reviewPosted);
     expect(row).toMatchObject({
       runId,
@@ -765,7 +853,7 @@ describe("recordResult", () => {
 
   it("keeps the ok result and records the failure when posting throws", async () => {
     const runId = await claimedRunId();
-    github.postReview = vi.fn(async () => {
+    github.updateReview = vi.fn(async () => {
       throw new Error("GitHub POST failed: 500");
     });
 
@@ -954,6 +1042,7 @@ describe("recordResult", () => {
 
   it("rejects malformed commentable lines", async () => {
     const runId = await claimedRunId();
+    (github.postReview as ReturnType<typeof vi.fn>).mockClear();
 
     const response = await recordResult(
       jsonRequest(`/api/runner/runs/${runId}/result`, {
@@ -973,6 +1062,7 @@ describe("recordResult", () => {
 
   it("does not post for a non-ok status", async () => {
     const runId = await claimedRunId();
+    (github.postReview as ReturnType<typeof vi.fn>).mockClear();
 
     await recordResult(
       jsonRequest(`/api/runner/runs/${runId}/result`, {
@@ -990,6 +1080,12 @@ describe("recordResult", () => {
       { owner: "octo", repo: "a", number: 1 },
       "a".repeat(40),
       { state: "success", description: "Review did not complete", context: "hawkeye" },
+      "ghs_token",
+    );
+    expect(github.updateReview).toHaveBeenCalledWith(
+      { owner: "octo", repo: "a", number: 1 },
+      "9",
+      "The review did not complete. The next push queues a new one.",
       "ghs_token",
     );
   });
