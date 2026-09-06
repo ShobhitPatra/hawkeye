@@ -213,17 +213,13 @@ export async function runJob(
   } finally {
     clearInterval(heartbeat);
   }
+  const durationMs = Date.now() - startedAt;
   if (report.status !== "ok")
     deps.report({
       state: "failed",
       detail: `${report.error ?? report.status} after ${turnsOf(report.turns)}${keptIn(runDirectory)}`,
     });
-  return deliverResult(
-    job.runId,
-    report,
-    { headSha: job.headSha, durationMs: Date.now() - startedAt, runDirectory },
-    deps,
-  );
+  return deliverResult(job.runId, report, { headSha: job.headSha, durationMs, runDirectory }, deps);
 }
 
 export async function runRunnerLoop(

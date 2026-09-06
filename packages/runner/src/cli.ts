@@ -80,6 +80,7 @@ export function createProgram(io: {
   stdout(line: string): void;
   stderr(line: string): void;
   style?: TerminalStyle;
+  stderrStyle?: TerminalStyle;
   progress?: ProgressLine;
 }): Command {
   const program = new Command("hawkeye")
@@ -248,7 +249,7 @@ export function createProgram(io: {
           stderr: io.stderr,
           appendFile: (path, line) => appendFileSync(path, line),
           home: homedir(),
-          ...(io.style === undefined ? {} : { style: io.style }),
+          ...(io.stderrStyle === undefined ? {} : { style: io.stderrStyle }),
         });
         if (contract) terminal.report({ state: "contract", detail: contract.path });
         const stop = new AbortController();

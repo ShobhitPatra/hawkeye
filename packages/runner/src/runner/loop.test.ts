@@ -204,6 +204,30 @@ describe("runRunnerLoop", () => {
       turns: 3,
       error: "stopped without a message",
     });
+    expect(d.reported.slice(-2)).toEqual([
+      {
+        state: "failed",
+        detail: expect.stringMatching(/^stopped without a message after 3 turns · run kept in /),
+      },
+      { state: "delivered", detail: "the control plane recorded the failure" },
+    ]);
+  });
+  it.each([
+    ["already-posted", { state: "skipped", detail: "already posted for aaaaaaa" }],
+    ["superseded", { state: "skipped", detail: "superseded by a newer push" }],
+    ["failed", { state: "failed", detail: "the control plane could not post the review" }],
+    [undefined, { state: "delivered", detail: "the control plane recorded the result" }],
+  ])("reports a review acknowledged as %s", async (posted, event) => {
+    const plane = await fakeControlPlane((received, response) => {
+      if (received.url === "/api/runner/jobs") return json(response, 200, claimedJob);
+      if (received.url.endsWith("/result"))
+        return json(response, 200, posted === undefined ? { ok: true } : { ok: true, posted });
+      return json(response, 200, { ok: true });
+    });
+    servers.push(plane.server);
+    const d = await deps(plane.baseUrl);
+    await runRunnerLoop(d, { once: true });
+    expect(d.reported.at(-1)).toEqual(event);
   });
   it("reports an error when the review cannot even start", async () => {
     const plane = await fakeControlPlane(scripted([claimedJob]));
@@ -218,6 +242,10 @@ describe("runRunnerLoop", () => {
       status: "error",
       turns: 0,
       error: "git fetch failed",
+    });
+    expect(d.reported).toContainEqual({
+      state: "failed",
+      detail: expect.stringMatching(/^git fetch failed after 0 turns · run kept in /),
     });
   });
   it("exits with the message when the token is rejected", async () => {

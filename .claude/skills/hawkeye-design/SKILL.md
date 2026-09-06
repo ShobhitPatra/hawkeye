@@ -151,7 +151,7 @@ The terminal is not where a review is read; the review lives on GitHub or in the
 
 A command that posts prints one line, verdict first: the verdict word, the finding count, the must-fix count only when it is not zero (in red), the turns and the duration (`6 turns · 4m 12s`), then the review's URL on its own line. While a review runs on a TTY, one line on stderr, `Reviewing owner/repo#N · 4 turns · 2m 05s`, is rewritten in place each turn and each second, then erased before the result; piped or without a TTY nothing is written until the result. No spinner, no bar.
 
-The daemon writes a log, read later as often as live: one line per state change, the local time first (`10:06:43`, dim), then a state word in a ten-column gutter (polling, claimed, reviewing, posted, skipped, failed, waiting, delivered, idle, stopping), then the subject. `failed` is the one red word, `waiting` the one amber word, the verdict on a posted line is bold; nothing else is colored. Paths under the home directory print with `~`. Per-turn and other detail lines belong in the run's `log.txt`, not on the terminal.
+The daemon writes a log, read later as often as live: one line per state change, the local time first (`10:06:43`, dim), then a state word in a ten-column gutter (polling, contract, claimed, reviewing, posted, skipped, failed, waiting, delivered, idle, stopping), then the subject. Color follows the stream the line is written to: a daemon log redirected to a file carries no escapes. `failed` is the one red word, `waiting` the one amber word, the verdict on a posted line is bold; nothing else is colored. Paths under the home directory print with `~`. Per-turn and other detail lines belong in the run's `log.txt`, not on the terminal.
 
 ### Loading, empty and failed
 
