@@ -11,7 +11,7 @@ const MAX_DESCRIPTION_LENGTH = 140;
 export type CommitStatusTarget = {
   reference: PullRequestReference;
   headSha: string;
-  token: string;
+  token: string | (() => Promise<string>);
 };
 
 export function reviewingDescription(runnerName: string): string {
@@ -34,6 +34,7 @@ export async function setCommitStatus(
   log?: (message: string) => void,
 ): Promise<void> {
   try {
+    const token = typeof target.token === "string" ? target.token : await target.token();
     await github.createCommitStatus(
       target.reference,
       target.headSha,
@@ -42,7 +43,7 @@ export async function setCommitStatus(
         description: description.slice(0, MAX_DESCRIPTION_LENGTH),
         context: HAWKEYE_STATUS_CONTEXT,
       },
-      target.token,
+      token,
     );
   } catch (error) {
     log?.(

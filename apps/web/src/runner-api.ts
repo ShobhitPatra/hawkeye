@@ -336,20 +336,20 @@ export async function recordResult(
     .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
     .where(eq(job.id, completed.jobId));
   if (!target) throw new Error(`run ${runId} has no armed pull request`);
-  const statusTarget = async () => ({
+  const statusTarget = {
     reference: {
       owner: target.armedPr.owner,
       repo: target.armedPr.repo,
       number: target.armedPr.number,
     },
     headSha: target.headSha,
-    token: await deps.github.installationTokenById(target.armedPr.installationId),
-  });
+    token: () => deps.github.installationTokenById(target.armedPr.installationId),
+  };
   const { result } = report;
   if (report.status !== "ok" || !result) {
     await setCommitStatus(
       deps.github,
-      await statusTarget(),
+      statusTarget,
       "success",
       NOT_COMPLETED_DESCRIPTION,
       deps.log,
@@ -368,7 +368,7 @@ export async function recordResult(
   });
   await setCommitStatus(
     deps.github,
-    await statusTarget(),
+    statusTarget,
     "success",
     posted === "failed"
       ? NOT_COMPLETED_DESCRIPTION

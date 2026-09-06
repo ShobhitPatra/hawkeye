@@ -43,6 +43,25 @@ describe("commit status", () => {
     );
   });
 
+  it("mints the token inside the guard so a token failure is swallowed too", async () => {
+    const log = vi.fn();
+    const createCommitStatus = vi.fn(async () => {});
+    await setCommitStatus(
+      { createCommitStatus } as unknown as GitHubClient,
+      {
+        ...target,
+        token: async () => {
+          throw new Error("rate limited");
+        },
+      },
+      "success",
+      "done",
+      log,
+    );
+    expect(createCommitStatus).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(`commit status not set on ${"a".repeat(7)}: rate limited`);
+  });
+
   it("logs and swallows a failure so a status never blocks a review", async () => {
     const log = vi.fn();
     const github = {
