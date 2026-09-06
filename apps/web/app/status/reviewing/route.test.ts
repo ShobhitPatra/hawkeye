@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GET } from "../app/status/reviewing/route";
+import { GET } from "./route";
 
 describe("GET /status/reviewing", () => {
   it("serves an uncached animated svg naming the runner", async () => {
