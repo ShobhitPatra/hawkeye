@@ -1,5 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import type { ReviewResult } from "./contract/schema.js";
 import type { GitHubClient } from "./github/client.js";
 import type { PullRequestReference } from "./github/pull-request-reference.js";
 import type { HarnessSpec } from "./harness/harness.js";
@@ -30,7 +31,14 @@ export type RunReviewDependencies = {
 };
 export type RunReviewOutcome =
   | { kind: "posted"; url: string; headSha: string; findings: number }
-  | { kind: "dry-run"; review: RenderedReview; headSha: string }
+  | {
+      kind: "dry-run";
+      review: RenderedReview;
+      result: ReviewResult;
+      turns: number;
+      reviewPath: string;
+      headSha: string;
+    }
   | { kind: "already-reviewed"; headSha: string };
 
 export async function runReview(
@@ -104,7 +112,15 @@ export async function runReview(
   const review = render(commentableLines(diff));
   await writeFile(reviewPath, JSON.stringify(review, null, 2));
 
-  if (input.dryRun) return { kind: "dry-run", review, headSha: pullRequest.headSha };
+  if (input.dryRun)
+    return {
+      kind: "dry-run",
+      review,
+      result,
+      turns: outcome.turns,
+      reviewPath,
+      headSha: pullRequest.headSha,
+    };
   const { review: sent, posted } = await postRenderedReview({
     github: deps.github,
     reference,

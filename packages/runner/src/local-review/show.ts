@@ -1,11 +1,37 @@
 import { dirname, join } from "node:path";
-import { findingId, renderReviewText, type RoundSummary } from "@hawkeye/core";
+import {
+  findingId,
+  renderReviewSummary,
+  renderReviewText,
+  type ReviewTextStyle,
+  type RoundSummary,
+} from "@hawkeye/core";
 import { listRounds, priorFindingsBefore, readRoundMeta, readRoundResult } from "./rounds.js";
 
 export async function showRound(
   directory: string,
   warn: (line: string) => void = () => {},
 ): Promise<string> {
+  const { result, meta, rounds, priorClaims } = await loadRound(directory, warn);
+  return renderReviewText({ result, meta, rounds, priorClaims });
+}
+
+export async function summarizeRound(
+  directory: string,
+  warn: (line: string) => void = () => {},
+  style?: Partial<ReviewTextStyle>,
+): Promise<string> {
+  const { result, meta, priorClaims } = await loadRound(directory, warn);
+  return renderReviewSummary({
+    result,
+    meta,
+    priorClaims,
+    resultPath: join(directory, "result.json"),
+    ...(style === undefined ? {} : { style }),
+  });
+}
+
+async function loadRound(directory: string, warn: (line: string) => void) {
   const meta = await readRoundMeta(directory);
   const result = await readRoundResult(directory);
   if (result === undefined)
@@ -63,5 +89,5 @@ export async function showRound(
       startedAt: siblingMeta.startedAt,
     });
   }
-  return renderReviewText({ result, meta, rounds, priorClaims });
+  return { result, meta, rounds, priorClaims };
 }
