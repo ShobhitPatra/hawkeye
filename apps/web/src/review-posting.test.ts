@@ -214,6 +214,32 @@ describe("postReviewForRun", () => {
     expect(github.updateReview).not.toHaveBeenCalled();
   });
 
+  it("does not close a reused placeholder another run posted into after the reservation", async () => {
+    github.review = vi.fn(async () => ({ body: "### Ship\n" }));
+    github.updateReview = vi.fn(async () => {});
+    await db.update(schema.run).set({ placeholderReviewId: "42" }).where(eq(schema.run.id, runId));
+    github.installationTokenById = vi.fn(async () => {
+      await db.insert(schema.job).values({
+        armedPrId: armedPr.id,
+        headSha: "d".repeat(40),
+        baseSha: "b".repeat(40),
+        notBefore: new Date(),
+        state: "done",
+      });
+      await db.insert(schema.reviewPosted).values({
+        runId,
+        armedPrId: armedPr.id,
+        headSha: "d".repeat(40),
+        githubReviewId: "42",
+        postedAt: new Date("2026-01-01T00:00:00Z"),
+      });
+      return "ghs_token";
+    });
+
+    await expect(post({})).resolves.toBe("superseded");
+    expect(github.updateReview).not.toHaveBeenCalled();
+  });
+
   it("closes a round-one placeholder when a newer round is already done", async () => {
     github.updateReview = vi.fn(async () => {});
     await db.update(schema.run).set({ placeholderReviewId: "42" }).where(eq(schema.run.id, runId));

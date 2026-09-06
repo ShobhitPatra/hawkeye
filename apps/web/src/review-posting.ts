@@ -282,13 +282,15 @@ export async function postReviewForRun(
   const release = () => db.delete(reviewPosted).where(eq(reviewPosted.id, reservation.id));
 
   const placeholder = "placeholder" in living;
-  const clear = (token: string, closing: string) =>
+  const clear = async (token: string, closing: string) =>
     clearReviewing(deps, {
       reference,
       headSha,
       token,
       runId: input.runId,
-      livingReviewId: placeholder ? undefined : living.githubReviewId,
+      livingReviewId: placeholder
+        ? (await livingReviewFor(db, armedPr))?.githubReviewId
+        : living.githubReviewId,
       placeholderReviewId: placeholder ? living.githubReviewId : null,
       closing,
     });
