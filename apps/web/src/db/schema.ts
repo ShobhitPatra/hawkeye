@@ -146,6 +146,7 @@ export const run = pgTable("run", {
   error: text("error"),
   streamPath: text("stream_path"),
   result: jsonb("result").$type<ReviewResult>(),
+  placeholderReviewId: text("placeholder_review_id"),
 });
 
 export const finding = pgTable(

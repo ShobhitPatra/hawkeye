@@ -1,6 +1,7 @@
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
 import { claimJob } from "@/runner-api";
+import { siteUrl } from "@/site-url";
 
 export const maxDuration = 30;
 
@@ -9,5 +10,6 @@ export async function GET(request: Request) {
     db: getDb(),
     github: createGitHubAppClient({ fetch }),
     log: console.error,
+    controlPlaneUrl: siteUrl(),
   });
 }

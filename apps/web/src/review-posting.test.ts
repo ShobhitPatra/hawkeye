@@ -51,6 +51,7 @@ function createGitHub(): GitHubClient {
       id: "9",
     })),
     updateReview: unsupported(),
+    review: unsupported(),
     createCommitStatus: vi.fn(async () => {}),
     listInstallationRepositories: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
@@ -256,6 +257,30 @@ describe("postReviewForRun", () => {
     expect(github.updateReview).not.toHaveBeenCalled();
     const rows = await db.select().from(schema.reviewPosted);
     expect(rows.find((row) => row.headSha === headSha)).toMatchObject({ githubReviewId: "9" });
+  });
+
+  it("closes a round-one placeholder when a newer head started reviewing meanwhile", async () => {
+    github.updateReview = vi.fn(async () => {});
+    await db.update(schema.run).set({ placeholderReviewId: "9" }).where(eq(schema.run.id, runId));
+    github.installationTokenById = vi.fn(async () => {
+      await db.insert(schema.job).values({
+        armedPrId: armedPr.id,
+        headSha: "d".repeat(40),
+        baseSha: "b".repeat(40),
+        notBefore: new Date(),
+        state: "done",
+      });
+      return "ghs_token";
+    });
+
+    await expect(post({})).resolves.toBe("superseded");
+    expect(github.updateReview).toHaveBeenCalledWith(
+      { owner: "octo", repo: "repo", number: 7 },
+      "9",
+      "Superseded by a newer push; its review follows.",
+      "ghs_token",
+    );
+    expect(await db.select().from(schema.reviewPosted)).toHaveLength(0);
   });
 
   it("patches the living review and posts new findings as a supplemental review", async () => {

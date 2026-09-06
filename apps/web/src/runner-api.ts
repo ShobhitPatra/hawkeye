@@ -39,7 +39,13 @@ import {
   releaseJob,
   requeueStaleJobs,
 } from "./job-queue";
-import { postReviewForRun } from "./review-posting";
+import { livingReviewFor, postReviewForRun } from "./review-posting";
+import {
+  clearReviewing,
+  markReviewing,
+  NOT_COMPLETED_BODY,
+  reviewingBlock,
+} from "./reviewing-line";
 import { requireRunner } from "./runner-auth";
 
 export const DEFAULT_CLAIM_POLL_INTERVAL_MS = 2_000;
@@ -52,6 +58,7 @@ export type ClaimDeps = {
   sleep?: (milliseconds: number) => Promise<void>;
   poll?: { intervalMs: number; totalMs: number };
   log?: (line: string) => void;
+  controlPlaneUrl: string;
 };
 
 export type RunnerApiDeps = { db: Db };
@@ -178,6 +185,20 @@ export async function claimJob(request: Request, deps: ClaimDeps): Promise<Respo
         reviewingDescription(runner.name),
         deps.log,
       );
+      const reference = { owner: armed.owner, repo: armed.repo, number: armed.number };
+      const living = await livingReviewFor(deps.db, armed);
+      await markReviewing(deps, {
+        reference,
+        headSha: claimed.headSha,
+        token: installationToken,
+        runId: created.id,
+        livingReviewId: living?.githubReviewId,
+        block: reviewingBlock({
+          controlPlaneUrl: deps.controlPlaneUrl,
+          runnerName: runner.name,
+          startedAt: now(),
+        }),
+      });
       const body: ClaimedJob = {
         job: {
           id: claimed.id,
@@ -354,6 +375,22 @@ export async function recordResult(
       NOT_COMPLETED_DESCRIPTION,
       deps.log,
     );
+    try {
+      const living = await livingReviewFor(deps.db, target.armedPr);
+      await clearReviewing(deps, {
+        reference: statusTarget.reference,
+        headSha: target.headSha,
+        token: await statusTarget.token(),
+        runId,
+        livingReviewId: living?.githubReviewId,
+        placeholderReviewId: existing.placeholderReviewId,
+        closing: NOT_COMPLETED_BODY,
+      });
+    } catch (error) {
+      deps.log?.(
+        `reviewing line not cleared for run ${runId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
     return Response.json({ ok: true }, { status: 200 });
   }
 
