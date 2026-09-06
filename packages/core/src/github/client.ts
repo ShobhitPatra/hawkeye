@@ -17,6 +17,7 @@ export type PullRequestDetails = {
   commits: number;
 };
 export type LinkedIssue = { number: number; title: string; body: string };
+export type CommitStatus = { state: "pending" | "success"; description: string; context: string };
 
 export type InstallationRepository = {
   owner: string;
@@ -67,6 +68,12 @@ export interface GitHubClient {
     review: RenderedReview,
     token: string,
   ): Promise<{ url: string; id: string }>;
+  createCommitStatus(
+    reference: PullRequestReference,
+    sha: string,
+    status: CommitStatus,
+    token: string,
+  ): Promise<void>;
   updateReview(
     reference: PullRequestReference,
     reviewId: string,
@@ -342,6 +349,14 @@ export function createGitHubClient(input: {
       if (typeof posted.id !== "number")
         throw new Error(`GitHub POST ${path} returned no review id`);
       return { url: posted.html_url, id: String(posted.id) };
+    },
+    async createCommitStatus(reference, sha, status, token) {
+      await request(
+        "POST",
+        `/repos/${reference.owner}/${reference.repo}/statuses/${sha}`,
+        bearer(token),
+        status,
+      );
     },
     async updateReview(reference, reviewId, body, token) {
       await request("PUT", `${pulls(reference)}/reviews/${reviewId}`, bearer(token), { body });

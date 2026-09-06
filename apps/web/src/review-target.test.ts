@@ -18,6 +18,7 @@ function fakeGitHub(mergeBase = vi.fn(async () => "m".repeat(40))): GitHubClient
     reviews: unsupported(),
     postReview: unsupported(),
     updateReview: unsupported(),
+    createCommitStatus: vi.fn(async () => {}),
     listInstallationRepositories: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
   };

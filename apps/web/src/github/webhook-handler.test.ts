@@ -36,6 +36,7 @@ const github: GitHubClient = {
   reviews: unsupported(),
   postReview: unsupported(),
   updateReview: unsupported(),
+  createCommitStatus: vi.fn(async () => {}),
   listInstallationRepositories: unsupported(),
   listOpenPullRequestsByAuthor: unsupported(),
 };

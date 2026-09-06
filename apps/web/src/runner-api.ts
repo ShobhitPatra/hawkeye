@@ -22,6 +22,13 @@ import {
   run,
   userSettings,
 } from "./db/schema";
+import {
+  NOT_COMPLETED_DESCRIPTION,
+  reviewedDescription,
+  reviewingDescription,
+  setCommitStatus,
+  SUPERSEDED_DESCRIPTION,
+} from "./commit-status";
 import { recordFindings } from "./findings";
 import {
   claimNextJob,
@@ -44,6 +51,7 @@ export type ClaimDeps = {
   now?: () => Date;
   sleep?: (milliseconds: number) => Promise<void>;
   poll?: { intervalMs: number; totalMs: number };
+  log?: (line: string) => void;
 };
 
 export type RunnerApiDeps = { db: Db };
@@ -159,6 +167,17 @@ export async function claimJob(request: Request, deps: ClaimDeps): Promise<Respo
         });
         return Response.json({ error: "installation token" }, { status: 500 });
       }
+      await setCommitStatus(
+        deps.github,
+        {
+          reference: { owner: armed.owner, repo: armed.repo, number: armed.number },
+          headSha: claimed.headSha,
+          token: installationToken,
+        },
+        "pending",
+        reviewingDescription(runner.name),
+        deps.log,
+      );
       const body: ClaimedJob = {
         job: {
           id: claimed.id,
@@ -311,15 +330,33 @@ export async function recordResult(
 
   const completed = await completeRun(deps.db, { runId, runnerId: runner.id, ...report });
   if (!completed) return claimLost();
-  const { result } = report;
-  if (report.status !== "ok" || !result) return Response.json({ ok: true }, { status: 200 });
-
   const [target] = await deps.db
     .select({ headSha: job.headSha, armedPr })
     .from(job)
     .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
     .where(eq(job.id, completed.jobId));
   if (!target) throw new Error(`run ${runId} has no armed pull request`);
+  const statusTarget = async () => ({
+    reference: {
+      owner: target.armedPr.owner,
+      repo: target.armedPr.repo,
+      number: target.armedPr.number,
+    },
+    headSha: target.headSha,
+    token: await deps.github.installationTokenById(target.armedPr.installationId),
+  });
+  const { result } = report;
+  if (report.status !== "ok" || !result) {
+    await setCommitStatus(
+      deps.github,
+      await statusTarget(),
+      "success",
+      NOT_COMPLETED_DESCRIPTION,
+      deps.log,
+    );
+    return Response.json({ ok: true }, { status: 200 });
+  }
+
   const posted = await postReviewForRun(deps, {
     runId,
     jobId: completed.jobId,
@@ -329,6 +366,17 @@ export async function recordResult(
     commentable: report.commentable ?? {},
     turns: completed.turns,
   });
+  await setCommitStatus(
+    deps.github,
+    await statusTarget(),
+    "success",
+    posted === "failed"
+      ? NOT_COMPLETED_DESCRIPTION
+      : posted === "superseded"
+        ? SUPERSEDED_DESCRIPTION
+        : reviewedDescription(result),
+    deps.log,
+  );
   const [recordedBefore] = await deps.db
     .select({ id: reviewPosted.id })
     .from(reviewPosted)

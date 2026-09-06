@@ -96,6 +96,7 @@ job: (repo, pr, head sha, merge base sha, previously reviewed sha?, open finding
    · POST pulls/{n}/reviews as the bot identity, event COMMENT
        body: the verdict word as a heading, its one-line reason, findings grouped under Must fix / Should fix / Optional / Inherited (anchored ones say "Posted inline at the line"), prior findings, collapsed rounds and lens tables, and a credit footer with the round and turn count
        comments[]: line-anchored findings, ```suggestion``` when an exact fix exists
+   · commit status `hawkeye` on the head: pending "Reviewing on <runner>" from the moment the job is claimed, then success with the verdict and finding count; a run that fails ends it as success "Review did not complete" (never failure or error: the status informs, it never blocks)
 ```
 
 Failures (CLI error, max-turns, invalid JSON, timeout) never touch the PR; they show in the dashboard with a retry.
@@ -139,7 +140,7 @@ TypeScript, pnpm monorepo: `packages/core` (contract, harness interface, render,
 
 ### Runner (milestone 1)
 
-1. Register a GitHub App (permissions: pull requests read/write, contents read, issues read, metadata read; no webhook), generate a private key, install it on your repos.
+1. Register a GitHub App (permissions: pull requests read/write, commit statuses read/write, contents read, issues read, metadata read; no webhook), generate a private key, install it on your repos.
 2. `~/.config/hawkeye/config.json`: `{ "appId": <id>, "appSlug": "<app-slug>", "privateKeyPath": "~/.config/hawkeye/app.pem" }` (`~` is expanded; env overrides: `HAWKEYE_APP_ID`, `HAWKEYE_APP_SLUG`, `HAWKEYE_APP_PRIVATE_KEY_PATH`).
 3. `pnpm install && pnpm build`, then `npx hawkeye-review review <pr-url> [--dry-run] [--force] [--contract <path>] [--model <name>]`.
 4. Optional: put your own review contract at `~/.config/hawkeye/contract.md` (or point `HAWKEYE_CONTRACT_PATH` at it, or pass `--contract <path>`) to replace the built-in lens and finding rules.

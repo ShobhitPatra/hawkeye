@@ -18,6 +18,7 @@ function fakeGitHub(pullRequest: GitHubClient["pullRequest"]): GitHubClient {
     reviews: unsupported(),
     postReview: unsupported(),
     updateReview: unsupported(),
+    createCommitStatus: vi.fn(async () => {}),
     listInstallationRepositories: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
   };
