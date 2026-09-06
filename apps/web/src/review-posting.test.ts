@@ -113,10 +113,28 @@ async function seedLivingReview(previousResult: ReviewResult) {
     .where(eq(schema.run.id, runId));
 }
 
-const post = (commentable: Record<string, number[]> = { "a.txt": [1, 2] }) =>
-  postReviewForRun({ db, github }, { runId, jobId, armedPr, headSha, result, commentable });
+const post = (commentable: Record<string, number[]> = { "a.txt": [1, 2] }, turns?: number) =>
+  postReviewForRun(
+    { db, github },
+    {
+      runId,
+      jobId,
+      armedPr,
+      headSha,
+      result,
+      commentable,
+      ...(turns === undefined ? {} : { turns }),
+    },
+  );
 
 describe("postReviewForRun", () => {
+  it("names round 1 and the run's turns in the first review's footer", async () => {
+    await expect(post({ "a.txt": [1, 2] }, 12)).resolves.toBe("posted");
+    const [, review] = (github.postReview as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(review.body.trimEnd().endsWith("on the author's own plan · round 1 · 12 turns")).toBe(
+      true,
+    );
+  });
   it("renders, posts as the installation and records the review", async () => {
     await expect(post()).resolves.toBe("posted");
 
@@ -132,6 +150,7 @@ describe("postReviewForRun", () => {
     expect(review.comments[0]).toMatchObject({ path: "a.txt", line: 2, side: "RIGHT" });
     expect(review.comments[0].body).toContain("anchored");
     expect(review.body).toContain("**unanchored**");
+    expect(review.body.trimEnd().endsWith("on the author's own plan · round 1")).toBe(true);
     const rows = await db.select().from(schema.reviewPosted);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ runId, armedPrId: "armed-1", headSha, githubReviewId: "9" });
@@ -254,9 +273,10 @@ describe("postReviewForRun", () => {
     expect(reviewId).toBe("5");
     expect(token).toBe("ghs_token");
     expect(body).toContain(`<!-- hawkeye: head=${headSha} -->`);
-    expect(body).toContain("### Rounds");
-    expect(body).toContain(`| 1 | \`${"c".repeat(7)}\` | changes needed |`);
-    expect(body).toContain(`| 2 | \`${"a".repeat(7)}\` | changes needed |`);
+    expect(body).toContain("<summary>Rounds</summary>");
+    expect(body).toContain(`| 1 | \`${"c".repeat(7)}\` | Changes needed |`);
+    expect(body).toContain(`| 2 | \`${"a".repeat(7)}\` | Changes needed |`);
+    expect(body.trimEnd()).toMatch(/on the author's own plan · round 2 · \d+ turns$/);
     const [, supplemental] = (github.postReview as ReturnType<typeof vi.fn>).mock.calls[0]!;
     expect(supplemental.commit_id).toBe(headSha);
     expect(supplemental.body).toBe(`<!-- hawkeye: head=${headSha} -->`);
@@ -335,7 +355,7 @@ describe("postReviewForRun", () => {
     expect(github.updateReview).toHaveBeenCalledTimes(1);
     const patchedBody = (github.updateReview as ReturnType<typeof vi.fn>).mock
       .calls[0]![2] as string;
-    expect(patchedBody).not.toContain("(inline)");
+    expect(patchedBody).not.toContain("Posted inline at the line");
     const rows = await db.select().from(schema.reviewPosted);
     expect(rows.find((row) => row.headSha === headSha)).toMatchObject({ githubReviewId: "5" });
   });

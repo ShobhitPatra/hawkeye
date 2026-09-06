@@ -599,6 +599,9 @@ describe("recordResult", () => {
     expect(reference).toEqual({ owner: "octo", repo: "a", number: 1 });
     expect(token).toBe("ghs_token");
     expect(review.body).toContain(`<!-- hawkeye: head=${"a".repeat(40)} -->`);
+    expect(review.body.trimEnd().endsWith("on the author's own plan · round 1 · 1 turn")).toBe(
+      true,
+    );
     const [row] = await db.select().from(schema.reviewPosted);
     expect(row).toMatchObject({
       runId,

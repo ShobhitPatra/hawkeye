@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { LENSES, type ReviewResult } from "../contract/schema.js";
 import { findingId } from "./finding-id.js";
 import { renderLivingReview } from "./render-living.js";
+import type { RoundSummary } from "./render-text.js";
 
 const head = "b".repeat(40);
 const result = (): ReviewResult => ({
@@ -17,14 +18,14 @@ const result = (): ReviewResult => ({
     { id: findingId("src/b.ts", "Fixed bug"), status: "addressed", note: "fixed\nin c2" },
   ],
 });
-const rounds = [
+const rounds: RoundSummary[] = [
   {
     round: 1,
     headSha: "a".repeat(40),
-    verdict: "changes_needed" as const,
+    verdict: "changes_needed",
     startedAt: "2026-01-01",
   },
-  { round: 2, headSha: head, verdict: "ship" as const, startedAt: "2026-01-02" },
+  { round: 2, headSha: head, verdict: "ship", startedAt: "2026-01-02", turns: 31 },
 ];
 const input = (previousIds = new Set([findingId("src/a.ts", "Old bug")])) => ({
   result: result(),
@@ -40,17 +41,17 @@ describe("renderLivingReview", () => {
   it("orders marker, verdict, findings, prior findings, rounds and footer", () => {
     const r = renderLivingReview(input());
     expect(r.body.startsWith(`<!-- hawkeye: head=${head} -->`)).toBe(true);
-    const verdict = r.body.indexOf("# <small>Verdict:</small> **CHANGES NEEDED**");
-    const findings = r.body.indexOf("## Findings");
-    const prior = r.body.indexOf("### Prior findings");
-    const roundsAt = r.body.indexOf("### Rounds");
+    const verdict = r.body.indexOf("### Changes needed");
+    const findings = r.body.indexOf("#### Must fix");
+    const prior = r.body.indexOf("#### Prior findings");
+    const roundsAt = r.body.indexOf("<summary>Rounds</summary>");
     const footer = r.body.indexOf("Reviewed by [Hawkeye]");
     expect(verdict).toBeGreaterThan(0);
     expect(verdict).toBeLessThan(findings);
     expect(findings).toBeLessThan(prior);
     expect(prior).toBeLessThan(roundsAt);
     expect(roundsAt).toBeLessThan(footer);
-    expect(r.body.trimEnd().endsWith("on the author's own plan.")).toBe(true);
+    expect(r.body.trimEnd().endsWith("on the author's own plan · round 2 · 31 turns")).toBe(true);
   });
   it("comments only on findings that are new this round and anchored", () => {
     const r = renderLivingReview(input());
@@ -62,7 +63,7 @@ describe("renderLivingReview", () => {
     const r = renderLivingReview(input());
     expect(r.body).toContain("**Old bug**");
     expect(r.body).toContain("still there");
-    expect(r.body).not.toContain("**Old bug** — `src/a.ts:4` (inline)");
+    expect(r.body).not.toContain("**Old bug** `src/a.ts:4`\n  Posted inline");
   });
   it("comments on nothing when every finding was already in the previous round", () => {
     const all = new Set([findingId("src/a.ts", "New bug"), findingId("src/a.ts", "Old bug")]);
@@ -80,19 +81,36 @@ describe("renderLivingReview", () => {
     const r = renderLivingReview(input());
     const openId = findingId("src/a.ts", "Old bug");
     const addressedId = findingId("src/b.ts", "Fixed bug");
-    expect(r.body).toContain(`- [${openId}] open · Old bug · still unaddressed`);
-    expect(r.body).toContain(`- [${addressedId}] addressed · Fixed bug · fixed in c2`);
+    expect(r.body).toContain(`- \`${openId}\` open · Old bug · still unaddressed`);
+    expect(r.body).toContain(`- \`${addressedId}\` addressed · Fixed bug · fixed in c2`);
   });
   it("omits the prior findings section when the result reports none", () => {
     const i = input();
     delete i.result.priorFindings;
-    expect(renderLivingReview(i).body).not.toContain("### Prior findings");
+    expect(renderLivingReview(i).body).not.toContain("Prior findings");
   });
-  it("renders the rounds table with short heads and spaced verdicts", () => {
+  it("collapses the rounds table with short heads and verdict labels", () => {
     const r = renderLivingReview(input());
-    expect(r.body).toContain("| Round | Head | Verdict | Started |");
-    expect(r.body).toContain(`| 1 | \`${"a".repeat(7)}\` | changes needed | 2026-01-01 |`);
-    expect(r.body).toContain(`| 2 | \`${"b".repeat(7)}\` | ship | 2026-01-02 |`);
+    expect(r.body).toContain(
+      "<details>\n<summary>Rounds</summary>\n\n| Round | Head | Verdict | Started |",
+    );
+    expect(r.body).toContain(`| 1 | \`${"a".repeat(7)}\` | Changes needed | 2026-01-01 |`);
+    expect(r.body).toContain(`| 2 | \`${"b".repeat(7)}\` | Ship | 2026-01-02 |`);
+  });
+  it("capitalizes pending and invalid rounds like the verdict labels", () => {
+    const i = input();
+    i.rounds = [
+      { round: 1, headSha: "c".repeat(40), verdict: "invalid", startedAt: "2026-01-01" },
+      { round: 2, headSha: head, verdict: "pending", startedAt: "2026-01-02" },
+    ];
+    const { body } = renderLivingReview(i);
+    expect(body).toContain(`| 1 | \`${"c".repeat(7)}\` | Invalid | 2026-01-01 |`);
+    expect(body).toContain(`| 2 | \`${"b".repeat(7)}\` | Pending | 2026-01-02 |`);
+  });
+  it("leaves round and turns off the footer when the current head has no round", () => {
+    const i = input();
+    i.rounds = [];
+    expect(renderLivingReview(i).body.trimEnd().endsWith("on the author's own plan")).toBe(true);
   });
   it("keeps the collapsed lens table in the living body", () => {
     const { body } = renderLivingReview(input());

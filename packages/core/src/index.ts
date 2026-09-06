@@ -25,7 +25,8 @@ export {
   type RunReviewOutcome,
 } from "./run.js";
 export type { RenderedReview, ReviewComment } from "./review/render.js";
-export { renderReview, type RenderInput } from "./review/render.js";
+export { renderReview, type FooterMeta, type RenderInput } from "./review/render.js";
+export { LENS_LABELS, SEVERITY_LABELS, VERDICT_LABELS } from "./review/format.js";
 export {
   renderLivingReview,
   type RenderLivingReviewInput,

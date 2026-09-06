@@ -23,6 +23,7 @@ export type ReviewPostingInput = {
   headSha: string;
   result: ReviewResult;
   commentable: Record<string, number[]>;
+  turns?: number;
 };
 export type ReviewPostingOutcome = "posted" | "already-posted" | "superseded" | "failed";
 
@@ -85,7 +86,12 @@ async function roundsFor(
   currentRunId: string,
 ): Promise<RoundSummary[]> {
   const rows = await db
-    .select({ headSha: job.headSha, startedAt: run.startedAt, result: run.result })
+    .select({
+      headSha: job.headSha,
+      startedAt: run.startedAt,
+      result: run.result,
+      turns: run.turns,
+    })
     .from(run)
     .innerJoin(job, eq(job.id, run.jobId))
     .innerJoin(reviewPosted, eq(reviewPosted.runId, run.id))
@@ -105,6 +111,7 @@ async function roundsFor(
       headSha: row.headSha,
       verdict: row.result.verdict,
       startedAt: `${row.startedAt.toISOString().slice(0, 16).replace("T", " ")} UTC`,
+      turns: row.turns,
     };
   });
 }
@@ -180,6 +187,7 @@ export async function postReviewForRun(
           headSha,
           commentable,
           repositoryUrl: HAWKEYE_REPOSITORY_URL,
+          footer: { round: 1, ...(input.turns === undefined ? {} : { turns: input.turns }) },
         });
       const { posted } = await postRenderedReview({
         github,
