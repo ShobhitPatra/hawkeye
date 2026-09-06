@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { LENSES, type ReviewResult } from "../contract/schema.js";
 import { findingId } from "./finding-id.js";
 import { renderLivingReview } from "./render-living.js";
+import type { RoundSummary } from "./render-text.js";
 
 const head = "b".repeat(40);
 const result = (): ReviewResult => ({
@@ -17,14 +18,14 @@ const result = (): ReviewResult => ({
     { id: findingId("src/b.ts", "Fixed bug"), status: "addressed", note: "fixed\nin c2" },
   ],
 });
-const rounds = [
+const rounds: RoundSummary[] = [
   {
     round: 1,
     headSha: "a".repeat(40),
-    verdict: "changes_needed" as const,
+    verdict: "changes_needed",
     startedAt: "2026-01-01",
   },
-  { round: 2, headSha: head, verdict: "ship" as const, startedAt: "2026-01-02", turns: 31 },
+  { round: 2, headSha: head, verdict: "ship", startedAt: "2026-01-02", turns: 31 },
 ];
 const input = (previousIds = new Set([findingId("src/a.ts", "Old bug")])) => ({
   result: result(),
@@ -95,6 +96,16 @@ describe("renderLivingReview", () => {
     );
     expect(r.body).toContain(`| 1 | \`${"a".repeat(7)}\` | Changes needed | 2026-01-01 |`);
     expect(r.body).toContain(`| 2 | \`${"b".repeat(7)}\` | Ship | 2026-01-02 |`);
+  });
+  it("capitalizes pending and invalid rounds like the verdict labels", () => {
+    const i = input();
+    i.rounds = [
+      { round: 1, headSha: "c".repeat(40), verdict: "invalid", startedAt: "2026-01-01" },
+      { round: 2, headSha: head, verdict: "pending", startedAt: "2026-01-02" },
+    ];
+    const { body } = renderLivingReview(i);
+    expect(body).toContain(`| 1 | \`${"c".repeat(7)}\` | Invalid | 2026-01-01 |`);
+    expect(body).toContain(`| 2 | \`${"b".repeat(7)}\` | Pending | 2026-01-02 |`);
   });
   it("leaves round and turns off the footer when the current head has no round", () => {
     const i = input();

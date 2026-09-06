@@ -80,5 +80,7 @@ export function renderLivingReview(input: RenderLivingReviewInput): RenderedLivi
 }
 
 function roundVerdict(verdict: RoundSummary["verdict"]): string {
-  return verdict === "pending" || verdict === "invalid" ? verdict : VERDICT_LABELS[verdict];
+  if (verdict === "pending") return "Pending";
+  if (verdict === "invalid") return "Invalid";
+  return VERDICT_LABELS[verdict];
 }
