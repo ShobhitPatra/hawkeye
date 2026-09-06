@@ -18,3 +18,17 @@ export function terminalStyle(input: {
     dim: (text) => `${ESC}2m${text}${ESC}22m`,
   };
 }
+
+export type ProgressLine = { update(text: string): void; clear(): void };
+
+export function progressLine(input: {
+  isTTY: boolean | undefined;
+  write(text: string): void;
+}): ProgressLine {
+  if (!input.isTTY) return { update: () => {}, clear: () => {} };
+  const erase = `\r${ESC}2K`;
+  return {
+    update: (text) => input.write(`${erase}${text}`),
+    clear: () => input.write(erase),
+  };
+}

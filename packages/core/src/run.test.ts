@@ -115,6 +115,8 @@ describe("runReview", () => {
       url: expect.stringContaining("pullrequestreview-9"),
       headSha: sha,
       findings: 1,
+      turns: expect.any(Number),
+      result: expect.objectContaining({ verdict: expect.any(String) }),
     });
     const posted = (d.github.postReview as ReturnType<typeof vi.fn>).mock.calls[0]![1];
     expect(posted.comments).toHaveLength(1);

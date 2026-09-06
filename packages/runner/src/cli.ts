@@ -22,7 +22,9 @@ import { describePreparedRound, prepareRound } from "./local-review/prepare.js";
 import { dismissFinding, withdrawDismissal } from "./local-review/rounds.js";
 import { showRound, summarizeRound } from "./local-review/show.js";
 import { resolveGitHubToken } from "./local-review/token.js";
+import { reviewOutcomeLine, reviewProgressLine } from "./review-outcome.js";
 import { createRunDirectory } from "./run-directory.js";
+import type { ProgressLine } from "./terminal.js";
 import { createControlPlaneClient } from "./runner/client.js";
 import { deviceLogin } from "./runner/device-login.js";
 import { assertControlPlaneUrl, loadRunnerConfig, writeRunnerConfig } from "./runner/config.js";
@@ -77,6 +79,7 @@ export function createProgram(io: {
   stdout(line: string): void;
   stderr(line: string): void;
   style?: ReviewTextStyle;
+  progress?: ProgressLine;
 }): Command {
   const program = new Command("hawkeye")
     .version(packageJson.version)
@@ -110,6 +113,15 @@ export function createProgram(io: {
       ) => {
         let runDirectory: string | undefined;
         let log = io.stderr;
+        const progress = io.progress ?? { update: () => {}, clear: () => {} };
+        const startedAt = Date.now();
+        let turns = 0;
+        let subject = pullRequest;
+        const showProgress = () =>
+          progress.update(
+            reviewProgressLine({ subject, turns, elapsedMs: Date.now() - startedAt }),
+          );
+        const ticker = setInterval(showProgress, 1000);
         try {
           if (options.full && !options.dryRun)
             throw new Error(
@@ -121,6 +133,7 @@ export function createProgram(io: {
             options.wallClockMinutes,
           );
           const reference = parsePullRequestReference(pullRequest);
+          subject = `${reference.owner}/${reference.repo}#${reference.number}`;
           const config = await loadConfig({
             env: process.env,
             home: homedir(),
@@ -170,8 +183,14 @@ export function createProgram(io: {
               createWorktree,
               readRepositoryRules,
               log,
+              onTurn: (count) => {
+                turns = count;
+                showProgress();
+              },
             },
           );
+          clearInterval(ticker);
+          progress.clear();
 
           if (outcome.kind === "already-reviewed")
             io.stdout(
@@ -188,9 +207,20 @@ export function createProgram(io: {
                     ...(io.style === undefined ? {} : { style: io.style }),
                   })}\nNot posted: dry run.`,
             );
-          if (outcome.kind === "posted")
-            io.stdout(`posted ${outcome.findings} finding(s): ${outcome.url}`);
+          if (outcome.kind === "posted") {
+            io.stdout(
+              reviewOutcomeLine({
+                result: outcome.result,
+                turns: outcome.turns,
+                durationMs: Date.now() - startedAt,
+                ...(io.style === undefined ? {} : { style: io.style }),
+              }),
+            );
+            io.stdout(outcome.url);
+          }
         } catch (error) {
+          clearInterval(ticker);
+          progress.clear();
           log(`error: ${(error as Error).message}`);
           if (runDirectory) log(`run directory: ${runDirectory}`);
           process.exitCode = 1;

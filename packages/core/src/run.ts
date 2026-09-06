@@ -28,9 +28,17 @@ export type RunReviewDependencies = {
   createWorktree: typeof createWorktree;
   readRepositoryRules: typeof readRepositoryRules;
   log(line: string): void;
+  onTurn?(turns: number): void;
 };
 export type RunReviewOutcome =
-  | { kind: "posted"; url: string; headSha: string; findings: number }
+  | {
+      kind: "posted";
+      url: string;
+      headSha: string;
+      findings: number;
+      result: ReviewResult;
+      turns: number;
+    }
   | {
       kind: "dry-run";
       review: RenderedReview;
@@ -135,5 +143,7 @@ export async function runReview(
     url: posted.url,
     headSha: pullRequest.headSha,
     findings: result.findings.length,
+    result,
+    turns: outcome.turns,
   };
 }
