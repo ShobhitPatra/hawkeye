@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LENSES, type ReviewResult } from "../contract/schema.js";
 import { findingId } from "./finding-id.js";
-import { renderReviewSummary } from "./render-summary.js";
+import { formatDuration, renderReviewOutcomeLine, renderReviewSummary } from "./render-summary.js";
 
 const base = (): ReviewResult => ({
   verdict: "blocked",
@@ -92,5 +92,38 @@ describe("renderReviewSummary", () => {
     expect(text).toContain("<m>Must fix</m>    Null deref\n            <d>src/a.ts:3 · ");
     expect(text).toContain("Should fix  Rename the helper");
     expect(text.endsWith("<d>Full review: /p</d>")).toBe(true);
+  });
+});
+
+describe("formatDuration", () => {
+  it("prints minutes and zero-padded seconds", () => {
+    expect(formatDuration(252_000)).toBe("4m 12s");
+    expect(formatDuration(14_400)).toBe("0m 14s");
+    expect(formatDuration(0)).toBe("0m 00s");
+  });
+});
+
+describe("renderReviewOutcomeLine", () => {
+  it("names the verdict, the counts and the duration, with must fix only when present", () => {
+    expect(renderReviewOutcomeLine({ result: base(), turns: 6, durationMs: 252_000 })).toBe(
+      "Blocked · 3 findings · 1 must fix · 6 turns · 4m 12s",
+    );
+    expect(
+      renderReviewOutcomeLine({
+        result: { ...base(), verdict: "ship", findings: [] },
+        turns: 1,
+        durationMs: 61_000,
+      }),
+    ).toBe("Ship · 0 findings · 1 turn · 1m 01s");
+  });
+  it("styles the verdict and the must-fix count", () => {
+    expect(
+      renderReviewOutcomeLine({
+        result: base(),
+        turns: 2,
+        durationMs: 1000,
+        style: { verdict: (text) => `<${text}>`, must: (text) => `[${text}]` },
+      }),
+    ).toBe("<Blocked> · 3 findings · [1 must fix] · 2 turns · 0m 01s");
   });
 });

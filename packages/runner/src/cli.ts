@@ -13,6 +13,7 @@ import {
   HAWKEYE_REPOSITORY_URL,
   parsePullRequestReference,
   readRepositoryRules,
+  renderReviewOutcomeLine,
   renderReviewSummary,
   type ReviewTextStyle,
   runReview,
@@ -22,7 +23,7 @@ import { describePreparedRound, prepareRound } from "./local-review/prepare.js";
 import { dismissFinding, withdrawDismissal } from "./local-review/rounds.js";
 import { showRound, summarizeRound } from "./local-review/show.js";
 import { resolveGitHubToken } from "./local-review/token.js";
-import { reviewOutcomeLine, reviewProgressLine } from "./review-outcome.js";
+import { reviewProgress } from "./review-outcome.js";
 import { createRunDirectory } from "./run-directory.js";
 import type { ProgressLine } from "./terminal.js";
 import { createControlPlaneClient } from "./runner/client.js";
@@ -112,16 +113,13 @@ export function createProgram(io: {
         },
       ) => {
         let runDirectory: string | undefined;
-        let log = io.stderr;
-        const progress = io.progress ?? { update: () => {}, clear: () => {} };
         const startedAt = Date.now();
-        let turns = 0;
-        let subject = pullRequest;
-        const showProgress = () =>
-          progress.update(
-            reviewProgressLine({ subject, turns, elapsedMs: Date.now() - startedAt }),
-          );
-        const ticker = setInterval(showProgress, 1000);
+        const progress = reviewProgress({
+          progress: io.progress ?? { update: () => {}, clear: () => {} },
+          stderr: io.stderr,
+          subject: pullRequest,
+        });
+        let log = progress.log;
         try {
           if (options.full && !options.dryRun)
             throw new Error(
@@ -133,7 +131,7 @@ export function createProgram(io: {
             options.wallClockMinutes,
           );
           const reference = parsePullRequestReference(pullRequest);
-          subject = `${reference.owner}/${reference.repo}#${reference.number}`;
+          progress.subject(`${reference.owner}/${reference.repo}#${reference.number}`);
           const config = await loadConfig({
             env: process.env,
             home: homedir(),
@@ -149,7 +147,7 @@ export function createProgram(io: {
           runDirectory = directory;
           const logPath = join(directory, "log.txt");
           log = (line: string) => {
-            io.stderr(line);
+            progress.log(line);
             appendFileSync(logPath, `${line}\n`);
           };
           log(`run directory: ${directory}`);
@@ -183,14 +181,10 @@ export function createProgram(io: {
               createWorktree,
               readRepositoryRules,
               log,
-              onTurn: (count) => {
-                turns = count;
-                showProgress();
-              },
+              onTurn: progress.turn,
             },
           );
-          clearInterval(ticker);
-          progress.clear();
+          progress.finish();
 
           if (outcome.kind === "already-reviewed")
             io.stdout(
@@ -209,7 +203,7 @@ export function createProgram(io: {
             );
           if (outcome.kind === "posted") {
             io.stdout(
-              reviewOutcomeLine({
+              renderReviewOutcomeLine({
                 result: outcome.result,
                 turns: outcome.turns,
                 durationMs: Date.now() - startedAt,
@@ -219,8 +213,7 @@ export function createProgram(io: {
             io.stdout(outcome.url);
           }
         } catch (error) {
-          clearInterval(ticker);
-          progress.clear();
+          progress.finish();
           log(`error: ${(error as Error).message}`);
           if (runDirectory) log(`run directory: ${runDirectory}`);
           process.exitCode = 1;

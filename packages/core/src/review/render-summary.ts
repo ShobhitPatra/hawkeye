@@ -24,6 +24,15 @@ const PLAIN: ReviewTextStyle = {
 };
 const GUTTER_WIDTH = 12;
 
+function count(amount: number, noun: string): string {
+  return `${amount} ${noun}${amount === 1 ? "" : "s"}`;
+}
+
+export function formatDuration(milliseconds: number): string {
+  const seconds = Math.max(0, Math.round(milliseconds / 1000));
+  return `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s`;
+}
+
 function gutter(label: string): string {
   return label.padEnd(GUTTER_WIDTH);
 }
@@ -63,13 +72,29 @@ export function renderReviewSummary(input: RenderSummaryInput): string {
       );
     }
   }
-  const count = result.findings.length;
   const facts = [
-    `${count} finding${count === 1 ? "" : "s"}`,
+    count(result.findings.length, "finding"),
     ...(input.meta === undefined ? [] : [`round ${input.meta.round}`]),
-    ...(input.turns === undefined ? [] : [`${input.turns} turn${input.turns === 1 ? "" : "s"}`]),
+    ...(input.turns === undefined ? [] : [count(input.turns, "turn")]),
   ];
   lines.push("", facts.join(" · "));
   if (input.resultPath !== undefined) lines.push(style.dim(`Full review: ${input.resultPath}`));
   return lines.join("\n");
+}
+
+export function renderReviewOutcomeLine(input: {
+  result: ReviewResult;
+  turns: number;
+  durationMs: number;
+  style?: Partial<ReviewTextStyle>;
+}): string {
+  const style = { ...PLAIN, ...input.style };
+  const mustFix = input.result.findings.filter((finding) => finding.severity === "must_fix").length;
+  return [
+    style.verdict(VERDICT_LABELS[input.result.verdict]),
+    count(input.result.findings.length, "finding"),
+    ...(mustFix === 0 ? [] : [style.must(`${mustFix} must fix`)]),
+    count(input.turns, "turn"),
+    formatDuration(input.durationMs),
+  ].join(" · ");
 }

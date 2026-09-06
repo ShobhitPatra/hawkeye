@@ -1,41 +1,56 @@
-import { type ReviewResult, type ReviewTextStyle, VERDICT_LABELS } from "@hawkeye/core";
-
-const PLAIN: ReviewTextStyle = {
-  verdict: (text) => text,
-  must: (text) => text,
-  dim: (text) => text,
-};
-
-export function formatDuration(milliseconds: number): string {
-  const seconds = Math.max(0, Math.round(milliseconds / 1000));
-  return `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s`;
-}
-
-function count(amount: number, noun: string): string {
-  return `${amount} ${noun}${amount === 1 ? "" : "s"}`;
-}
-
-export function reviewOutcomeLine(input: {
-  result: ReviewResult;
-  turns: number;
-  durationMs: number;
-  style?: Partial<ReviewTextStyle>;
-}): string {
-  const style = { ...PLAIN, ...input.style };
-  const mustFix = input.result.findings.filter((finding) => finding.severity === "must_fix").length;
-  return [
-    style.verdict(VERDICT_LABELS[input.result.verdict]),
-    count(input.result.findings.length, "finding"),
-    ...(mustFix === 0 ? [] : [style.must(`${mustFix} must fix`)]),
-    count(input.turns, "turn"),
-    formatDuration(input.durationMs),
-  ].join(" · ");
-}
+import { formatDuration } from "@hawkeye/core";
+import type { ProgressLine } from "./terminal.js";
 
 export function reviewProgressLine(input: {
   subject: string;
   turns: number;
   elapsedMs: number;
 }): string {
-  return `Reviewing ${input.subject} · ${count(input.turns, "turn")} · ${formatDuration(input.elapsedMs)}`;
+  return `Reviewing ${input.subject} · ${input.turns} turn${input.turns === 1 ? "" : "s"} · ${formatDuration(input.elapsedMs)}`;
+}
+
+export type ReviewProgress = {
+  log(line: string): void;
+  subject(name: string): void;
+  turn(turns: number): void;
+  finish(): void;
+};
+
+export function reviewProgress(input: {
+  progress: ProgressLine;
+  stderr(line: string): void;
+  subject: string;
+  now?: () => number;
+  tickMs?: number;
+}): ReviewProgress {
+  const now = input.now ?? Date.now;
+  const startedAt = now();
+  let subject = input.subject;
+  let turns = 0;
+  let running = true;
+  const paint = () => {
+    if (running)
+      input.progress.update(reviewProgressLine({ subject, turns, elapsedMs: now() - startedAt }));
+  };
+  const ticker = setInterval(paint, input.tickMs ?? 1000);
+  return {
+    log: (line) => {
+      input.progress.clear();
+      input.stderr(line);
+      paint();
+    },
+    subject: (name) => {
+      subject = name;
+      paint();
+    },
+    turn: (count) => {
+      turns = count;
+      paint();
+    },
+    finish: () => {
+      running = false;
+      clearInterval(ticker);
+      input.progress.clear();
+    },
+  };
 }
