@@ -15,7 +15,6 @@ import {
   readRepositoryRules,
   renderReviewOutcomeLine,
   renderReviewSummary,
-  type ReviewTextStyle,
   runReview,
 } from "@hawkeye/core";
 import { expandHome, loadConfig } from "./config.js";
@@ -25,7 +24,8 @@ import { showRound, summarizeRound } from "./local-review/show.js";
 import { resolveGitHubToken } from "./local-review/token.js";
 import { reviewProgress } from "./review-progress.js";
 import { createRunDirectory } from "./run-directory.js";
-import type { ProgressLine } from "./terminal.js";
+import { runnerConsole } from "./runner/console.js";
+import type { ProgressLine, TerminalStyle } from "./terminal.js";
 import { createControlPlaneClient } from "./runner/client.js";
 import { deviceLogin } from "./runner/device-login.js";
 import { assertControlPlaneUrl, loadRunnerConfig, writeRunnerConfig } from "./runner/config.js";
@@ -79,7 +79,7 @@ export async function loadContractOverride(input: {
 export function createProgram(io: {
   stdout(line: string): void;
   stderr(line: string): void;
-  style?: ReviewTextStyle;
+  style?: TerminalStyle;
   progress?: ProgressLine;
 }): Command {
   const program = new Command("hawkeye")
@@ -244,15 +244,24 @@ export function createProgram(io: {
           defaultPath: DEFAULT_CONTRACT_PATH,
           readFile: (p) => readFile(p, "utf8"),
         });
-        if (contract) io.stderr(`using contract override: ${contract.path}`);
+        const terminal = runnerConsole({
+          stderr: io.stderr,
+          appendFile: (path, line) => appendFileSync(path, line),
+          home: homedir(),
+          ...(io.style === undefined ? {} : { style: io.style }),
+        });
+        if (contract) terminal.report({ state: "contract", detail: contract.path });
         const stop = new AbortController();
         const onSignal = (signal: NodeJS.Signals) => {
-          io.stderr(`${signal} received; finishing the current job`);
+          terminal.report({
+            state: "stopping",
+            detail: `${signal} received; finishing the current job`,
+          });
           stop.abort();
         };
         process.once("SIGINT", onSignal);
         process.once("SIGTERM", onSignal);
-        io.stderr(`polling ${config.controlPlaneUrl}`);
+        terminal.report({ state: "polling", detail: config.controlPlaneUrl });
         try {
           await runRunnerLoop(
             {
@@ -269,7 +278,8 @@ export function createProgram(io: {
               createRunDirectory: (reference) =>
                 createRunDirectory({ root: RUNS_ROOT, reference, now: new Date() }),
               fetch,
-              log: io.stderr,
+              report: terminal.report,
+              log: terminal.log,
               ...(contract ? { contractOverride: contract.content } : {}),
               signal: stop.signal,
             },

@@ -7,6 +7,7 @@ describe("terminalStyle", () => {
     expect(style.verdict("Ship")).toBe("\u001b[1mShip\u001b[22m");
     expect(style.must("Must fix")).toBe("\u001b[31mMust fix\u001b[39m");
     expect(style.dim("a.ts")).toBe("\u001b[2ma.ts\u001b[22m");
+    expect(style.warn("waiting")).toBe("\u001b[33mwaiting\u001b[39m");
   });
   it("prints plain text when piped, under NO_COLOR, or on a dumb terminal", () => {
     for (const input of [
@@ -19,6 +20,7 @@ describe("terminalStyle", () => {
       expect(style.verdict("Ship")).toBe("Ship");
       expect(style.must("Must fix")).toBe("Must fix");
       expect(style.dim("a.ts")).toBe("a.ts");
+      expect(style.warn("waiting")).toBe("waiting");
     }
   });
 });

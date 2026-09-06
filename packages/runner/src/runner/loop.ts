@@ -3,6 +3,7 @@ import {
   createWorktree,
   type HarnessSpec,
   readRepositoryRules,
+  type ReviewResult,
   type RunResultReport,
   runReviewJob,
 } from "@hawkeye/core";
@@ -14,6 +15,12 @@ export const DEFAULT_EMPTY_POLL_DELAY_MS = 1_000;
 export const DEFAULT_RESULT_RETRY_DELAYS_MS = [2_000, 4_000, 8_000];
 export const ONCE_CLAIM_ATTEMPTS = 3;
 
+export type RunnerEvent =
+  | { state: "claimed"; subject: string; headSha: string }
+  | { state: "reviewing"; runDirectory: string }
+  | { state: "posted"; result: ReviewResult; turns: number; durationMs: number }
+  | { state: "skipped" | "failed" | "waiting" | "delivered" | "idle"; detail: string };
+
 export type RunnerLoopDependencies = {
   client: ControlPlaneClient;
   harness: HarnessSpec;
@@ -21,6 +28,7 @@ export type RunnerLoopDependencies = {
   readRepositoryRules: typeof readRepositoryRules;
   createRunDirectory(reference: ClaimedJob["pullRequest"]): Promise<string>;
   fetch: typeof fetch;
+  report(event: RunnerEvent): void;
   log(line: string): void;
   contractOverride?: string;
   signal?: AbortSignal;
@@ -48,13 +56,20 @@ function isAbort(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
 }
 
+function turnsOf(turns: number): string {
+  return `${turns} turn${turns === 1 ? "" : "s"}`;
+}
+
+function keptIn(runDirectory: string | undefined): string {
+  return runDirectory === undefined ? "" : ` · run kept in ${runDirectory}`;
+}
+
 async function reportFor(
   claimed: ClaimedJob,
   deps: RunnerLoopDependencies,
+  runDirectory: string,
 ): Promise<RunResultReport> {
   const { job, pullRequest } = claimed;
-  const runDirectory = await deps.createRunDirectory(pullRequest);
-  deps.log(`run directory: ${runDirectory}`);
   const contractOverride = deps.contractOverride ?? claimed.settings.promptOverride;
   const outcome = await runReviewJob(
     {
@@ -77,7 +92,9 @@ async function reportFor(
       onTurn: () => {
         deps.client
           .sendEvents(job.runId, [{ type: "turn", at: new Date().toISOString() }])
-          .catch((error: Error) => deps.log(`turn event not sent: ${error.message}`));
+          .catch((error: Error) =>
+            deps.report({ state: "waiting", detail: `turn event not sent: ${error.message}` }),
+          );
       },
     },
   );
@@ -95,9 +112,46 @@ function isRetryable(error: unknown): boolean {
   return !(error instanceof ControlPlaneRequestError) || error.status >= 500;
 }
 
+function reportAcknowledged(
+  report: RunResultReport,
+  posted: string | undefined,
+  context: { headSha: string; durationMs: number },
+  deps: RunnerLoopDependencies,
+): void {
+  if (report.status !== "ok" || report.result === undefined) {
+    deps.report({ state: "delivered", detail: "the control plane recorded the failure" });
+    return;
+  }
+  switch (posted) {
+    case "posted":
+      deps.report({
+        state: "posted",
+        result: report.result,
+        turns: report.turns,
+        durationMs: context.durationMs,
+      });
+      return;
+    case "already-posted":
+      deps.report({
+        state: "skipped",
+        detail: `already posted for ${context.headSha.slice(0, 7)}`,
+      });
+      return;
+    case "superseded":
+      deps.report({ state: "skipped", detail: "superseded by a newer push" });
+      return;
+    case "failed":
+      deps.report({ state: "failed", detail: "the control plane could not post the review" });
+      return;
+    default:
+      deps.report({ state: "delivered", detail: "the control plane recorded the result" });
+  }
+}
+
 async function deliverResult(
   runId: string,
   report: RunResultReport,
+  context: { headSha: string; durationMs: number; runDirectory: string | undefined },
   deps: RunnerLoopDependencies,
 ): Promise<"delivered" | "dropped" | "undelivered"> {
   const sleep = deps.sleep ?? sleepFor;
@@ -105,21 +159,26 @@ async function deliverResult(
   for (let attempt = 0; ; attempt += 1) {
     try {
       const acknowledged = await deps.client.sendResult(runId, report);
-      deps.log(`result ${report.status} after ${report.turns} turn(s)`);
-      if (acknowledged.posted !== undefined) deps.log(`review ${acknowledged.posted}`);
+      reportAcknowledged(report, acknowledged.posted, context, deps);
       return "delivered";
     } catch (error) {
       if (error instanceof ControlPlaneRequestError && error.status === 409) {
-        deps.log(`result ${report.status} dropped: the claim was lost`);
+        deps.report({ state: "failed", detail: "result dropped: the claim was lost" });
         return "dropped";
       }
       const message = (error as Error).message;
       const delay = delays[attempt];
       if (!isRetryable(error) || delay === undefined) {
-        deps.log(`result ${report.status} not delivered: ${message}`);
+        deps.report({
+          state: "failed",
+          detail: `result not delivered: ${message}${keptIn(context.runDirectory)}`,
+        });
         return "undelivered";
       }
-      deps.log(`result not sent (${message}); retrying in ${delay}ms`);
+      deps.report({
+        state: "waiting",
+        detail: `result not sent (${message}); retrying in ${delay / 1000}s`,
+      });
       await sleep(delay);
     }
   }
@@ -130,23 +189,41 @@ export async function runJob(
   deps: RunnerLoopDependencies,
 ): Promise<"delivered" | "dropped" | "undelivered"> {
   const { job, pullRequest } = claimed;
-  deps.log(
-    `job claimed: ${pullRequest.owner}/${pullRequest.repo}#${pullRequest.number} head ${job.headSha.slice(0, 7)}`,
-  );
+  const startedAt = Date.now();
+  deps.report({
+    state: "claimed",
+    subject: `${pullRequest.owner}/${pullRequest.repo}#${pullRequest.number}`,
+    headSha: job.headSha,
+  });
   const heartbeat = setInterval(() => {
     deps.client
       .heartbeat(job.id)
-      .catch((error: Error) => deps.log(`heartbeat failed: ${error.message}`));
+      .catch((error: Error) =>
+        deps.report({ state: "waiting", detail: `heartbeat failed: ${error.message}` }),
+      );
   }, deps.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS);
   let report: RunResultReport;
+  let runDirectory: string | undefined;
   try {
-    report = await reportFor(claimed, deps);
+    runDirectory = await deps.createRunDirectory(pullRequest);
+    deps.report({ state: "reviewing", runDirectory });
+    report = await reportFor(claimed, deps, runDirectory);
   } catch (error) {
     report = { status: "error", turns: 0, error: (error as Error).message };
   } finally {
     clearInterval(heartbeat);
   }
-  return deliverResult(job.runId, report, deps);
+  if (report.status !== "ok")
+    deps.report({
+      state: "failed",
+      detail: `${report.error ?? report.status} after ${turnsOf(report.turns)}${keptIn(runDirectory)}`,
+    });
+  return deliverResult(
+    job.runId,
+    report,
+    { headSha: job.headSha, durationMs: Date.now() - startedAt, runDirectory },
+    deps,
+  );
 }
 
 export async function runRunnerLoop(
@@ -167,14 +244,18 @@ export async function runRunnerLoop(
         throw new Error(`claim failed ${failedClaims} times: ${(error as Error).message}`, {
           cause: error,
         });
-      deps.log(`claim failed: ${(error as Error).message}`);
-      await sleep(deps.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS, deps.signal);
+      const delay = deps.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
+      deps.report({
+        state: "waiting",
+        detail: `claim failed: ${(error as Error).message}; retrying in ${delay / 1000}s`,
+      });
+      await sleep(delay, deps.signal);
       continue;
     }
     failedClaims = 0;
     if (claimed === undefined) {
       if (options.once) {
-        deps.log("no job queued");
+        deps.report({ state: "idle", detail: "no job queued" });
         return;
       }
       await sleep(deps.emptyPollDelayMs ?? DEFAULT_EMPTY_POLL_DELAY_MS, deps.signal);

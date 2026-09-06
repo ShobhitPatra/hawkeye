@@ -6,7 +6,7 @@ import type { AddressInfo } from "node:net";
 import type { ClaimedJob, HarnessResult, HarnessSpec } from "@hawkeye/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createControlPlaneClient } from "./client.js";
-import { runRunnerLoop, type RunnerLoopDependencies } from "./loop.js";
+import { type RunnerEvent, runRunnerLoop, type RunnerLoopDependencies } from "./loop.js";
 
 const LENSES = ["intent", "behavior", "blast_radius", "verification", "fit", "hygiene"];
 const review = {
@@ -87,8 +87,9 @@ afterEach(async () => {
 async function deps(
   baseUrl: string,
   overrides: Partial<RunnerLoopDependencies> & { harnessResult?: HarnessResult } = {},
-): Promise<RunnerLoopDependencies & { logged: string[] }> {
+): Promise<RunnerLoopDependencies & { logged: string[]; reported: RunnerEvent[] }> {
   const logged: string[] = [];
+  const reported: RunnerEvent[] = [];
   const harness: HarnessSpec = {
     name: "fake",
     run: vi.fn(async (i): Promise<HarnessResult> => {
@@ -132,12 +133,14 @@ async function deps(
         },
         commits: 1,
       })) as typeof fetch,
+    report: (event) => reported.push(event),
     log: (line) => logged.push(line),
     heartbeatIntervalMs: 10,
     retryDelayMs: 1,
     emptyPollDelayMs: 1,
     resultRetryDelaysMs: [1, 1, 1],
     logged,
+    reported,
     ...rest,
   };
 }
@@ -161,10 +164,10 @@ describe("runRunnerLoop", () => {
       body: { status: "ok", turns: 1, result: review, commentable: { "a.txt": [1, 2] } },
     });
     expect(plane.received.some((r) => r.url === "/api/runner/runs/run-1/events")).toBe(true);
-    expect(d.logged).toContain("job claimed: o/r#7 head aaaaaaa");
+    expect(d.reported[0]).toEqual({ state: "claimed", subject: "o/r#7", headSha: "a".repeat(40) });
+    expect(d.reported[1]).toMatchObject({ state: "reviewing" });
     expect(d.logged).toContain("turn 1");
-    expect(d.logged).toContain("result ok after 1 turn(s)");
-    expect(d.logged).toContain("review posted");
+    expect(d.reported[2]).toMatchObject({ state: "posted", result: review, turns: 1 });
     const harnessInput = (d.harness.run as ReturnType<typeof vi.fn>).mock.calls[0]![0];
     expect(harnessInput).toMatchObject({ maxTurns: 3, wallClockMs: 60_000 });
   });
@@ -231,7 +234,10 @@ describe("runRunnerLoop", () => {
     servers.push(plane.server);
     const d = await deps(plane.baseUrl);
     await runRunnerLoop(d, { once: true });
-    expect(d.logged).toContain("result ok dropped: the claim was lost");
+    expect(d.reported).toContainEqual({
+      state: "failed",
+      detail: "result dropped: the claim was lost",
+    });
   });
   it("polls again after an empty claim and retries after a failed claim", async () => {
     let calls = 0;
@@ -261,9 +267,11 @@ describe("runRunnerLoop", () => {
     await runRunnerLoop(d);
     expect(claimed).toBe(1);
     expect(calls).toBe(3);
-    expect(d.logged).toContain(
-      "claim failed: control plane GET /api/runner/jobs failed: 500 db down",
-    );
+    expect(d.reported).toContainEqual({
+      state: "waiting",
+      detail:
+        "claim failed: control plane GET /api/runner/jobs failed: 500 db down; retrying in 0.001s",
+    });
     expect(plane.received.find((r) => r.url.endsWith("/result"))?.body).toMatchObject({
       status: "ok",
     });
@@ -360,7 +368,7 @@ describe("runRunnerLoop", () => {
     servers.push(plane.server);
     const d = await deps(plane.baseUrl);
     await runRunnerLoop(d, { once: true });
-    expect(d.logged).toContain("no job queued");
+    expect(d.reported).toContainEqual({ state: "idle", detail: "no job queued" });
   });
   it("retries the result after a 5xx and delivers it", async () => {
     const plane = await fakeControlPlane(scripted([claimedJob], [503, 502, 200]));
@@ -375,7 +383,8 @@ describe("runRunnerLoop", () => {
     await runRunnerLoop(d, { once: true });
     expect(plane.received.filter((r) => r.url.endsWith("/result")).length).toBe(3);
     expect(sleeps).toEqual([2, 4]);
-    expect(d.logged).toContain("result ok after 1 turn(s)");
+    expect(d.reported.filter((event) => event.state === "waiting")).toHaveLength(2);
+    expect(d.reported.at(-1)).toMatchObject({ state: "posted", turns: 1 });
   });
   it("keeps the daemon running when the result cannot be delivered", async () => {
     let claims = 0;
@@ -398,9 +407,12 @@ describe("runRunnerLoop", () => {
     await runRunnerLoop(d);
     expect(plane.received.filter((r) => r.url.endsWith("/result")).length).toBe(4);
     expect(claims).toBe(2);
-    expect(d.logged).toContain(
-      "result ok not delivered: control plane POST /api/runner/runs/run-1/result failed: 500 db down",
-    );
+    expect(d.reported.at(-1)).toMatchObject({
+      state: "failed",
+      detail: expect.stringMatching(
+        /^result not delivered: control plane POST \/api\/runner\/runs\/run-1\/result failed: 500 db down · run kept in /,
+      ),
+    });
   });
   it("exits non-zero with once when the result cannot be delivered", async () => {
     const plane = await fakeControlPlane(scripted([claimedJob], [500]));
@@ -428,7 +440,7 @@ describe("runRunnerLoop", () => {
       "claim failed 3 times: control plane GET /api/runner/jobs failed: 500 db down",
     );
     expect(calls).toBe(3);
-    expect(d.logged.filter((line) => line.startsWith("claim failed:")).length).toBe(2);
+    expect(d.reported.filter((event) => event.state === "waiting")).toHaveLength(2);
   });
   it("waits before polling again after an empty claim", async () => {
     let calls = 0;
