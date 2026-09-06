@@ -327,6 +327,7 @@ export async function recordResult(
     headSha: target.headSha,
     result,
     commentable: report.commentable ?? {},
+    turns: completed.turns,
   });
   const [recordedBefore] = await deps.db
     .select({ id: reviewPosted.id })

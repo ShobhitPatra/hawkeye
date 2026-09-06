@@ -23,6 +23,7 @@ export type ReviewPostingInput = {
   headSha: string;
   result: ReviewResult;
   commentable: Record<string, number[]>;
+  turns?: number;
 };
 export type ReviewPostingOutcome = "posted" | "already-posted" | "superseded" | "failed";
 
@@ -186,6 +187,7 @@ export async function postReviewForRun(
           headSha,
           commentable,
           repositoryUrl: HAWKEYE_REPOSITORY_URL,
+          footer: { round: 1, ...(input.turns === undefined ? {} : { turns: input.turns }) },
         });
       const { posted } = await postRenderedReview({
         github,
