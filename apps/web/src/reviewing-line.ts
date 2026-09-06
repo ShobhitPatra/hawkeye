@@ -38,6 +38,8 @@ export function hasReviewingBlock(body: string): boolean {
 
 export const NOT_COMPLETED_BODY = "The review did not complete. The next push queues a new one.";
 export const SUPERSEDED_BODY = "Superseded by a newer push; its review follows.";
+export const ALREADY_POSTED_BODY =
+  "Another run reviewed this push; its review is on this pull request.";
 
 function escapeXml(text: string): string {
   return text.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -72,11 +74,25 @@ export async function markReviewing(
   input: ReviewingTarget & {
     runId: string;
     livingReviewId: string | undefined;
+    closedPlaceholderId: string | undefined;
     block: string;
   },
 ): Promise<void> {
   const { github } = deps;
   try {
+    if (input.closedPlaceholderId) {
+      await github.updateReview(
+        input.reference,
+        input.closedPlaceholderId,
+        input.block,
+        input.token,
+      );
+      await deps.db
+        .update(run)
+        .set({ placeholderReviewId: input.closedPlaceholderId })
+        .where(eq(run.id, input.runId));
+      return;
+    }
     if (input.livingReviewId) {
       const { body } = await github.review(input.reference, input.livingReviewId, input.token);
       await github.updateReview(

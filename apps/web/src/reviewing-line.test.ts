@@ -73,7 +73,15 @@ describe("markReviewing", () => {
     } as unknown as GitHubClient;
     await markReviewing(
       { db, github },
-      { reference, headSha: "a".repeat(40), token: "t", runId, livingReviewId: "5", block },
+      {
+        reference,
+        headSha: "a".repeat(40),
+        token: "t",
+        runId,
+        livingReviewId: "5",
+        closedPlaceholderId: undefined,
+        block,
+      },
     );
     expect(github.updateReview).toHaveBeenCalledWith(
       reference,
@@ -91,7 +99,15 @@ describe("markReviewing", () => {
     } as unknown as GitHubClient;
     await markReviewing(
       { db, github },
-      { reference, headSha: "a".repeat(40), token: "t", runId, livingReviewId: "5", block },
+      {
+        reference,
+        headSha: "a".repeat(40),
+        token: "t",
+        runId,
+        livingReviewId: "5",
+        closedPlaceholderId: undefined,
+        block,
+      },
     );
     expect((github.updateReview as ReturnType<typeof vi.fn>).mock.calls[0]![2]).toBe(
       `${block}old body`,
@@ -104,13 +120,44 @@ describe("markReviewing", () => {
     } as unknown as GitHubClient;
     await markReviewing(
       { db, github },
-      { reference, headSha: "a".repeat(40), token: "t", runId, livingReviewId: undefined, block },
+      {
+        reference,
+        headSha: "a".repeat(40),
+        token: "t",
+        runId,
+        livingReviewId: undefined,
+        closedPlaceholderId: undefined,
+        block,
+      },
     );
     expect(github.postReview).toHaveBeenCalledWith(
       reference,
       { event: "COMMENT", commit_id: "a".repeat(40), body: block, comments: [] },
       "t",
     );
+    const [row] = await db.select().from(schema.run);
+    expect(row?.placeholderReviewId).toBe("42");
+  });
+
+  it("reuses a closed placeholder instead of posting another", async () => {
+    const github = {
+      updateReview: vi.fn(async () => {}),
+      postReview: vi.fn(),
+    } as unknown as GitHubClient;
+    await markReviewing(
+      { db, github },
+      {
+        reference,
+        headSha: "a".repeat(40),
+        token: "t",
+        runId,
+        livingReviewId: undefined,
+        closedPlaceholderId: "42",
+        block,
+      },
+    );
+    expect(github.updateReview).toHaveBeenCalledWith(reference, "42", block, "t");
+    expect(github.postReview).not.toHaveBeenCalled();
     const [row] = await db.select().from(schema.run);
     expect(row?.placeholderReviewId).toBe("42");
   });
@@ -124,7 +171,15 @@ describe("markReviewing", () => {
     } as unknown as GitHubClient;
     await markReviewing(
       { db, github, log },
-      { reference, headSha: "a".repeat(40), token: "t", runId, livingReviewId: undefined, block },
+      {
+        reference,
+        headSha: "a".repeat(40),
+        token: "t",
+        runId,
+        livingReviewId: undefined,
+        closedPlaceholderId: undefined,
+        block,
+      },
     );
     expect(log).toHaveBeenCalledWith(`reviewing line not written for run ${runId}: nope`);
   });

@@ -184,6 +184,38 @@ describe("claimJob", () => {
     expect(body.endsWith("<!-- hawkeye: head=aaa -->\n\n### Ship\n")).toBe(true);
   });
 
+  it("reuses the closed placeholder on the next claim after a failed round", async () => {
+    const firstRunId = await claimedRunId();
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${firstRunId}/result`, {
+        status: "error",
+        turns: 1,
+        error: "boom",
+      }),
+      { db, github },
+      firstRunId,
+    );
+    (github.updateReview as ReturnType<typeof vi.fn>).mockClear();
+    (github.postReview as ReturnType<typeof vi.fn>).mockClear();
+    await enqueueJob(db, {
+      armedPrId: "armed-1",
+      headSha: "b".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: new Date(now.getTime() - 60_000),
+    });
+
+    const response = await claimJob(request("/api/runner/jobs"), claimDeps());
+    const body = await response.json();
+
+    expect(github.postReview).not.toHaveBeenCalled();
+    const [, reviewId, reviewBody] = (github.updateReview as ReturnType<typeof vi.fn>).mock
+      .calls[0]!;
+    expect(reviewId).toBe("9");
+    expect(reviewBody).toContain("Reviewing on laptop");
+    const [run] = await db.select().from(schema.run).where(eq(schema.run.id, body.job.runId));
+    expect(run?.placeholderReviewId).toBe("9");
+  });
+
   it("still claims when the commit status cannot be set", async () => {
     await enqueue();
     github.createCommitStatus = vi.fn(async () => {

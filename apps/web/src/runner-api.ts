@@ -39,7 +39,7 @@ import {
   releaseJob,
   requeueStaleJobs,
 } from "./job-queue";
-import { livingReviewFor, postReviewForRun } from "./review-posting";
+import { closedPlaceholderFor, livingReviewFor, postReviewForRun } from "./review-posting";
 import {
   clearReviewing,
   markReviewing,
@@ -187,12 +187,14 @@ export async function claimJob(request: Request, deps: ClaimDeps): Promise<Respo
       );
       const reference = { owner: armed.owner, repo: armed.repo, number: armed.number };
       const living = await livingReviewFor(deps.db, armed);
+      const closedPlaceholder = living ? undefined : await closedPlaceholderFor(deps.db, armed);
       await markReviewing(deps, {
         reference,
         headSha: claimed.headSha,
         token: installationToken,
         runId: created.id,
         livingReviewId: living?.githubReviewId,
+        closedPlaceholderId: closedPlaceholder?.githubReviewId,
         block: reviewingBlock({
           controlPlaneUrl: deps.controlPlaneUrl,
           runnerName: runner.name,

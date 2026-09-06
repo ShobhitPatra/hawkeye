@@ -14,7 +14,12 @@ import { and, asc, desc, eq, isNotNull, isNull, lt, ne, or, sql } from "drizzle-
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import { armedPr as armedPrTable, job, reviewPosted, run } from "./db/schema";
-import { clearReviewing, NOT_COMPLETED_BODY, SUPERSEDED_BODY } from "./reviewing-line";
+import {
+  ALREADY_POSTED_BODY,
+  clearReviewing,
+  NOT_COMPLETED_BODY,
+  SUPERSEDED_BODY,
+} from "./reviewing-line";
 
 export type ReviewPostingDeps = { db: Db; github: GitHubClient; log?: (line: string) => void };
 export type ReviewPostingInput = {
@@ -67,6 +72,49 @@ async function placeholderFor(
     .where(eq(run.id, runId));
   if (!row?.placeholderReviewId) return undefined;
   return { githubReviewId: row.placeholderReviewId, placeholder: true };
+}
+
+export async function closedPlaceholderFor(
+  db: Db,
+  armedPr: ReviewPostingInput["armedPr"],
+): Promise<{ githubReviewId: string } | undefined> {
+  const [row] = await db
+    .select({ placeholderReviewId: run.placeholderReviewId })
+    .from(run)
+    .innerJoin(job, eq(job.id, run.jobId))
+    .innerJoin(armedPrTable, eq(armedPrTable.id, job.armedPrId))
+    .where(
+      and(samePullRequest(armedPr), isNotNull(run.placeholderReviewId), ne(run.status, "running")),
+    )
+    .orderBy(desc(run.startedAt))
+    .limit(1);
+  if (!row?.placeholderReviewId) return undefined;
+  return { githubReviewId: row.placeholderReviewId };
+}
+
+async function closePlaceholder(
+  deps: ReviewPostingDeps,
+  input: ReviewPostingInput,
+  closing: string,
+): Promise<void> {
+  const placeholder = await placeholderFor(deps.db, input.runId);
+  if (!placeholder) return;
+  const { armedPr, headSha } = input;
+  try {
+    await clearReviewing(deps, {
+      reference: { owner: armedPr.owner, repo: armedPr.repo, number: armedPr.number },
+      headSha,
+      token: await deps.github.installationTokenById(armedPr.installationId),
+      runId: input.runId,
+      livingReviewId: undefined,
+      placeholderReviewId: placeholder.githubReviewId,
+      closing,
+    });
+  } catch (error) {
+    deps.log?.(
+      `reviewing line not cleared for run ${input.runId}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
 
 async function previousRoundFindings(
@@ -218,6 +266,14 @@ export async function postReviewForRun(
       return { failed: error instanceof Error ? error.message : String(error) };
     }
   });
+  if (reservation === "superseded" || reservation === "already-posted") {
+    await closePlaceholder(
+      deps,
+      input,
+      reservation === "superseded" ? SUPERSEDED_BODY : ALREADY_POSTED_BODY,
+    );
+    return reservation;
+  }
   if (typeof reservation === "string") return reservation;
   if ("failed" in reservation) return failRun(deps, input.runId, reservation.failed);
   const { living } = reservation;
@@ -289,7 +345,7 @@ export async function postReviewForRun(
     }
     await github.updateReview(reference, living.githubReviewId, finalBody, token);
     githubWrote = true;
-    if (!supplementalPosted) await record(living.githubReviewId);
+    if (!supplementalPosted || placeholder) await record(living.githubReviewId);
     return "posted";
   } catch (error) {
     if (!githubWrote) await release();
