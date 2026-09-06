@@ -78,6 +78,8 @@ export {
 export { fetchMergeBase } from "./github/client.js";
 export { renderReviewText, type RenderTextInput, type RoundSummary } from "./review/render-text.js";
 export {
+  formatDuration,
+  renderReviewOutcomeLine,
   renderReviewSummary,
   type RenderSummaryInput,
   type ReviewTextStyle,

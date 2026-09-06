@@ -143,7 +143,7 @@ TypeScript, pnpm monorepo: `packages/core` (contract, harness interface, render,
 
 1. Register a GitHub App (permissions: pull requests read/write, commit statuses read/write, contents read, issues read, metadata read; no webhook), generate a private key, install it on your repos.
 2. `~/.config/hawkeye/config.json`: `{ "appId": <id>, "appSlug": "<app-slug>", "privateKeyPath": "~/.config/hawkeye/app.pem" }` (`~` is expanded; env overrides: `HAWKEYE_APP_ID`, `HAWKEYE_APP_SLUG`, `HAWKEYE_APP_PRIVATE_KEY_PATH`).
-3. `pnpm install && pnpm build`, then `npx hawkeye-review review <pr-url> [--dry-run [--full]] [--force] [--contract <path>] [--model <name>]`. `--dry-run` prints the verdict and one line per finding instead of posting; `--full` prints the review as it would be posted.
+3. `pnpm install && pnpm build`, then `npx hawkeye-review review <pr-url> [--dry-run [--full]] [--force] [--contract <path>] [--model <name>]`. After posting it prints one line with the verdict, finding count, must-fix count when any, turns and duration, then the review's URL; on a terminal a "Reviewing owner/repo#N · turns · elapsed" line is rewritten in place while it runs. `--dry-run` prints the verdict and one line per finding instead of posting; `--full` prints the review as it would be posted.
 4. Optional: put your own review contract at `~/.config/hawkeye/contract.md` (or point `HAWKEYE_CONTRACT_PATH` at it, or pass `--contract <path>`) to replace the built-in lens and finding rules.
 
 Reviews post as `<app-slug>[bot]` (the author's instance: `hawkeye-review[bot]`). Run artifacts land in `~/.cache/hawkeye/runs/`.

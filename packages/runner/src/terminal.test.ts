@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { terminalStyle } from "./terminal.js";
+import { progressLine, terminalStyle } from "./terminal.js";
 
 describe("terminalStyle", () => {
   it("colors on a TTY", () => {
@@ -20,5 +20,27 @@ describe("terminalStyle", () => {
       expect(style.must("Must fix")).toBe("Must fix");
       expect(style.dim("a.ts")).toBe("a.ts");
     }
+  });
+});
+
+describe("progressLine", () => {
+  it("rewrites one line in place on a TTY and clears it", () => {
+    const written: string[] = [];
+    const line = progressLine({ isTTY: true, write: (text) => written.push(text) });
+    line.update("Reviewing · 1 turn");
+    line.update("Reviewing · 2 turns");
+    line.clear();
+    expect(written).toEqual([
+      "\r\u001b[2KReviewing · 1 turn",
+      "\r\u001b[2KReviewing · 2 turns",
+      "\r\u001b[2K",
+    ]);
+  });
+  it("writes nothing when piped", () => {
+    const written: string[] = [];
+    const line = progressLine({ isTTY: false, write: (text) => written.push(text) });
+    line.update("Reviewing");
+    line.clear();
+    expect(written).toEqual([]);
   });
 });

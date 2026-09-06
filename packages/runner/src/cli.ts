@@ -13,6 +13,7 @@ import {
   HAWKEYE_REPOSITORY_URL,
   parsePullRequestReference,
   readRepositoryRules,
+  renderReviewOutcomeLine,
   renderReviewSummary,
   type ReviewTextStyle,
   runReview,
@@ -22,7 +23,9 @@ import { describePreparedRound, prepareRound } from "./local-review/prepare.js";
 import { dismissFinding, withdrawDismissal } from "./local-review/rounds.js";
 import { showRound, summarizeRound } from "./local-review/show.js";
 import { resolveGitHubToken } from "./local-review/token.js";
+import { reviewProgress } from "./review-progress.js";
 import { createRunDirectory } from "./run-directory.js";
+import type { ProgressLine } from "./terminal.js";
 import { createControlPlaneClient } from "./runner/client.js";
 import { deviceLogin } from "./runner/device-login.js";
 import { assertControlPlaneUrl, loadRunnerConfig, writeRunnerConfig } from "./runner/config.js";
@@ -77,6 +80,7 @@ export function createProgram(io: {
   stdout(line: string): void;
   stderr(line: string): void;
   style?: ReviewTextStyle;
+  progress?: ProgressLine;
 }): Command {
   const program = new Command("hawkeye")
     .version(packageJson.version)
@@ -109,7 +113,13 @@ export function createProgram(io: {
         },
       ) => {
         let runDirectory: string | undefined;
-        let log = io.stderr;
+        const startedAt = Date.now();
+        const progress = reviewProgress({
+          progress: io.progress ?? { update: () => {}, clear: () => {} },
+          stderr: io.stderr,
+          subject: pullRequest,
+        });
+        let log = progress.log;
         try {
           if (options.full && !options.dryRun)
             throw new Error(
@@ -121,6 +131,7 @@ export function createProgram(io: {
             options.wallClockMinutes,
           );
           const reference = parsePullRequestReference(pullRequest);
+          progress.subject(`${reference.owner}/${reference.repo}#${reference.number}`);
           const config = await loadConfig({
             env: process.env,
             home: homedir(),
@@ -136,7 +147,7 @@ export function createProgram(io: {
           runDirectory = directory;
           const logPath = join(directory, "log.txt");
           log = (line: string) => {
-            io.stderr(line);
+            progress.log(line);
             appendFileSync(logPath, `${line}\n`);
           };
           log(`run directory: ${directory}`);
@@ -170,8 +181,10 @@ export function createProgram(io: {
               createWorktree,
               readRepositoryRules,
               log,
+              onTurn: progress.turn,
             },
           );
+          progress.finish();
 
           if (outcome.kind === "already-reviewed")
             io.stdout(
@@ -188,9 +201,19 @@ export function createProgram(io: {
                     ...(io.style === undefined ? {} : { style: io.style }),
                   })}\nNot posted: dry run.`,
             );
-          if (outcome.kind === "posted")
-            io.stdout(`posted ${outcome.findings} finding(s): ${outcome.url}`);
+          if (outcome.kind === "posted") {
+            io.stdout(
+              renderReviewOutcomeLine({
+                result: outcome.result,
+                turns: outcome.turns,
+                durationMs: Date.now() - startedAt,
+                ...(io.style === undefined ? {} : { style: io.style }),
+              }),
+            );
+            io.stdout(outcome.url);
+          }
         } catch (error) {
+          progress.finish();
           log(`error: ${(error as Error).message}`);
           if (runDirectory) log(`run directory: ${runDirectory}`);
           process.exitCode = 1;

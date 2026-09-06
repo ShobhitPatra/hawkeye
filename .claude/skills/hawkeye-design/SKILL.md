@@ -149,6 +149,8 @@ Plain text is the contract; color is decoration that must be removable. On a TTY
 
 The terminal is not where a review is read; the review lives on GitHub or in the round's result file. A command that ends in a verdict prints the verdict word, its reason, then one line per finding in the margin column as text: the severity label in a 12-column gutter, the claim beside it, and the path, line and finding id in dim on the next line. Prior findings follow as `Prior` lines with id, status and note. Then a facts line (finding count, then round and turns when known, middle dots between) and a dim line naming the full review. Details, lenses and the rounds table print only with `--full`.
 
+A command that posts prints one line, verdict first: the verdict word, the finding count, the must-fix count only when it is not zero (in red), the turns and the duration (`6 turns · 4m 12s`), then the review's URL on its own line. While a review runs on a TTY, one line on stderr, `Reviewing owner/repo#N · 4 turns · 2m 05s`, is rewritten in place each turn and each second, then erased before the result; piped or without a TTY nothing is written until the result. No spinner, no bar.
+
 ### Loading, empty and failed
 
 Empty and failed are sentences (`.hk-state`), never illustrations or icon tiles. Loading is the skeleton or the shimmering word. A page that fetches shows the progress line under the top bar with a sentence in the content area, never a blank page.
