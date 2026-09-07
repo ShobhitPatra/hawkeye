@@ -1,8 +1,36 @@
 import type { GitHubClient, PullRequestReference } from "@hawkeye/core";
+import { hold, type HoldStore } from "./hold";
 
 export type TitledReference = PullRequestReference & { installationId: string };
 
+export const TITLE_TTL_MS = 10 * 60_000;
+const held: HoldStore<string> = new Map();
+
 export async function pullRequestTitles(
+  github: GitHubClient,
+  references: TitledReference[],
+  memory: { cache?: HoldStore<string>; now?: number } = {},
+): Promise<Map<string, string>> {
+  const cache = memory.cache ?? held;
+  const now = memory.now ?? Date.now();
+  const titles = new Map<string, string>();
+  const missing = new Map<string, TitledReference>();
+  for (const reference of references) {
+    const key = titleKey(reference);
+    if (titles.has(key) || missing.has(key)) continue;
+    const fresh = cache.get(key);
+    if (fresh && now - fresh.at < fresh.ttl) titles.set(key, await fresh.value);
+    else missing.set(key, reference);
+  }
+  const fetched = await fetchTitles(github, [...missing.values()]);
+  for (const [key, title] of fetched) {
+    titles.set(key, title);
+    hold(cache, key, { now, ttlMs: TITLE_TTL_MS }, async () => title);
+  }
+  return titles;
+}
+
+async function fetchTitles(
   github: GitHubClient,
   references: TitledReference[],
 ): Promise<Map<string, string>> {

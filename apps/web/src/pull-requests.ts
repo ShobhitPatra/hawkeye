@@ -1,6 +1,7 @@
 import type { GitHubClient, OpenPullRequest } from "@hawkeye/core";
 import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "./db/client";
+import { hold, type HoldStore } from "./hold";
 import { installation, installationUser } from "./db/schema";
 
 export interface ListedPullRequest extends OpenPullRequest {
@@ -16,31 +17,23 @@ export const PULL_REQUEST_LIST_TTL_MS = 60_000;
 export const FAILED_LIST_TTL_MS = 15_000;
 
 type Listing = { pullRequests: ListedPullRequest[]; failures: InstallationFailure[] };
-type ListingCache = Map<string, { at: number; ttl: number; listing: Promise<Listing> }>;
-const listings: ListingCache = new Map();
+const listings: HoldStore<Listing> = new Map();
 
 export async function listUserOpenPullRequests(
-  deps: { db: Db; github: GitHubClient; cache?: ListingCache },
+  deps: { db: Db; github: GitHubClient; cache?: HoldStore<Listing> },
   input: { userId: string; login: string; now?: number },
 ): Promise<Listing> {
-  const cache = deps.cache ?? listings;
-  const now = input.now ?? Date.now();
-  const key = `${input.userId}:${input.login}`;
-  const held = cache.get(key);
-  if (held && now - held.at < held.ttl) return held.listing;
-  for (const [otherKey, other] of cache) if (now - other.at >= other.ttl) cache.delete(otherKey);
-  const listing = fetchUserOpenPullRequests(deps, input);
-  const entry = { at: now, ttl: PULL_REQUEST_LIST_TTL_MS, listing };
-  cache.set(key, entry);
-  listing.then(
-    (result) => {
-      if (result.failures.length > 0) entry.ttl = FAILED_LIST_TTL_MS;
+  return hold(
+    deps.cache ?? listings,
+    `${input.userId}:${input.login}`,
+    {
+      now: input.now ?? Date.now(),
+      ttlMs: PULL_REQUEST_LIST_TTL_MS,
+      ttlAfter: (listing) =>
+        listing.failures.length > 0 ? FAILED_LIST_TTL_MS : PULL_REQUEST_LIST_TTL_MS,
     },
-    () => {
-      if (cache.get(key) === entry) cache.delete(key);
-    },
+    () => fetchUserOpenPullRequests(deps, input),
   );
-  return listing;
 }
 
 async function fetchUserOpenPullRequests(
