@@ -730,6 +730,7 @@ html {
 .hk-review-control[data-pending] {
   cursor: progress;
 }
+
 .hk-input {
   height: 30px;
   padding: 0 var(--hk-space-2);
