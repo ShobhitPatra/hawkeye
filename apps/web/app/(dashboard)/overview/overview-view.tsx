@@ -1,6 +1,7 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { formatUpdated } from "@/format-updated";
-import { dayKey, type Overview, type Totals, yearDays } from "@/overview";
+import { dayKey, type Overview, type RecentReview, type Totals, yearDays } from "@/overview";
 import { verdictLabel } from "@/run-format";
 import type { RunnerStatus } from "@/runner-status";
 import { RunnerSentence } from "../runner-sentence";
@@ -21,14 +22,72 @@ function level(count: number): number {
   return 4;
 }
 
+export function RecentReviews({ recent, now }: { recent: RecentReview[]; now: Date }) {
+  if (recent.length === 0) return null;
+  return (
+    <section className="hk-section" aria-labelledby="recent">
+      <h2 className="hk-heading" id="recent">
+        Recent reviews
+      </h2>
+      <div className="hk-table-wrap">
+        <table className="hk-table">
+          <thead>
+            <tr>
+              <th scope="col">Pull request</th>
+              <th scope="col">Verdict</th>
+              <th scope="col" className="hk-numeric">
+                Turns
+              </th>
+              <th scope="col">Reviewed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recent.map((review) => (
+              <tr
+                key={`${review.owner}/${review.repo}#${review.number}-${review.endedAt.getTime()}`}
+              >
+                <td>
+                  <div className="hk-cell-stack">
+                    <Link href={`/prs/${review.owner}/${review.repo}/${review.number}`}>
+                      {review.title ?? `${review.owner}/${review.repo} #${review.number}`}
+                    </Link>
+                    <span className="hk-metadata">
+                      {review.owner}/{review.repo} <span className="hk-mono">#{review.number}</span>
+                    </span>
+                  </div>
+                </td>
+                <td>
+                  <span
+                    className="hk-status"
+                    data-state={review.verdict === "blocked" ? "failed" : undefined}
+                  >
+                    {verdictLabel(review.verdict)}
+                  </span>
+                </td>
+                <td className="hk-numeric">{review.turns}</td>
+                <td>{formatUpdated(review.endedAt.toISOString(), now.getTime())}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="hk-state hk-compact hk-muted">
+        <Link href="/prs">All pull requests</Link>
+      </p>
+    </section>
+  );
+}
+
 export function OverviewView({
   overview,
   runner,
   now,
+  recent,
 }: {
   overview: Overview;
   runner: RunnerStatus;
   now: Date;
+  recent: ReactNode;
 }) {
   const empty = overview.allTime.reviews === 0 && overview.allTime.findings === 0;
   const days = yearDays(now);
@@ -92,59 +151,7 @@ export function OverviewView({
         </div>
       </section>
 
-      {overview.recent.length > 0 && (
-        <section className="hk-section" aria-labelledby="recent">
-          <h2 className="hk-heading" id="recent">
-            Recent reviews
-          </h2>
-          <div className="hk-table-wrap">
-            <table className="hk-table">
-              <thead>
-                <tr>
-                  <th scope="col">Pull request</th>
-                  <th scope="col">Verdict</th>
-                  <th scope="col" className="hk-numeric">
-                    Turns
-                  </th>
-                  <th scope="col">Reviewed</th>
-                </tr>
-              </thead>
-              <tbody>
-                {overview.recent.map((review) => (
-                  <tr
-                    key={`${review.owner}/${review.repo}#${review.number}-${review.endedAt.getTime()}`}
-                  >
-                    <td>
-                      <div className="hk-cell-stack">
-                        <Link href={`/prs/${review.owner}/${review.repo}/${review.number}`}>
-                          {review.title ?? `${review.owner}/${review.repo} #${review.number}`}
-                        </Link>
-                        <span className="hk-metadata">
-                          {review.owner}/{review.repo}{" "}
-                          <span className="hk-mono">#{review.number}</span>
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                      <span
-                        className="hk-status"
-                        data-state={review.verdict === "blocked" ? "failed" : undefined}
-                      >
-                        {verdictLabel(review.verdict)}
-                      </span>
-                    </td>
-                    <td className="hk-numeric">{review.turns}</td>
-                    <td>{formatUpdated(review.endedAt.toISOString(), now.getTime())}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="hk-state hk-compact hk-muted">
-            <Link href="/prs">All pull requests</Link>
-          </p>
-        </section>
-      )}
+      {recent}
     </main>
   );
 }

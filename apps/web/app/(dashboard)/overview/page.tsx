@@ -1,10 +1,11 @@
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
-import { loadOverview } from "@/overview";
+import { loadOverview, type RecentReview } from "@/overview";
 import { pullRequestTitles, titleKey } from "@/pull-request-titles";
 import { requestRunnerStatus } from "@/request-runner-status";
 import { requireSession } from "@/session";
-import { OverviewView } from "./overview-view";
+import { Suspense } from "react";
+import { OverviewView, RecentReviews } from "./overview-view";
 
 export default async function OverviewPage() {
   const session = await requireSession();
@@ -13,10 +14,41 @@ export default async function OverviewPage() {
     loadOverview(getDb(), session.user.id, now),
     requestRunnerStatus(session.user.id),
   ]);
-  const titles = await pullRequestTitles(createGitHubAppClient({ fetch }), overview.recent);
-  const recent = overview.recent.map((review) => {
+  return (
+    <OverviewView
+      overview={overview}
+      runner={runner}
+      now={now}
+      recent={
+        <Suspense fallback={<RecentReviewsLoading count={overview.recent.length} />}>
+          <RecentReviewsWithTitles recent={overview.recent} now={now} />
+        </Suspense>
+      }
+    />
+  );
+}
+
+async function RecentReviewsWithTitles({ recent, now }: { recent: RecentReview[]; now: Date }) {
+  const titles = await pullRequestTitles(createGitHubAppClient({ fetch }), recent);
+  const titled = recent.map((review) => {
     const title = titles.get(titleKey(review));
     return title ? { ...review, title } : review;
   });
-  return <OverviewView overview={{ ...overview, recent }} runner={runner} now={now} />;
+  return <RecentReviews recent={titled} now={now} />;
+}
+
+function RecentReviewsLoading({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <section className="hk-section" aria-labelledby="recent">
+      <h2 className="hk-heading" id="recent">
+        Recent reviews
+      </h2>
+      <div className="hk-skeleton" data-rows aria-hidden="true">
+        {Array.from({ length: Math.min(count, 5) }, (_, index) => (
+          <span key={index} />
+        ))}
+      </div>
+    </section>
+  );
 }
