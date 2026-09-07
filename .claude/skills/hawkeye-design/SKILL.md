@@ -162,7 +162,7 @@ Empty and failed are sentences (`.hk-state`), never illustrations or icon tiles.
 
 ## Public CSS API
 
-Tokens are `--hk-*`, classes are `hk-*`, both from `stylesheet.css` beside this file. Use the exact names; never invent a `hk-*` class or redeclare a `--hk-*` token in page CSS. Page-owned CSS may compose layout from public tokens only.
+Tokens are `--hk-*`, classes are `hk-*`, both from `stylesheet.css` beside this file. The `hidden` attribute always hides under `.hk-root`, whatever display a class sets. Use the exact names; never invent a `hk-*` class or redeclare a `--hk-*` token in page CSS. Page-owned CSS may compose layout from public tokens only.
 
 Roots and shell: `hk-root`, `hk-topbar[data-sticky]`, `hk-wordmark`, `hk-nav`, `hk-topbar-end`, `hk-account-name`, `hk-account-initial`, `hk-menu` (a `<details>`), `hk-menu-panel`, `hk-menu-who`, `hk-menu-row`, `hk-progress`, `hk-page`.
 

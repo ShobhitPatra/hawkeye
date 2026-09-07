@@ -98,7 +98,6 @@ function TerminalLine({ line }: { line: (typeof review.terminal)[number] }) {
 
 export function LandingHero() {
   const root = useRef<HTMLElement>(null);
-  const timers = useRef<number[]>([]);
 
   useEffect(() => {
     const hero = root.current;
@@ -123,9 +122,11 @@ export function LandingHero() {
     };
     walk(md);
 
+    const timers: number[] = [];
     const at = (ms: number, fn: () => void) => {
-      timers.current.push(window.setTimeout(fn, ms));
+      timers.push(window.setTimeout(fn, ms));
     };
+    const clearTimers = () => timers.splice(0).forEach(clearTimeout);
     const light = (upTo: number) =>
       flow.forEach((el, index) => {
         if (index <= upTo) el.setAttribute("data-on", "");
@@ -171,8 +172,7 @@ export function LandingHero() {
       textNodes.forEach(({ node }) => (node.nodeValue = ""));
     };
     const play = () => {
-      timers.current.forEach(clearTimeout);
-      timers.current = [];
+      clearTimers();
       light(0);
       show("pull-request");
       chip.hidden = true;
@@ -211,11 +211,10 @@ export function LandingHero() {
     replay.addEventListener("click", play);
     if (reduce) finish();
     else play();
-    const pending = timers.current;
     return () => {
       replay.removeEventListener("click", play);
       body.removeEventListener("scroll", markEnd);
-      pending.forEach(clearTimeout);
+      clearTimers();
     };
   }, []);
 

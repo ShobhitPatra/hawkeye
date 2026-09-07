@@ -191,8 +191,6 @@
   line-height: 1.7;
   padding: var(--hk-space-4) var(--hk-space-5);
   white-space: pre;
-  scrollbar-width: thin;
-  scrollbar-color: var(--hk-line-2) transparent;
 }
 .ld-term-line {
   opacity: 0;

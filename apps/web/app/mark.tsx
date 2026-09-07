@@ -1,3 +1,5 @@
+import { MARK_EYE, MARK_PATHS } from "@/mark-paths";
+
 export function Mark({ size = 20 }: { size?: number }) {
   return (
     <svg
@@ -11,10 +13,10 @@ export function Mark({ size = 20 }: { size?: number }) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M6 17c2-6 5-9 9-10l6-1.5" />
-      <path d="M15 7c-1 4-3.5 6-7 7" />
-      <path d="M7 15l-2 4 4-2" />
-      <circle cx="16.5" cy="6.6" r=".9" fill="currentColor" stroke="none" />
+      {MARK_PATHS.map((d) => (
+        <path key={d} d={d} />
+      ))}
+      <circle cx={MARK_EYE.cx} cy={MARK_EYE.cy} r={MARK_EYE.r} fill="currentColor" stroke="none" />
     </svg>
   );
 }
