@@ -3,7 +3,7 @@ import Link from "next/link";
 import { formatUpdated } from "@/format-updated";
 import { formatDuration, formatError, runFailureLabel, shortSha, verdictLabel } from "@/run-format";
 import type { ArmedPullRequestSummary, PullRequestFinding, PullRequestRun } from "@/runs";
-import { armAction, disarmAction } from "../../../actions";
+import { ReviewControl } from "../../../review-control";
 
 const SEVERITY_LABELS: Record<Severity, string> = {
   must_fix: "Must fix",
@@ -62,20 +62,11 @@ export function PullRequestView({
             {title ?? `${reference.owner}/${reference.repo} #${reference.number}`}
           </h1>
           <div className="hk-actions">
-            <form action={arm.armed ? disarmAction : armAction}>
-              <input type="hidden" name="owner" value={reference.owner} />
-              <input type="hidden" name="repo" value={reference.repo} />
-              <input type="hidden" name="number" value={reference.number} />
-              <input type="hidden" name="installationId" value={arm.installationId} />
-              <button
-                type="submit"
-                className="hk-button"
-                data-variant={arm.armed ? "primary" : undefined}
-                aria-pressed={arm.armed}
-              >
-                {arm.armed ? "Armed" : "Arm"}
-              </button>
-            </form>
+            <ReviewControl
+              reference={reference}
+              installationId={arm.installationId}
+              reviewing={arm.armed}
+            />
             <a className="hk-button" href={htmlUrl}>
               Open on GitHub
             </a>
@@ -122,7 +113,7 @@ export function PullRequestView({
           <p>
             {arm.armed
               ? "The next push queues one, or the runner picks up the job already waiting."
-              : "Arm the pull request and its next push is reviewed."}
+              : "Click Review and its next push is reviewed."}
           </p>
         </div>
       )}
@@ -131,7 +122,7 @@ export function PullRequestView({
         <div className="hk-state">
           <p>
             <span className="hk-status" data-state="running">
-              Reviewing
+              In review
             </span>{" "}
             on {latest.runnerName ?? "your runner"}, started{" "}
             {formatUpdated(latest.startedAt.toISOString(), now)}.
@@ -260,7 +251,7 @@ function RunResult({ run }: { run: PullRequestRun }) {
   if (run.status === "running")
     return (
       <span className="hk-status" data-state="running">
-        Reviewing
+        In review
       </span>
     );
   if (run.status !== "ok" || !run.verdict)

@@ -25,11 +25,11 @@ export function PullRequestsView({
         <h1 className="hk-title">Pull requests</h1>
         <div className="hk-meta">
           <span>
-            <b>{statuses.size}</b> armed
+            reviews on for <b>{statuses.size}</b>
           </span>
           {reviewing > 0 && (
             <span>
-              <b>{reviewing}</b> reviewing
+              <b>{reviewing}</b> in review
             </span>
           )}
           <span>

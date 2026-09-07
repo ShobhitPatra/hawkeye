@@ -678,30 +678,57 @@ html {
   flex: none;
 }
 
-.hk-arm {
-  width: 8px;
-  height: 8px;
-  padding: 0;
-  border-radius: 50%;
-  border: 1.5px solid var(--hk-fg-2);
-  background: transparent;
-  display: inline-block;
-  flex: none;
-  vertical-align: middle;
+.hk-review {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--hk-space-1);
 }
-button.hk-arm {
+.hk-review-control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hk-space-2);
+  font: inherit;
+  font-size: var(--hk-type-compact);
+  line-height: var(--hk-leading-compact);
+  color: var(--hk-fg-2);
+  background: none;
+  border: 0;
+  padding: 0;
   cursor: pointer;
-  position: relative;
+  transition: color var(--hk-duration) var(--hk-ease);
+}
+.hk-review-control i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  flex: none;
   transition: background-color var(--hk-duration) var(--hk-ease);
 }
-button.hk-arm::before {
-  content: "";
-  position: absolute;
-  inset: -8px;
+.hk-review-control[data-on] {
+  color: var(--hk-fg);
 }
-.hk-arm[data-armed="true"] {
-  background: var(--hk-fg);
-  border-color: var(--hk-fg);
+.hk-review-control[data-on] i,
+.hk-review-control[data-pending] i {
+  background: currentColor;
+}
+.hk-review-control:hover,
+.hk-review-control:focus-visible {
+  color: var(--hk-fg);
+}
+.hk-review-next {
+  display: none;
+}
+.hk-review-control:not([data-pending]):hover .hk-review-word,
+.hk-review-control:not([data-pending]):focus-visible .hk-review-word {
+  display: none;
+}
+.hk-review-control:not([data-pending]):hover .hk-review-next,
+.hk-review-control:not([data-pending]):focus-visible .hk-review-next {
+  display: inline;
+}
+.hk-review-control[data-pending] {
+  cursor: progress;
 }
 
 .hk-input {
@@ -1028,10 +1055,6 @@ button.hk-arm::before {
 }
 .hk-table td.hk-numeric .hk-actions {
   justify-content: flex-end;
-}
-.hk-table td.hk-cell-arm {
-  width: 8px;
-  padding-right: var(--hk-space-3);
 }
 
 /* Surfaces, earned rarely */

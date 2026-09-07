@@ -4,7 +4,7 @@ import { formatUpdated } from "@/format-updated";
 import type { ListedPullRequest } from "@/pull-requests";
 import type { PullRequestStatus } from "@/pull-request-status";
 import { verdictLabel } from "@/run-format";
-import { armAction, disarmAction } from "./actions";
+import { ReviewControl } from "./review-control";
 
 function StatusWord({
   status,
@@ -15,7 +15,7 @@ function StatusWord({
 }) {
   switch (status.kind) {
     case "armed":
-      return <span className="hk-status">Armed</span>;
+      return null;
     case "queued":
       return runnerOnline ? (
         <span className="hk-status">Queued</span>
@@ -27,7 +27,7 @@ function StatusWord({
     case "reviewing":
       return (
         <span className="hk-status" data-state="running">
-          Reviewing
+          In review
         </span>
       );
     case "failed":
@@ -63,9 +63,6 @@ export function PullRequestTable({
       <table className="hk-table">
         <thead>
           <tr>
-            <th scope="col">
-              <span className="hk-visually-hidden">Armed</span>
-            </th>
             <th scope="col">Pull request</th>
             <th scope="col">Status</th>
             <th scope="col" className="hk-numeric">
@@ -75,6 +72,9 @@ export function PullRequestTable({
               Findings
             </th>
             <th scope="col">Reviewed</th>
+            <th scope="col">
+              <span className="hk-visually-hidden">Review control</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -85,22 +85,6 @@ export function PullRequestTable({
             const last = status && status.kind !== "armed" ? status.last : undefined;
             return (
               <tr key={pullRequest.htmlUrl} data-dim={isArmed ? undefined : "true"}>
-                <td className="hk-cell-arm">
-                  <form action={isArmed ? disarmAction : armAction}>
-                    <input type="hidden" name="owner" value={pullRequest.owner} />
-                    <input type="hidden" name="repo" value={pullRequest.repo} />
-                    <input type="hidden" name="number" value={pullRequest.number} />
-                    <input type="hidden" name="installationId" value={pullRequest.installationId} />
-                    <button
-                      type="submit"
-                      className="hk-arm"
-                      data-armed={isArmed ? "true" : "false"}
-                      aria-pressed={isArmed}
-                      aria-label={isArmed ? "Disarm" : "Arm"}
-                      title={isArmed ? "Disarm" : "Arm"}
-                    />
-                  </form>
-                </td>
                 <td>
                   <div className="hk-cell-stack">
                     {isArmed ? (
@@ -114,16 +98,17 @@ export function PullRequestTable({
                     </span>
                   </div>
                 </td>
-                <td>
-                  {status ? (
-                    <StatusWord status={status} runnerOnline={runnerOnline} />
-                  ) : (
-                    <span className="hk-status">Not armed</span>
-                  )}
-                </td>
+                <td>{status && <StatusWord status={status} runnerOnline={runnerOnline} />}</td>
                 <td className="hk-numeric">{last?.rounds ?? ""}</td>
                 <td className="hk-numeric">{last?.openFindings ?? ""}</td>
                 <td>{last ? formatUpdated(last.reviewedAt.toISOString(), now) : ""}</td>
+                <td>
+                  <ReviewControl
+                    reference={pullRequest}
+                    installationId={pullRequest.installationId}
+                    reviewing={isArmed}
+                  />
+                </td>
               </tr>
             );
           })}
