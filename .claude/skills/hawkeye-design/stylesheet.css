@@ -302,6 +302,17 @@ html {
   gap: var(--hk-space-4);
   align-items: center;
 }
+.hk-fresh {
+  font-size: var(--hk-type-metadata);
+  line-height: var(--hk-leading-metadata);
+  color: var(--hk-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 760px) {
+  .hk-fresh {
+    display: none;
+  }
+}
 .hk-topbar[data-sticky] {
   position: sticky;
   top: 0;

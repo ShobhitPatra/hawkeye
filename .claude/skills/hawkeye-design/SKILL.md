@@ -104,7 +104,7 @@ Confirming an action is a state word changing, with at most a 160ms color transi
 
 ### Top bar
 
-One bar, 44px, with a hairline beneath it, on every page. Signed in: the wordmark, then Overview, Pull requests, Runners, Settings, then at the right an amber runner status only when a runner has waiting jobs, and the account name. The name opens a menu (`hk-menu`) holding the theme choice, the installation link and sign out, so Settings stays about review behavior. No avatar. The bar is sticky on dashboard pages and scrolls away on the landing. The current page is the foreground color; nothing is underlined. Under 760px the four words stay inline, the name collapses to its initial and the status word hides. Signed out: the wordmark, Source, the theme menu as a lone half-filled circle (`hk-menu[data-icon]`, labelled for assistive tech, the one icon without a visible word) holding the same three choices, and a Sign in button.
+One bar, 44px, with a hairline beneath it, on every page. Signed in: the wordmark, then Overview, Pull requests, Runners, Settings, then at the right the small Updated 12 s ago line, an amber runner status only when a runner has waiting jobs, and the account name. The name opens a menu (`hk-menu`) holding the theme choice, the installation link and sign out, so Settings stays about review behavior. No avatar. The bar is sticky on dashboard pages and scrolls away on the landing. The current page is the foreground color; nothing is underlined. Under 760px the four words stay inline, the name collapses to its initial and the status word hides. Signed out: the wordmark, Source, the theme menu as a lone half-filled circle (`hk-menu[data-icon]`, labelled for assistive tech, the one icon without a visible word) holding the same three choices, and a Sign in button.
 
 ### Overview
 
@@ -160,11 +160,13 @@ Everything else the CLI says is a sentence. `prepare` prints the round on one li
 
 Empty and failed are sentences (`.hk-state`), never illustrations or icon tiles. Loading is the skeleton or the shimmering word. A page that fetches shows the progress line under the top bar with a sentence in the content area, never a blank page.
 
+Dashboard pages stay fresh on their own: every 15 seconds while the tab is visible, and the moment it regains focus, the page refetches and rows change in place. The top bar's right side carries `Updated 12 s ago` at metadata size in tertiary text (`.hk-fresh`, tabular figures, hidden under 760px), nothing more; while a fetch runs the progress line shows under the bar. Nothing else moves. A page never asks the user to reload.
+
 ## Public CSS API
 
 Tokens are `--hk-*`, classes are `hk-*`, both from `stylesheet.css` beside this file. The `hidden` attribute always hides under `.hk-root`, whatever display a class sets. Use the exact names; never invent a `hk-*` class or redeclare a `--hk-*` token in page CSS. Page-owned CSS may compose layout from public tokens only.
 
-Roots and shell: `hk-root`, `hk-topbar[data-sticky]`, `hk-wordmark`, `hk-nav`, `hk-topbar-end`, `hk-account-name`, `hk-account-initial`, `hk-menu` (a `<details>`; `data-icon` for an icon-only summary), `hk-menu-panel`, `hk-menu-who`, `hk-menu-theme`, `hk-menu-row`, `hk-progress`, `hk-page`.
+Roots and shell: `hk-root`, `hk-topbar[data-sticky]`, `hk-wordmark`, `hk-nav`, `hk-topbar-end`, `hk-account-name`, `hk-account-initial`, `hk-fresh`, `hk-menu` (a `<details>`; `data-icon` for an icon-only summary), `hk-menu-panel`, `hk-menu-who`, `hk-menu-theme`, `hk-menu-row`, `hk-progress`, `hk-page`.
 
 Type roles: `hk-headline` (landing only), `hk-display`, `hk-title`, `hk-heading`, `hk-lede`, `hk-body`, `hk-compact`, `hk-metadata`, `hk-label`, `hk-mono`, `hk-numeric`, `hk-muted`, `hk-prose`, `hk-visually-hidden`.
 

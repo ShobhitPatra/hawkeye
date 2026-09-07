@@ -3,6 +3,7 @@ import { Mark } from "../mark";
 import { describeRunnerStatus, type RunnerStatus } from "@/runner-status";
 import type { Theme } from "@/theme";
 import { ThemeChoice } from "../theme-choice";
+import { LiveRefresh } from "./live-refresh";
 import { NavLinks } from "./nav-links";
 import { SignOutButton } from "./sign-out-button";
 
@@ -24,6 +25,7 @@ export function TopBar({
       </Link>
       <NavLinks />
       <div className="hk-topbar-end">
+        <LiveRefresh />
         {!runner.online && runner.waitingJobs > 0 && (
           <Link className="hk-status" data-state="attention" href="/runners">
             {describeRunnerStatus(runner)}
