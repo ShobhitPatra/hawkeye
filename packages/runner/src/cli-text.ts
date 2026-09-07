@@ -13,6 +13,13 @@ export function connectedLines(input: {
   ];
 }
 
+export function reviewFailedLine(
+  message: string,
+  emphasize: (text: string) => string = (text) => text,
+): string {
+  return `${emphasize("Review failed.")} ${message}`;
+}
+
 export function alreadyReviewedLines(reference: PullRequestReference, headSha: string): string[] {
   return [
     `${reference.owner}/${reference.repo}#${reference.number} at ${headSha.slice(0, 7)} is already reviewed.`,

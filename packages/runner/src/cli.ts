@@ -17,7 +17,7 @@ import {
   renderReviewSummary,
   runReview,
 } from "@hawkeye/core";
-import { alreadyReviewedLines, connectedLines } from "./cli-text.js";
+import { alreadyReviewedLines, connectedLines, reviewFailedLine } from "./cli-text.js";
 import { expandHome, loadConfig } from "./config.js";
 import { describePreparedRound, prepareRound } from "./local-review/prepare.js";
 import { dismissFinding, withdrawDismissal } from "./local-review/rounds.js";
@@ -115,7 +115,6 @@ export function createProgram(io: {
         },
       ) => {
         let runDirectory: string | undefined;
-        let logPath: string | undefined;
         const startedAt = Date.now();
         let maxTurns: number;
         let wallClockMinutes: number;
@@ -154,7 +153,6 @@ export function createProgram(io: {
           });
           runDirectory = directory;
           const runLogPath = join(directory, "log.txt");
-          logPath = runLogPath;
           log = (line: string) => {
             progress.log(line);
             appendFileSync(runLogPath, `${line}\n`);
@@ -221,15 +219,12 @@ export function createProgram(io: {
           }
         } catch (error) {
           progress.finish();
-          const failed = `Review failed. ${(error as Error).message}`;
-          progress.log(
-            failed.replace(
-              "Review failed.",
-              io.stderrStyle?.must("Review failed.") ?? "Review failed.",
-            ),
-          );
-          if (logPath !== undefined) appendFileSync(logPath, `${failed}\n`);
-          if (runDirectory) log(`The run is kept in ${shortenHome(runDirectory, homedir())}.`);
+          const message = (error as Error).message;
+          progress.log(reviewFailedLine(message, io.stderrStyle?.must));
+          if (runDirectory) {
+            appendFileSync(join(runDirectory, "log.txt"), `${reviewFailedLine(message)}\n`);
+            log(`The run is kept in ${shortenHome(runDirectory, homedir())}.`);
+          }
           process.exitCode = 1;
         }
       },

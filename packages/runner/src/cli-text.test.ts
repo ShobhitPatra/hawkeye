@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alreadyReviewedLines, connectedLines } from "./cli-text.js";
+import { alreadyReviewedLines, connectedLines, reviewFailedLine } from "./cli-text.js";
 
 describe("connectedLines", () => {
   it("names the runner after the device flow and shortens the config path", () => {
@@ -18,6 +18,15 @@ describe("connectedLines", () => {
     expect(connectedLines({ runnerName: undefined, configPath: "/c.json", home: "/h" })[0]).toBe(
       "Connected. Token saved to /c.json.",
     );
+  });
+});
+
+describe("reviewFailedLine", () => {
+  it("leads with the failure and styles only that phrase", () => {
+    expect(reviewFailedLine("claude exited 1 after 2 turns (error); nothing was posted")).toBe(
+      "Review failed. claude exited 1 after 2 turns (error); nothing was posted",
+    );
+    expect(reviewFailedLine("boom", (text) => `<${text}>`)).toBe("<Review failed.> boom");
   });
 });
 
