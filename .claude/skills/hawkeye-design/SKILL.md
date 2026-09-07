@@ -35,7 +35,7 @@ Four faces, one voice. The visual tokens apply to the dashboard and any landing 
 - A review opens with the verdict and its one-line reason. No greeting, no praise, no summary of what the pull request does. Silence is the compliment.
 - No hedges. A finding states what breaks and what to do. "Might", "consider", "it seems", "perhaps" mark a claim that is not a finding.
 - Underlines exist only on links inside running text (prose, finding details, state sentences, help lines). Navigation, crumbs, table titles, the wordmark, menu items and buttons never underline, not even on hover; they shift color. The stylesheet enforces this through those classes, so a bare link on a page that is not restyled yet keeps its underline.
-- Controls say what happens: "Arm", "Re-review", "Start the runner". After the action, the state word changes; no toast that restates it.
+- Controls say what happens: "Review", "Pause", "Resume", "Re-review", "Start the runner". After the action, the state word changes; no toast that restates it.
 - State sentences say what is true and what to do next: "Runner offline. 3 pull requests are waiting and will be reviewed when it reconnects."
 - Errors say what went wrong, that nothing was lost when that is true, and the next step. No apologies.
 - Name things as the user knows them: pull request, runner, review, finding, round. Not job, payload, webhook.
@@ -52,7 +52,7 @@ Design in monochrome on a warm neutral. Color is a secondary cue, always paired 
 - Amber (`--hk-warn`) only for states that need the user to act: runner offline, pull requests waiting.
 - No green. A posted review, a passing verdict, an online runner are the normal state and stay neutral.
 - No blue. Focus rings use the foreground color.
-- Armed versus not armed is a filled versus hollow circle (`.hk-arm`), not a color.
+- Whether a pull request is reviewed is the review control (`.hk-review-control`): a filled or hollow circle with its word beside it, Reviewing or Review, never a color. Hovering shows what a click does, Pause or Review; the moment after a click the word shimmers Starting or Pausing, and a refusal rolls the control back with one sentence under it.
 - Both themes always. The system preference is the default; the theme choice (Light, Dark, System) in the account menu and the landing bar is kept in a cookie and stamped on `<html>` as `data-theme` by the server, so no page flashes; System stamps nothing and follows the media query. Never ship a color that only exists in one theme.
 
 ### Typography
@@ -66,7 +66,7 @@ Design in monochrome on a warm neutral. Color is a secondary cue, always paired 
 
 ### The mark
 
-A hawk in profile, in flight: one raised wing, a body line ending in a beak, a short tail, and a dot for the eye, facing right. Drawn on a 24 grid at stroke 1.5, the same weight as the interface icons (`mark.svg`). It is monochrome and takes the current color. It lives where there is no room for words: the GitHub App avatar (`avatar-light.svg`, one fixed image on the light palette, since GitHub does not follow the page theme), the favicon (`favicon.svg`, swaps stroke with the system theme; the app serves its own copies from `apps/web/public/`, regenerated from this file whenever the mark changes), and in a lockup with the bird before the wordmark (`.hk-lockup`, 20px, 8px gap) in the top bar, the landing footer, the README header and the social card. It never replaces the arm circle. Do not fill it, add color, mirror it, or redraw it at another stroke.
+A hawk in profile, in flight: one raised wing, a body line ending in a beak, a short tail, and a dot for the eye, facing right. Drawn on a 24 grid at stroke 1.5, the same weight as the interface icons (`mark.svg`). It is monochrome and takes the current color. It lives where there is no room for words: the GitHub App avatar (`avatar-light.svg`, one fixed image on the light palette, since GitHub does not follow the page theme), the favicon (`favicon.svg`, swaps stroke with the system theme; the app serves its own copies from `apps/web/public/`, regenerated from this file whenever the mark changes), and in a lockup with the bird before the wordmark (`.hk-lockup`, 20px, 8px gap) in the top bar, the landing footer, the README header and the social card. It never replaces the review control's circle. Do not fill it, add color, mirror it, or redraw it at another stroke.
 
 ### Spacing and shape
 
@@ -82,7 +82,7 @@ The signature of Hawkeye is a reviewer's margin. Every entry in a list of findin
 
 ### Icons
 
-Lucide, stroke 1.5, one library and one weight everywhere, loaded from `lucide-react`. 16px inside controls and rows, 20px in empty states. Always beside a text label except chevrons and close. Never colored, never decorative, never an icon tile. The arm circle is CSS, not an icon.
+Lucide, stroke 1.5, one library and one weight everywhere, loaded from `lucide-react`. 16px inside controls and rows, 20px in empty states. Always beside a text label except chevrons and close. Never colored, never decorative, never an icon tile. The review control's circle is CSS, not an icon.
 
 ### Motion
 
@@ -112,11 +112,11 @@ The signed-in root. It answers, in order: is the runner up and is anything waiti
 
 ### Dashboard lists
 
-A list is a table at compact size. Text columns left, numbers right, header alignment matches its cells. The title is the link; hover shifts its color, never underlines. First column is the arm circle, which is the arm and disarm button; its filled or hollow state is the only indicator. Status is one word: Armed, Queued, Waiting with runner offline in amber, Reviewing with the shimmer, Run failed in red, or the verdict word. A cell that needs a second line (repo under a title) stacks it as metadata, never as a second column. Status is a word, colored only by the rules above. Rows for unarmed or closed pull requests dim to secondary text. No row hover surfaces, no zebra stripes.
+A list is a table at compact size. Text columns left, numbers right, header alignment matches its cells. The title is the link; hover shifts its color, never underlines. The last column is the review control, circle and word, the one button in the row. Status is one word about the review itself: Queued, Waiting with runner offline in amber, In review with the shimmer, Run failed in red, or the verdict word; a pull request with reviews on and nothing yet reviewed shows no status word, the control already says Reviewing. A cell that needs a second line (repo under a title) stacks it as metadata, never as a second column. Status is a word, colored only by the rules above. Rows for unarmed or closed pull requests dim to secondary text. No row hover surfaces, no zebra stripes.
 
 ### Dashboard detail pages
 
-Top to bottom: crumb; title row with Arm and Re-review at the right; meta line; verdict (word on its own line at heading size, reason below); findings in the margin column grouped by severity in contract order; rounds table; review lenses behind a disclosure; link to the comment on GitHub. Arm sits on the title line because arming is the one action the page exists for.
+Top to bottom: crumb; title row with the review control and Re-review at the right; meta line; verdict (word on its own line at heading size, reason below); findings in the margin column grouped by severity in contract order; rounds table; review lenses behind a disclosure; link to the comment on GitHub. The review control sits on the title line because turning reviews on or off is the one action the page exists for.
 
 ### Landing
 
@@ -174,7 +174,7 @@ Verdict: `hk-verdict[data-verdict]`, `hk-verdict-word`, `hk-verdict-why`.
 
 Margin column: `hk-margin`, `hk-entry[data-severity]`, `hk-gutter`, `hk-severity[data-severity]`, `hk-lens`, `hk-entry-body`, `hk-claim`, `hk-path` (wrap the text in `<bdi>`), `hk-detail`, `hk-group-heading`.
 
-Controls: `hk-button[data-variant="primary"]`, `hk-arm[data-armed]`, `hk-input`, `hk-textarea`, `hk-choice`, `hk-field`, `hk-field-wide`, `hk-form-row`, `hk-action-row`, `hk-help`, `hk-link` (on an `<a>` inside `hk-root` only: forces the underline back inside any context that removes it, the top bar, navigation, crumbs, tables and the menu; a bare link in running text already underlines).
+Controls: `hk-button[data-variant="primary"]`, `hk-review` with `hk-review-control[data-on][data-pending]`, `hk-review-word`, `hk-review-next`, `hk-input`, `hk-textarea`, `hk-choice`, `hk-field`, `hk-field-wide`, `hk-form-row`, `hk-action-row`, `hk-help`, `hk-link` (on an `<a>` inside `hk-root` only: forces the underline back inside any context that removes it, the top bar, navigation, crumbs, tables and the menu; a bare link in running text already underlines).
 
 Code and sections: `hk-code`, `hk-code-row`, `hk-section`, `hk-steps` (an `<ol>` whose items carry `hk-step-body`).
 
@@ -182,7 +182,7 @@ Status words: `hk-status[data-state="attention" | "failed" | "running"]`.
 
 Figures and the year grid: `hk-figures`, `hk-figure`, `hk-figure-label`, `hk-figure-value`, `hk-figure-note`, `hk-heat`, `hk-heat-months`, `hk-heat-grid` (cells are `<i data-level="0..4" title>`), `hk-heat-key` (swatches are `<i data-level>` too).
 
-Tables: `hk-table-header`, `hk-table-wrap`, `hk-table`, `hk-numeric`, `hk-cell-arm`, `hk-cell-stack`, `tr[data-dim]`.
+Tables: `hk-table-header`, `hk-table-wrap`, `hk-table`, `hk-numeric`, `hk-cell-stack`, `tr[data-dim]`.
 
 Surfaces and states: `hk-surface`, `hk-disclosure`, `hk-rule`, `hk-state`, `hk-skeleton[data-rows]`.
 
