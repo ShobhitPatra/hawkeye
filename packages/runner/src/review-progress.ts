@@ -11,7 +11,6 @@ export function reviewProgressLine(input: {
 
 export type ReviewProgress = {
   log(line: string): void;
-  subject(name: string): void;
   turn(turns: number): void;
   finish(): void;
 };
@@ -25,22 +24,19 @@ export function reviewProgress(input: {
 }): ReviewProgress {
   const now = input.now ?? Date.now;
   const startedAt = now();
-  let subject = input.subject;
   let turns = 0;
   let running = true;
   const paint = () => {
     if (running)
-      input.progress.update(reviewProgressLine({ subject, turns, elapsedMs: now() - startedAt }));
+      input.progress.update(
+        reviewProgressLine({ subject: input.subject, turns, elapsedMs: now() - startedAt }),
+      );
   };
   const ticker = setInterval(paint, input.tickMs ?? 1000);
   return {
     log: (line) => {
       input.progress.clear();
       input.stderr(line);
-      paint();
-    },
-    subject: (name) => {
-      subject = name;
       paint();
     },
     turn: (count) => {

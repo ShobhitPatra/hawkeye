@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Lens, ReviewResult } from "@hawkeye/core";
-import { runnerConsole, shortenHome } from "./console.js";
+import { shortenHome } from "../terminal.js";
+import { runnerConsole } from "./console.js";
 
 const LENSES: Lens[] = ["intent", "behavior", "blast_radius", "verification", "fit", "hygiene"];
 const result: ReviewResult = {

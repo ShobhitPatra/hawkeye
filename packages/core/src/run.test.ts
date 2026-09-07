@@ -178,7 +178,7 @@ describe("runReview", () => {
   it("posts nothing when the harness fails or the result is invalid", async () => {
     const failing = deps({ harnessStatus: "error" });
     await expect(runReview(await input(), failing)).rejects.toThrow(
-      "Harness error: boom after 0 turns",
+      "boom after 0 turns (error); nothing was posted",
     );
     expect(failing.github.postReview).not.toHaveBeenCalled();
     const invalid = deps({ resultJson: { verdict: "ship" } });

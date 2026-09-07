@@ -124,6 +124,12 @@ describe("showRound", () => {
     await expect(showRound(directory)).rejects.toThrow(/^Invalid review result: summary:/);
   });
 
+  it("says there is no round when the directory has no meta", async () => {
+    const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-round-")), "round-9");
+    await expect(showRound(directory)).rejects.toThrow(
+      `No round at ${directory}. Run hawkeye-review prepare first.`,
+    );
+  });
   it("names the meta file when it is not a round meta", async () => {
     const directory = await mkdtemp(join(tmpdir(), "hawkeye-round-"));
     await writeFile(join(directory, "meta.json"), JSON.stringify({ round: "3" }));
@@ -136,7 +142,7 @@ describe("showRound", () => {
     const directory = await mkdtemp(join(tmpdir(), "hawkeye-round-"));
     await writeFile(join(directory, "meta.json"), JSON.stringify(meta));
     await expect(showRound(directory)).rejects.toThrow(
-      `no review yet: the session has not written ${join(directory, "result.json")}`,
+      `No review yet. The session has not written ${join(directory, "result.json")}.`,
     );
   });
   it("warns when an open prior finding is not repeated in the findings", async () => {

@@ -110,7 +110,7 @@ describe("review", () => {
       "--full",
     ]);
     expect(stderr).toHaveBeenCalledWith(
-      "error: --full applies only with --dry-run; a posted review is read on GitHub",
+      "--full applies only with --dry-run; a posted review is read on GitHub",
     );
     expect(process.exitCode).toBe(1);
     process.exitCode = exitCode;

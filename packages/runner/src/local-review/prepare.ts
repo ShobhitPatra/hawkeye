@@ -1,3 +1,4 @@
+import { shortenHome } from "../terminal.js";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -132,17 +133,21 @@ export async function prepareRound(
   return { meta, directory, resultPath, checkoutPath: worktree.path };
 }
 
-export function describePreparedRound(prepared: PreparedRound): string[] {
+export function describePreparedRound(prepared: PreparedRound, home: string): string[] {
   const { meta } = prepared;
   const { owner, repo, number } = meta.pullRequest;
   const after =
     meta.previousRound === undefined || meta.previousHeadSha === undefined
       ? ""
-      : ` (after round ${meta.previousRound} at ${meta.previousHeadSha.slice(0, 7)})`;
+      : `, after round ${meta.previousRound} at ${meta.previousHeadSha.slice(0, 7)}`;
+  const path = (value: string) => shortenHome(value, home);
   return [
-    `round ${meta.round} for ${owner}/${repo}#${number} at ${meta.headSha.slice(0, 7)}${after}`,
-    prepared.directory,
-    prepared.checkoutPath,
-    prepared.resultPath,
+    `Round ${meta.round} for ${owner}/${repo}#${number} at ${meta.headSha.slice(0, 7)}${after}`,
+    `  prompt    ${path(join(prepared.directory, "prompt.md"))}`,
+    `  checkout  ${path(prepared.checkoutPath)}`,
+    `  result    ${path(prepared.resultPath)}`,
+    "",
+    "Read the prompt, review the checkout, write the result, then",
+    `hawkeye-review show ${path(prepared.directory)}`,
   ];
 }

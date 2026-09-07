@@ -85,12 +85,18 @@ describe("prepareRound", () => {
     await expect(readFile(join(directory, "checkout", "AGENTS.md"), "utf8")).resolves.toBe(
       "house rules",
     );
-    expect(describePreparedRound(prepared)).toEqual([
-      "round 1 for o/r#7 at aaaaaaa",
-      directory,
-      join(directory, "checkout"),
-      join(directory, "result.json"),
+    expect(describePreparedRound(prepared, "/nowhere")).toEqual([
+      "Round 1 for o/r#7 at aaaaaaa",
+      `  prompt    ${join(directory, "prompt.md")}`,
+      `  checkout  ${join(directory, "checkout")}`,
+      `  result    ${join(directory, "result.json")}`,
+      "",
+      "Read the prompt, review the checkout, write the result, then",
+      `hawkeye-review show ${directory}`,
     ]);
+    expect(describePreparedRound(prepared, root)[1]).toBe(
+      `  prompt    ~${join(directory, "prompt.md").slice(root.length)}`,
+    );
     expect(await readFile(join(directory, "prompt.md"), "utf8")).toContain(
       `The directory ${join(directory, "checkout")} is a checkout`,
     );
@@ -145,8 +151,8 @@ describe("prepareRound", () => {
       previousRound: 1,
       previousHeadSha: headSha,
     });
-    expect(describePreparedRound(second)[0]).toBe(
-      "round 2 for o/r#7 at aaaaaaa (after round 1 at aaaaaaa)",
+    expect(describePreparedRound(second, "/nowhere")[0]).toBe(
+      "Round 2 for o/r#7 at aaaaaaa, after round 1 at aaaaaaa",
     );
   });
   it("carries a dismissal into round three after round two withdrew the finding", async () => {

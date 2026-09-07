@@ -22,7 +22,7 @@ export async function loadRunnerConfig(input: {
     const value = input.env[envName] || fromFile;
     if (value === undefined || value === "")
       throw new Error(
-        `Missing ${fileName}: run "hawkeye runner login --url <url>" or set ${envName}`,
+        `Not connected. Run hawkeye-review runner login --url <control plane url> first, or set ${envName}.`,
       );
     return value;
   };

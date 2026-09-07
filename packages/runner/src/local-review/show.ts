@@ -36,7 +36,9 @@ async function loadRound(directory: string, warn: (line: string) => void) {
   const meta = await readRoundMeta(directory);
   const result = await readRoundResult(directory);
   if (result === undefined)
-    throw new Error(`no review yet: the session has not written ${join(directory, "result.json")}`);
+    throw new Error(
+      `No review yet. The session has not written ${join(directory, "result.json")}.`,
+    );
   const priorClaims: Record<string, string> = {};
   if (meta.previousRound !== undefined) {
     const reported = new Set((result.priorFindings ?? []).map((prior) => prior.id));

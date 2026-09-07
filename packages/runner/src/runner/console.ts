@@ -1,6 +1,6 @@
 import { renderReviewOutcomeLine } from "@hawkeye/core";
 import { join } from "node:path";
-import type { TerminalStyle } from "../terminal.js";
+import { shortenHome, type TerminalStyle } from "../terminal.js";
 import type { RunnerEvent } from "./loop.js";
 
 export type ConsoleEvent =
@@ -14,11 +14,6 @@ const PLAIN: TerminalStyle = {
   dim: (text) => text,
   warn: (text) => text,
 };
-
-export function shortenHome(text: string, home: string): string {
-  const escaped = home.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return text.replace(new RegExp(`(^|\\s)${escaped}(?=/|$)`, "g"), "$1~");
-}
 
 export function runnerConsole(input: {
   stderr(line: string): void;

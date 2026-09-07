@@ -107,7 +107,9 @@ export async function runReview(
   );
   if (outcome.status === "invalid-output") throw new Error(outcome.error);
   if (outcome.status !== "ok")
-    throw new Error(`Harness ${outcome.status}: ${outcome.error} after ${outcome.turns} turns`);
+    throw new Error(
+      `${outcome.error} after ${outcome.turns} turn${outcome.turns === 1 ? "" : "s"} (${outcome.status}); nothing was posted`,
+    );
   const { result, diff } = outcome;
   const render = (commentable: Map<string, Set<number>>) =>
     renderReview({

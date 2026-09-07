@@ -23,6 +23,11 @@ export function terminalStyle(input: {
   };
 }
 
+export function shortenHome(text: string, home: string): string {
+  const escaped = home.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return text.replace(new RegExp(`(^|\\s)${escaped}(?=/|$)`, "g"), "$1~");
+}
+
 export type ProgressLine = { update(text: string): void; clear(): void };
 
 export function progressLine(input: {
