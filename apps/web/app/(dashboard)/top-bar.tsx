@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Mark } from "../mark";
 import { describeRunnerStatus, type RunnerStatus } from "@/runner-status";
 import { NavLinks } from "./nav-links";
 import { SignOutButton } from "./sign-out-button";
@@ -13,7 +14,8 @@ export function TopBar({
   const initial = user.name.slice(0, 1).toUpperCase();
   return (
     <header className="hk-topbar" data-sticky>
-      <Link className="hk-wordmark" href="/overview">
+      <Link className="hk-wordmark hk-lockup" href="/overview">
+        <Mark />
         hawkeye
       </Link>
       <NavLinks />
