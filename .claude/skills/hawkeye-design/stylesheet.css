@@ -119,6 +119,16 @@
   box-sizing: border-box;
   min-width: 0;
 }
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hk-line-2) transparent;
+}
+.hk-root * {
+  scrollbar-width: thin;
+}
+.hk-root [hidden] {
+  display: none !important;
+}
 .hk-root :focus-visible {
   outline: 2px solid var(--hk-focus);
   outline-offset: 2px;
@@ -251,6 +261,16 @@
   font-weight: var(--hk-weight-medium);
   color: var(--hk-fg);
   letter-spacing: -0.01em;
+}
+.hk-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hk-space-2);
+}
+.hk-lockup svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
 }
 .hk-nav {
   display: flex;
