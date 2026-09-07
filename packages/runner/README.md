@@ -9,7 +9,7 @@ Design, docs and source: https://github.com/ShobhitPatra/hawkeye
 ```sh
 npx hawkeye-review prepare https://github.com/owner/repo/pull/123
 # your agent session reads <round>/prompt.md, reviews the checkout, writes result.json
-npx hawkeye-review show <round-dir>
+npx hawkeye-review show <round-dir>          # the verdict and one line per finding; --full for the whole review
 ```
 
 Re-running `prepare` on the same pull request starts the next round: the prompt carries the previous findings, the interdiff, and your dismissals (`dismiss` / `undismiss`).
