@@ -154,12 +154,12 @@ describe("listUserOpenPullRequests", () => {
       { db, github: broken.github, cache },
       { userId: "user-1", login: "alice", now: 10_000 },
     );
-    expect(broken.listInstallationRepositories).toHaveBeenCalledTimes(2);
+    expect(broken.listInstallationRepositories).toHaveBeenCalledTimes(1);
     await listUserOpenPullRequests(
       { db, github: broken.github, cache },
       { userId: "user-1", login: "alice", now: 16_000 },
     );
-    expect(broken.listInstallationRepositories).toHaveBeenCalledTimes(4);
+    expect(broken.listInstallationRepositories).toHaveBeenCalledTimes(2);
     cache.clear();
     const throwing = {
       ...broken.github,
