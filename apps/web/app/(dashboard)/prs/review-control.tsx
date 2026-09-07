@@ -14,16 +14,16 @@ export function ReviewControl({
   installationId: string;
   reviewing: boolean;
 }) {
-  const [expected, setExpected] = useState<boolean | undefined>(undefined);
+  const [expected, setExpected] = useState<{ from: boolean; to: boolean } | undefined>(undefined);
   const [failed, setFailed] = useState<string | undefined>(undefined);
   const [pending, startTransition] = useTransition();
-  if (expected !== undefined && expected === reviewing) setExpected(undefined);
-  const shown = expected ?? reviewing;
+  if (expected !== undefined && reviewing !== expected.from) setExpected(undefined);
+  const shown = expected?.to ?? reviewing;
   const words = reviewControlWords({ reviewing: shown, pending });
   const toggle = () => {
     if (pending) return;
     const next = !shown;
-    setExpected(next);
+    setExpected({ from: reviewing, to: next });
     setFailed(undefined);
     startTransition(async () => {
       const form = new FormData();

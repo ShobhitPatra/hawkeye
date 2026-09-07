@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { REFRESH_INTERVAL_MS, shouldRefresh, updatedAgo } from "@/freshness";
+import { formatUpdated } from "@/format-updated";
+import { REFRESH_INTERVAL_MS, shouldRefresh } from "@/freshness";
 
 export function LiveRefresh() {
   const router = useRouter();
@@ -40,7 +41,9 @@ export function LiveRefresh() {
   }, []);
   return (
     <>
-      <span className="hk-fresh">{updatedAgo(now - updatedAt)}</span>
+      <span className="hk-fresh">
+        Updated {formatUpdated(new Date(updatedAt).toISOString(), now)}
+      </span>
       {pending && <div className="hk-progress" aria-hidden="true" />}
     </>
   );

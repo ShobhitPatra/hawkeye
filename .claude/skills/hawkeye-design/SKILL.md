@@ -160,7 +160,7 @@ Everything else the CLI says is a sentence. `prepare` prints the round on one li
 
 Empty and failed are sentences (`.hk-state`), never illustrations or icon tiles. Loading is the skeleton or the shimmering word. A page that fetches shows the progress line under the top bar with a sentence in the content area, never a blank page.
 
-Dashboard pages stay fresh on their own: every 15 seconds while the tab is visible, and the moment it regains focus, the page refetches and rows change in place. The top bar's right side carries `Updated 12 s ago` at metadata size in tertiary text (`.hk-fresh`, tabular figures, hidden under 760px), nothing more; while a fetch runs the progress line shows under the bar. Nothing else moves. A page never asks the user to reload.
+Dashboard pages stay fresh on their own: every 15 seconds while the tab is visible, and the moment it regains focus, the page refetches and rows change in place. The top bar's right side carries `Updated 12 seconds ago` at metadata size in tertiary text (`.hk-fresh`, tabular figures, hidden under 760px), nothing more; while a fetch runs the progress line shows under the bar. Nothing else moves. A page never asks the user to reload.
 
 ## Public CSS API
 

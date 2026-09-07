@@ -27,8 +27,17 @@ export async function listUserOpenPullRequests(
   const key = `${input.userId}:${input.login}`;
   const held = cache.get(key);
   if (held && now - held.at < PULL_REQUEST_LIST_TTL_MS) return held.listing;
+  for (const [otherKey, entry] of cache)
+    if (now - entry.at >= PULL_REQUEST_LIST_TTL_MS) cache.delete(otherKey);
   const listing = fetchUserOpenPullRequests(deps, input);
-  cache.set(key, { at: now, listing });
+  const entry = { at: now, listing };
+  cache.set(key, entry);
+  listing.then(
+    (result) => {
+      if (result.pullRequests.length === 0 && result.failures.length > 0) cache.delete(key);
+    },
+    () => cache.delete(key),
+  );
   return listing;
 }
 

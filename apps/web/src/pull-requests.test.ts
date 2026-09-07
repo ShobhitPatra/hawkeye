@@ -143,6 +143,47 @@ describe("listUserOpenPullRequests", () => {
     );
     expect(listInstallationRepositories).toHaveBeenCalledTimes(4);
   });
+  it("does not hold a listing that failed or that every installation refused", async () => {
+    const cache = new Map();
+    const broken = fakeGitHub({}, {}, { "10": "down", "11": "down", "12": "down" });
+    await listUserOpenPullRequests(
+      { db, github: broken.github, cache },
+      { userId: "user-1", login: "alice", now: 0 },
+    );
+    expect(cache.size).toBe(0);
+    const throwing = {
+      ...broken.github,
+      installationTokenById: vi.fn(async () => {
+        throw new Error("boom");
+      }),
+    };
+    const failing = {
+      db: {
+        select: () => {
+          throw new Error("db down");
+        },
+      } as unknown as typeof db,
+      github: throwing,
+      cache,
+    };
+    await expect(
+      listUserOpenPullRequests(failing, { userId: "user-1", login: "alice", now: 0 }),
+    ).rejects.toThrow("db down");
+    expect(cache.size).toBe(0);
+  });
+  it("evicts listings older than a minute when a new one is stored", async () => {
+    const cache = new Map();
+    const { github } = fakeGitHub({}, {});
+    await listUserOpenPullRequests(
+      { db, github, cache },
+      { userId: "user-1", login: "alice", now: 0 },
+    );
+    await listUserOpenPullRequests(
+      { db, github, cache },
+      { userId: "user-2", login: "hubot", now: 61_000 },
+    );
+    expect([...cache.keys()]).toEqual(["user-2:hubot"]);
+  });
   it("returns nothing for a user without live installations", async () => {
     const { github, installationTokenById } = fakeGitHub({}, {});
 
