@@ -32,12 +32,12 @@ export async function listUserOpenPullRequests(
   const listing = fetchUserOpenPullRequests(deps, input);
   const entry = { at: now, listing };
   cache.set(key, entry);
-  listing.then(
-    (result) => {
-      if (result.pullRequests.length === 0 && result.failures.length > 0) cache.delete(key);
-    },
-    () => cache.delete(key),
-  );
+  const forget = () => {
+    if (cache.get(key) === entry) cache.delete(key);
+  };
+  listing.then((result) => {
+    if (result.failures.length > 0) forget();
+  }, forget);
   return listing;
 }
 

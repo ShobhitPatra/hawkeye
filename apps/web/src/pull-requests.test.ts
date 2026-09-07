@@ -143,9 +143,9 @@ describe("listUserOpenPullRequests", () => {
     );
     expect(listInstallationRepositories).toHaveBeenCalledTimes(4);
   });
-  it("does not hold a listing that failed or that every installation refused", async () => {
+  it("does not hold a listing that failed or that any installation refused", async () => {
     const cache = new Map();
-    const broken = fakeGitHub({}, {}, { "10": "down", "11": "down", "12": "down" });
+    const broken = fakeGitHub({}, {}, { "11": "down" });
     await listUserOpenPullRequests(
       { db, github: broken.github, cache },
       { userId: "user-1", login: "alice", now: 0 },
