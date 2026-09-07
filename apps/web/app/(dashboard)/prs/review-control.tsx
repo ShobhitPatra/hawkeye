@@ -17,6 +17,7 @@ export function ReviewControl({
   const [expected, setExpected] = useState<boolean | undefined>(undefined);
   const [failed, setFailed] = useState<string | undefined>(undefined);
   const [pending, startTransition] = useTransition();
+  if (expected !== undefined && expected === reviewing) setExpected(undefined);
   const shown = expected ?? reviewing;
   const words = reviewControlWords({ reviewing: shown, pending });
   const toggle = () => {
@@ -34,8 +35,8 @@ export function ReviewControl({
         await (next ? armAction : disarmAction)(form);
       } catch {
         setFailed(next ? "Could not start. Try again." : "Could not pause. Try again.");
+        setExpected(undefined);
       }
-      setExpected(undefined);
     });
   };
   return (

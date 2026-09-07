@@ -308,11 +308,6 @@ html {
   color: var(--hk-fg-3);
   font-variant-numeric: tabular-nums;
 }
-@media (max-width: 760px) {
-  .hk-fresh {
-    display: none;
-  }
-}
 .hk-topbar[data-sticky] {
   position: sticky;
   top: 0;
@@ -1188,6 +1183,9 @@ html {
 @media (max-width: 760px) {
   .hk-figures {
     grid-template-columns: 1fr;
+  }
+  .hk-fresh {
+    display: none;
   }
   .hk-heat {
     overflow-x: auto;

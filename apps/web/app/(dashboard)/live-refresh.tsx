@@ -9,34 +9,33 @@ export function LiveRefresh() {
   const [pending, startTransition] = useTransition();
   const [updatedAt, setUpdatedAt] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
-  const inFlight = useRef(false);
-  inFlight.current = pending;
+  const lastStart = useRef(0);
+  const timer = useRef<number | undefined>(undefined);
   const refresh = () => {
-    if (
-      !shouldRefresh({ visible: document.visibilityState === "visible", pending: inFlight.current })
-    )
-      return;
-    startTransition(() => {
-      router.refresh();
-      setUpdatedAt(Date.now());
-    });
+    const started = Date.now();
+    const visible = document.visibilityState === "visible";
+    if (!shouldRefresh({ visible, pending, sinceLastStartMs: started - lastStart.current })) return;
+    lastStart.current = started;
+    startTransition(() => router.refresh());
+    window.clearInterval(timer.current);
+    timer.current = window.setInterval(() => latest.current(), REFRESH_INTERVAL_MS);
   };
   const latest = useRef(refresh);
   latest.current = refresh;
   useEffect(() => {
-    const onTimer = () => latest.current();
-    const onVisible = () => {
-      if (document.visibilityState === "visible") latest.current();
-    };
-    const timer = setInterval(onTimer, REFRESH_INTERVAL_MS);
-    const clock = setInterval(() => setNow(Date.now()), 1000);
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", onTimer);
+    if (!pending) setUpdatedAt(Date.now());
+  }, [pending]);
+  useEffect(() => {
+    const onReturn = () => latest.current();
+    timer.current = window.setInterval(onReturn, REFRESH_INTERVAL_MS);
+    const clock = window.setInterval(() => setNow(Date.now()), 1000);
+    document.addEventListener("visibilitychange", onReturn);
+    window.addEventListener("focus", onReturn);
     return () => {
-      clearInterval(timer);
-      clearInterval(clock);
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", onTimer);
+      window.clearInterval(timer.current);
+      window.clearInterval(clock);
+      document.removeEventListener("visibilitychange", onReturn);
+      window.removeEventListener("focus", onReturn);
     };
   }, []);
   return (

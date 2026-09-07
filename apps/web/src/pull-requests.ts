@@ -12,10 +12,30 @@ export interface InstallationFailure {
   message: string;
 }
 
+export const PULL_REQUEST_LIST_TTL_MS = 60_000;
+
+type Listing = { pullRequests: ListedPullRequest[]; failures: InstallationFailure[] };
+type ListingCache = Map<string, { at: number; listing: Promise<Listing> }>;
+const listings: ListingCache = new Map();
+
 export async function listUserOpenPullRequests(
+  deps: { db: Db; github: GitHubClient; cache?: ListingCache },
+  input: { userId: string; login: string; now?: number },
+): Promise<Listing> {
+  const cache = deps.cache ?? listings;
+  const now = input.now ?? Date.now();
+  const key = `${input.userId}:${input.login}`;
+  const held = cache.get(key);
+  if (held && now - held.at < PULL_REQUEST_LIST_TTL_MS) return held.listing;
+  const listing = fetchUserOpenPullRequests(deps, input);
+  cache.set(key, { at: now, listing });
+  return listing;
+}
+
+async function fetchUserOpenPullRequests(
   deps: { db: Db; github: GitHubClient },
   input: { userId: string; login: string },
-): Promise<{ pullRequests: ListedPullRequest[]; failures: InstallationFailure[] }> {
+): Promise<Listing> {
   const installations = await deps.db
     .select({ id: installation.id })
     .from(installation)
