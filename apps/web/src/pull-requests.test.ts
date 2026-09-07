@@ -143,14 +143,24 @@ describe("listUserOpenPullRequests", () => {
     );
     expect(listInstallationRepositories).toHaveBeenCalledTimes(4);
   });
-  it("does not hold a listing that failed or that any installation refused", async () => {
+  it("holds a listing with a refused installation only briefly and never holds one that threw", async () => {
     const cache = new Map();
     const broken = fakeGitHub({}, {}, { "11": "down" });
     await listUserOpenPullRequests(
       { db, github: broken.github, cache },
       { userId: "user-1", login: "alice", now: 0 },
     );
-    expect(cache.size).toBe(0);
+    await listUserOpenPullRequests(
+      { db, github: broken.github, cache },
+      { userId: "user-1", login: "alice", now: 10_000 },
+    );
+    expect(broken.listInstallationRepositories).toHaveBeenCalledTimes(2);
+    await listUserOpenPullRequests(
+      { db, github: broken.github, cache },
+      { userId: "user-1", login: "alice", now: 16_000 },
+    );
+    expect(broken.listInstallationRepositories).toHaveBeenCalledTimes(4);
+    cache.clear();
     const throwing = {
       ...broken.github,
       installationTokenById: vi.fn(async () => {

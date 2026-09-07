@@ -13,9 +13,10 @@ export interface InstallationFailure {
 }
 
 export const PULL_REQUEST_LIST_TTL_MS = 60_000;
+export const FAILED_LIST_TTL_MS = 15_000;
 
 type Listing = { pullRequests: ListedPullRequest[]; failures: InstallationFailure[] };
-type ListingCache = Map<string, { at: number; listing: Promise<Listing> }>;
+type ListingCache = Map<string, { at: number; ttl: number; listing: Promise<Listing> }>;
 const listings: ListingCache = new Map();
 
 export async function listUserOpenPullRequests(
@@ -26,18 +27,19 @@ export async function listUserOpenPullRequests(
   const now = input.now ?? Date.now();
   const key = `${input.userId}:${input.login}`;
   const held = cache.get(key);
-  if (held && now - held.at < PULL_REQUEST_LIST_TTL_MS) return held.listing;
-  for (const [otherKey, entry] of cache)
-    if (now - entry.at >= PULL_REQUEST_LIST_TTL_MS) cache.delete(otherKey);
+  if (held && now - held.at < held.ttl) return held.listing;
+  for (const [otherKey, other] of cache) if (now - other.at >= other.ttl) cache.delete(otherKey);
   const listing = fetchUserOpenPullRequests(deps, input);
-  const entry = { at: now, listing };
+  const entry = { at: now, ttl: PULL_REQUEST_LIST_TTL_MS, listing };
   cache.set(key, entry);
-  const forget = () => {
-    if (cache.get(key) === entry) cache.delete(key);
-  };
-  listing.then((result) => {
-    if (result.failures.length > 0) forget();
-  }, forget);
+  listing.then(
+    (result) => {
+      if (result.failures.length > 0) entry.ttl = FAILED_LIST_TTL_MS;
+    },
+    () => {
+      if (cache.get(key) === entry) cache.delete(key);
+    },
+  );
   return listing;
 }
 
