@@ -73,7 +73,7 @@ A hawk in profile, in flight: one raised wing, a body line ending in a beak, a s
 - Spacing steps: 4, 8, 12, 16, 24, 32, 48, 64. Within a group 4 to 12, between groups 16 to 24, between sections 32 to 48.
 - Every gap has one owner: the parent's `gap`. Children carry no margins.
 - Radii: 3px on controls and inputs, 6px on the rare surface that earns one. No box shadows anywhere; separation is a 1px line.
-- Scrollbars, on the page and inside any panel that scrolls: thin, no track, a rounded thumb in the hairline color that darkens on hover. The stylesheet sets this once for `html` and every element under `.hk-root`.
+- Scrollbars, on the page and inside any panel that scrolls: thin, no track, the thumb in the hairline color, through the standard `scrollbar-width` and `scrollbar-color` properties only, so every browser draws the same bar and no hover state exists. The stylesheet sets the width on every element under `.hk-root` and the color once on `html`, where it inherits; a panel with its own palette sets its own color.
 - The page is one continuous canvas. A bordered surface is earned only by interaction or a grouping that spacing cannot express. Never a card inside a card, never a card around a table.
 
 ### The margin column

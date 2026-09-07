@@ -295,14 +295,6 @@
 .ld-cm-body:not([data-end]) {
   mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent);
 }
-.ld-cm-body::-webkit-scrollbar-thumb {
-  background: var(--gh-line);
-  background-clip: padding-box;
-}
-.ld-cm-body::-webkit-scrollbar-thumb:hover {
-  background: var(--gh-fg2);
-  background-clip: padding-box;
-}
 .ld-wait p {
   margin: 0 0 12px;
 }

@@ -126,24 +126,6 @@ html {
 .hk-root * {
   scrollbar-width: thin;
 }
-.hk-root ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-.hk-root ::-webkit-scrollbar-track {
-  background: transparent;
-}
-.hk-root ::-webkit-scrollbar-thumb {
-  background: var(--hk-line-2);
-  border-radius: 4px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-.hk-root ::-webkit-scrollbar-thumb:hover {
-  background: var(--hk-fg-3);
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
 .hk-root [hidden] {
   display: none !important;
 }
