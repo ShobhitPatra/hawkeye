@@ -34,14 +34,16 @@ describe("loadRunnerConfig", () => {
   it("names the missing field and the login command", async () => {
     await expect(
       loadRunnerConfig({ env: {}, configPath: "/none", readFile: missing }),
-    ).rejects.toThrow(/Missing controlPlaneUrl: run "hawkeye runner login/);
+    ).rejects.toThrow(
+      /Not connected\. Run npx hawkeye-review runner login --url <control plane url> first, or set HAWKEYE_CONTROL_PLANE_URL\./,
+    );
     await expect(
       loadRunnerConfig({
         env: {},
         configPath: "/c.json",
         readFile: async () => JSON.stringify({ controlPlaneUrl: "https://x", token: "" }),
       }),
-    ).rejects.toThrow(/Missing token/);
+    ).rejects.toThrow(/Not connected\..*HAWKEYE_RUNNER_TOKEN\./);
   });
   it("rejects non-string values in the config file", async () => {
     await expect(

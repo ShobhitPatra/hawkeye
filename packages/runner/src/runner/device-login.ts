@@ -6,6 +6,8 @@ export type DeviceLoginInput = {
   runnerName: string;
   fetch: typeof fetch;
   log(line: string): void;
+  emphasize?(text: string): string;
+  now?(): number;
   sleep?(milliseconds: number): Promise<void>;
 };
 
@@ -48,8 +50,15 @@ export async function deviceLogin(input: DeviceLoginInput): Promise<string> {
   const verifyUrl = text(payload.verifyUrl, "verifyUrl");
   const intervalSeconds = seconds(payload.intervalSeconds, "intervalSeconds");
 
-  input.log(`code ${code}`);
-  input.log(`approve at ${verifyUrl}`);
+  const expiresAt = typeof payload.expiresAt === "string" ? Date.parse(payload.expiresAt) : NaN;
+  const minutes = Number.isNaN(expiresAt)
+    ? undefined
+    : Math.round((expiresAt - (input.now ?? Date.now)()) / 60_000);
+  input.log(`Code ${(input.emphasize ?? ((value) => value))(code)}`);
+  input.log(`Approve it at ${verifyUrl}`);
+  input.log(
+    `Waiting for approval${minutes === undefined || minutes < 1 ? "" : `, up to ${minutes} minute${minutes === 1 ? "" : "s"}`}.`,
+  );
 
   let failures = 0;
   for (;;) {

@@ -50,7 +50,12 @@ async function readOptionalFile(path: string): Promise<string | undefined> {
 
 export async function readRoundMeta(directory: string): Promise<RoundMeta> {
   const metaPath = join(directory, "meta.json");
-  return parseRoundMeta(JSON.parse(await readFile(metaPath, "utf8")), metaPath);
+  const raw = await readFile(metaPath, "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT")
+      throw new Error(`No round at ${directory}. Run npx hawkeye-review prepare first.`);
+    throw error;
+  });
+  return parseRoundMeta(JSON.parse(raw), metaPath);
 }
 
 export async function readRoundResult(directory: string): Promise<ReviewResult | undefined> {

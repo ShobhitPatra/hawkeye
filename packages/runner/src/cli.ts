@@ -17,6 +17,7 @@ import {
   renderReviewSummary,
   runReview,
 } from "@hawkeye/core";
+import { alreadyReviewedLines, connectedLines, reviewFailedLine } from "./cli-text.js";
 import { expandHome, loadConfig } from "./config.js";
 import { describePreparedRound, prepareRound } from "./local-review/prepare.js";
 import { dismissFinding, withdrawDismissal } from "./local-review/rounds.js";
@@ -25,7 +26,7 @@ import { resolveGitHubToken } from "./local-review/token.js";
 import { reviewProgress } from "./review-progress.js";
 import { createRunDirectory } from "./run-directory.js";
 import { runnerConsole } from "./runner/console.js";
-import type { ProgressLine, TerminalStyle } from "./terminal.js";
+import { type ProgressLine, shortenHome, type TerminalStyle } from "./terminal.js";
 import { createControlPlaneClient } from "./runner/client.js";
 import { deviceLogin } from "./runner/device-login.js";
 import { assertControlPlaneUrl, loadRunnerConfig, writeRunnerConfig } from "./runner/config.js";
@@ -115,24 +116,29 @@ export function createProgram(io: {
       ) => {
         let runDirectory: string | undefined;
         const startedAt = Date.now();
-        const progress = reviewProgress({
-          progress: io.progress ?? { update: () => {}, clear: () => {} },
-          stderr: io.stderr,
-          subject: pullRequest,
-        });
-        let log = progress.log;
+        let maxTurns: number;
+        let wallClockMinutes: number;
+        let reference: ReturnType<typeof parsePullRequestReference>;
         try {
           if (options.full && !options.dryRun)
             throw new Error(
               "--full applies only with --dry-run; a posted review is read on GitHub",
             );
-          const maxTurns = positiveInteger("--max-turns", options.maxTurns);
-          const wallClockMinutes = positiveInteger(
-            "--wall-clock-minutes",
-            options.wallClockMinutes,
-          );
-          const reference = parsePullRequestReference(pullRequest);
-          progress.subject(`${reference.owner}/${reference.repo}#${reference.number}`);
+          maxTurns = positiveInteger("--max-turns", options.maxTurns);
+          wallClockMinutes = positiveInteger("--wall-clock-minutes", options.wallClockMinutes);
+          reference = parsePullRequestReference(pullRequest);
+        } catch (error) {
+          io.stderr((error as Error).message);
+          process.exitCode = 1;
+          return;
+        }
+        const progress = reviewProgress({
+          progress: io.progress ?? { update: () => {}, clear: () => {} },
+          stderr: io.stderr,
+          subject: `${reference.owner}/${reference.repo}#${reference.number}`,
+        });
+        let log = progress.log;
+        try {
           const config = await loadConfig({
             env: process.env,
             home: homedir(),
@@ -146,10 +152,10 @@ export function createProgram(io: {
             now: new Date(),
           });
           runDirectory = directory;
-          const logPath = join(directory, "log.txt");
+          const runLogPath = join(directory, "log.txt");
           log = (line: string) => {
             progress.log(line);
-            appendFileSync(logPath, `${line}\n`);
+            appendFileSync(runLogPath, `${line}\n`);
           };
           log(`run directory: ${directory}`);
 
@@ -188,9 +194,7 @@ export function createProgram(io: {
           progress.finish();
 
           if (outcome.kind === "already-reviewed")
-            io.stdout(
-              `already reviewed ${outcome.headSha.slice(0, 7)}; use --force to review again`,
-            );
+            for (const line of alreadyReviewedLines(reference, outcome.headSha)) io.stdout(line);
           if (outcome.kind === "dry-run")
             io.stdout(
               options.full
@@ -215,8 +219,12 @@ export function createProgram(io: {
           }
         } catch (error) {
           progress.finish();
-          log(`error: ${(error as Error).message}`);
-          if (runDirectory) log(`run directory: ${runDirectory}`);
+          const message = (error as Error).message;
+          progress.log(reviewFailedLine(message, io.stderrStyle?.must));
+          if (runDirectory) {
+            appendFileSync(join(runDirectory, "log.txt"), `${reviewFailedLine(message)}\n`);
+            log(`The run is kept in ${shortenHome(runDirectory, homedir())}.`);
+          }
           process.exitCode = 1;
         }
       },
@@ -291,7 +299,7 @@ export function createProgram(io: {
           process.off("SIGTERM", onSignal);
         }
       } catch (error) {
-        io.stderr(`error: ${(error as Error).message}`);
+        io.stderr((error as Error).message);
         process.exitCode = 1;
       }
     });
@@ -312,12 +320,17 @@ export function createProgram(io: {
             runnerName: options.name,
             fetch,
             log: io.stderr,
+            ...(io.stderrStyle === undefined ? {} : { emphasize: io.stderrStyle.verdict }),
           }));
         await writeRunnerConfig(RUNNER_CONFIG_PATH, { controlPlaneUrl: options.url, token });
-        if (options.token === undefined) io.stdout(`runner ${options.name} connected`);
-        io.stdout(`saved ${RUNNER_CONFIG_PATH}`);
+        for (const line of connectedLines({
+          runnerName: options.token === undefined ? options.name : undefined,
+          configPath: RUNNER_CONFIG_PATH,
+          home: homedir(),
+        }))
+          io.stdout(line);
       } catch (error) {
-        io.stderr(`error: ${(error as Error).message}`);
+        io.stderr((error as Error).message);
         process.exitCode = 1;
       }
     });
@@ -367,9 +380,9 @@ export function createProgram(io: {
               warn: (line) => io.stderr(`warning: ${line}`),
             },
           );
-          for (const line of describePreparedRound(prepared)) io.stdout(line);
+          for (const line of describePreparedRound(prepared, homedir())) io.stdout(line);
         } catch (error) {
-          io.stderr(`error: ${(error as Error).message}`);
+          io.stderr((error as Error).message);
           process.exitCode = 1;
         }
       },
@@ -390,7 +403,7 @@ export function createProgram(io: {
             : await summarizeRound(directory, warn, io.style),
         );
       } catch (error) {
-        io.stderr(`error: ${(error as Error).message}`);
+        io.stderr((error as Error).message);
         process.exitCode = 1;
       }
     });
@@ -405,7 +418,7 @@ export function createProgram(io: {
         const withdrawn = await withdrawDismissal(expandHome(roundDirectory, homedir()), id);
         io.stdout(`withdrew the dismissal of ${id} in ${withdrawn.directory}`);
       } catch (error) {
-        io.stderr(`error: ${(error as Error).message}`);
+        io.stderr((error as Error).message);
         process.exitCode = 1;
       }
     });
@@ -421,7 +434,7 @@ export function createProgram(io: {
         const dismissed = await dismissFinding(expandHome(roundDirectory, homedir()), id, reason);
         io.stdout(`dismissed ${id} in ${dismissed.directory}`);
       } catch (error) {
-        io.stderr(`error: ${(error as Error).message}`);
+        io.stderr((error as Error).message);
         process.exitCode = 1;
       }
     });

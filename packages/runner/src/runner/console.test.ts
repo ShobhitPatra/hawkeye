@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Lens, ReviewResult } from "@hawkeye/core";
-import { runnerConsole, shortenHome } from "./console.js";
+import { runnerConsole } from "./console.js";
 
 const LENSES: Lens[] = ["intent", "behavior", "blast_radius", "verification", "fit", "hygiene"];
 const result: ReviewResult = {
@@ -24,14 +24,6 @@ function console(style?: Parameters<typeof runnerConsole>[0]["style"]) {
   });
   return { ...created, lines, files };
 }
-
-describe("shortenHome", () => {
-  it("replaces the home prefix with a tilde", () => {
-    expect(shortenHome("/home/u/.cache/hawkeye", "/home/u")).toBe("~/.cache/hawkeye");
-    expect(shortenHome("/home/user2/x", "/home/u")).toBe("/home/user2/x");
-    expect(shortenHome("kept in /home/u/r", "/home/u")).toBe("kept in ~/r");
-  });
-});
 
 describe("runnerConsole", () => {
   it("prints time, a state word in a fixed column and the subject", () => {

@@ -153,6 +153,8 @@ A command that posts prints one line, verdict first: the verdict word, the findi
 
 The daemon writes a log, read later as often as live: one line per state change, the local time first (`10:06:43`, dim), then a state word in a ten-column gutter (polling, contract, claimed, reviewing, posted, skipped, failed, waiting, delivered, idle, stopping), then the subject. Color follows the stream the line is written to: a daemon log redirected to a file carries no escapes. `failed` is the one red word, `waiting` the one amber word, the verdict on a posted line is bold; nothing else is colored. Paths under the home directory print with `~`. Per-turn and other detail lines belong in the run's `log.txt`, not on the terminal.
 
+Everything else the CLI says is a sentence. `prepare` prints the round on one line, then `prompt`, `checkout` and `result` as labeled paths in a gutter, then the next command to run. `runner login` prints `Code XXXX-XXXX` with the code as the one bold thing, the approval link, that it is waiting and for how long, then `Connected as <name>. Token saved to <path>.` and the command to run next. A printed command is always `npx hawkeye-review …`, the way the README runs it. Errors carry no `error:` prefix, the exit code says that: what went wrong, that nothing was lost when that is true, and the next step, each its own sentence. A failed review starts with `Review failed.` in red and ends with where the run is kept. Paths under the home directory print with `~`.
+
 ### Loading, empty and failed
 
 Empty and failed are sentences (`.hk-state`), never illustrations or icon tiles. Loading is the skeleton or the shimmering word. A page that fetches shows the progress line under the top bar with a sentence in the content area, never a blank page.

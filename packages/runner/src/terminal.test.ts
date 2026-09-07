@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { progressLine, terminalStyle } from "./terminal.js";
+import { progressLine, shortenHome, terminalStyle } from "./terminal.js";
 
 describe("terminalStyle", () => {
   it("colors on a TTY", () => {
@@ -44,5 +44,13 @@ describe("progressLine", () => {
     line.update("Reviewing");
     line.clear();
     expect(written).toEqual([]);
+  });
+});
+
+describe("shortenHome", () => {
+  it("replaces the home prefix with a tilde", () => {
+    expect(shortenHome("/home/u/.cache/hawkeye", "/home/u")).toBe("~/.cache/hawkeye");
+    expect(shortenHome("/home/user2/x", "/home/u")).toBe("/home/user2/x");
+    expect(shortenHome("kept in /home/u/r", "/home/u")).toBe("kept in ~/r");
   });
 });

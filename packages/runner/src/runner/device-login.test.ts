@@ -24,6 +24,8 @@ function login(responses: (Response | Error)[]) {
     runnerName: "laptop",
     fetch: fetch as unknown as typeof globalThis.fetch,
     log: (line) => logged.push(line),
+    emphasize: (text) => `<${text}>`,
+    now: () => Date.parse("2026-01-01T12:00:00.000Z"),
     sleep: async (milliseconds) => {
       slept.push(milliseconds);
     },
@@ -40,7 +42,11 @@ describe("deviceLogin", () => {
     ]);
     await expect(promise).resolves.toBe("hk_new");
     expect(slept).toEqual([5000, 5000]);
-    expect(logged).toEqual(["code AAAA-BBBB", "approve at " + started.verifyUrl]);
+    expect(logged).toEqual([
+      "Code <AAAA-BBBB>",
+      "Approve it at " + started.verifyUrl,
+      "Waiting for approval, up to 10 minutes.",
+    ]);
     const [startUrl, startInit] = fetch.mock.calls[0]! as unknown as [string, RequestInit];
     expect(startUrl).toBe("https://hawkeye.example/api/runner/login");
     expect(JSON.parse(startInit.body as string)).toEqual({ name: "laptop" });
