@@ -14,13 +14,15 @@ export function ReviewControl({
   installationId: string;
   reviewing: boolean;
 }) {
-  const [shown, setShown] = useState(reviewing);
+  const [expected, setExpected] = useState<boolean | undefined>(undefined);
   const [failed, setFailed] = useState<string | undefined>(undefined);
   const [pending, startTransition] = useTransition();
+  const shown = expected ?? reviewing;
   const words = reviewControlWords({ reviewing: shown, pending });
   const toggle = () => {
+    if (pending) return;
     const next = !shown;
-    setShown(next);
+    setExpected(next);
     setFailed(undefined);
     startTransition(async () => {
       const form = new FormData();
@@ -31,9 +33,9 @@ export function ReviewControl({
       try {
         await (next ? armAction : disarmAction)(form);
       } catch {
-        setShown(!next);
         setFailed(next ? "Could not start. Try again." : "Could not pause. Try again.");
       }
+      setExpected(undefined);
     });
   };
   return (
@@ -44,7 +46,7 @@ export function ReviewControl({
         data-on={shown ? "" : undefined}
         data-pending={pending ? "" : undefined}
         aria-pressed={shown}
-        disabled={pending}
+        aria-disabled={pending}
         onClick={toggle}
       >
         <i />

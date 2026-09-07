@@ -122,7 +122,7 @@ export function PullRequestView({
         <div className="hk-state">
           <p>
             <span className="hk-status" data-state="running">
-              Reviewing
+              In review
             </span>{" "}
             on {latest.runnerName ?? "your runner"}, started{" "}
             {formatUpdated(latest.startedAt.toISOString(), now)}.
@@ -251,7 +251,7 @@ function RunResult({ run }: { run: PullRequestRun }) {
   if (run.status === "running")
     return (
       <span className="hk-status" data-state="running">
-        Reviewing
+        In review
       </span>
     );
   if (run.status !== "ok" || !run.verdict)
