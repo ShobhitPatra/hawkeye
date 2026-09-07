@@ -106,7 +106,7 @@ describe("listUserOpenPullRequests", () => {
     );
 
     const found = await listUserOpenPullRequests(
-      { db, github },
+      { db, github, cache: new Map() },
       { userId: "user-1", login: "octocat" },
     );
 
@@ -121,11 +121,87 @@ describe("listUserOpenPullRequests", () => {
     ]);
   });
 
+  it("reuses one listing for a minute, then fetches again", async () => {
+    const cache = new Map();
+    const { github, listInstallationRepositories } = fakeGitHub(
+      { "token-10": [repository("octo", "repo")] },
+      { "token-10": [pullRequest("octo", 1, "2026-08-01T00:00:00Z")] },
+    );
+    const first = await listUserOpenPullRequests(
+      { db, github, cache },
+      { userId: "user-1", login: "alice", now: 0 },
+    );
+    const again = await listUserOpenPullRequests(
+      { db, github, cache },
+      { userId: "user-1", login: "alice", now: 59_000 },
+    );
+    expect(again).toBe(first);
+    expect(listInstallationRepositories).toHaveBeenCalledTimes(2);
+    await listUserOpenPullRequests(
+      { db, github, cache },
+      { userId: "user-1", login: "alice", now: 61_000 },
+    );
+    expect(listInstallationRepositories).toHaveBeenCalledTimes(4);
+  });
+  it("holds a listing with a refused installation only briefly and never holds one that threw", async () => {
+    const cache = new Map();
+    const broken = fakeGitHub({}, {}, { "11": "down" });
+    await listUserOpenPullRequests(
+      { db, github: broken.github, cache },
+      { userId: "user-1", login: "alice", now: 0 },
+    );
+    await listUserOpenPullRequests(
+      { db, github: broken.github, cache },
+      { userId: "user-1", login: "alice", now: 10_000 },
+    );
+    expect(broken.listInstallationRepositories).toHaveBeenCalledTimes(1);
+    await listUserOpenPullRequests(
+      { db, github: broken.github, cache },
+      { userId: "user-1", login: "alice", now: 16_000 },
+    );
+    expect(broken.listInstallationRepositories).toHaveBeenCalledTimes(2);
+    cache.clear();
+    const throwing = {
+      ...broken.github,
+      installationTokenById: vi.fn(async () => {
+        throw new Error("boom");
+      }),
+    };
+    const failing = {
+      db: {
+        select: () => {
+          throw new Error("db down");
+        },
+      } as unknown as typeof db,
+      github: throwing,
+      cache,
+    };
+    await expect(
+      listUserOpenPullRequests(failing, { userId: "user-1", login: "alice", now: 0 }),
+    ).rejects.toThrow("db down");
+    expect(cache.size).toBe(0);
+  });
+  it("evicts listings older than a minute when a new one is stored", async () => {
+    const cache = new Map();
+    const { github } = fakeGitHub({}, {});
+    await listUserOpenPullRequests(
+      { db, github, cache },
+      { userId: "user-1", login: "alice", now: 0 },
+    );
+    await listUserOpenPullRequests(
+      { db, github, cache },
+      { userId: "user-2", login: "hubot", now: 61_000 },
+    );
+    expect([...cache.keys()]).toEqual(["user-2:hubot"]);
+  });
   it("returns nothing for a user without live installations", async () => {
     const { github, installationTokenById } = fakeGitHub({}, {});
 
     await expect(
-      listUserOpenPullRequests({ db, github }, { userId: "ghost", login: "ghost" }),
+      listUserOpenPullRequests(
+        { db, github, cache: new Map() },
+        { userId: "ghost", login: "ghost" },
+      ),
     ).resolves.toEqual({ pullRequests: [], failures: [] });
     expect(installationTokenById).not.toHaveBeenCalled();
   });
@@ -133,7 +209,10 @@ describe("listUserOpenPullRequests", () => {
   it("only reads the installations linked to the user", async () => {
     const { github, installationTokenById } = fakeGitHub({}, {});
 
-    await listUserOpenPullRequests({ db, github }, { userId: "user-2", login: "hubot" });
+    await listUserOpenPullRequests(
+      { db, github, cache: new Map() },
+      { userId: "user-2", login: "hubot" },
+    );
 
     expect(installationTokenById.mock.calls).toEqual([["13"]]);
   });
@@ -147,7 +226,7 @@ describe("listUserOpenPullRequests", () => {
     );
 
     const found = await listUserOpenPullRequests(
-      { db, github },
+      { db, github, cache: new Map() },
       { userId: "user-1", login: "octocat" },
     );
 

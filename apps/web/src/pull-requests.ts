@@ -12,10 +12,41 @@ export interface InstallationFailure {
   message: string;
 }
 
+export const PULL_REQUEST_LIST_TTL_MS = 60_000;
+export const FAILED_LIST_TTL_MS = 15_000;
+
+type Listing = { pullRequests: ListedPullRequest[]; failures: InstallationFailure[] };
+type ListingCache = Map<string, { at: number; ttl: number; listing: Promise<Listing> }>;
+const listings: ListingCache = new Map();
+
 export async function listUserOpenPullRequests(
+  deps: { db: Db; github: GitHubClient; cache?: ListingCache },
+  input: { userId: string; login: string; now?: number },
+): Promise<Listing> {
+  const cache = deps.cache ?? listings;
+  const now = input.now ?? Date.now();
+  const key = `${input.userId}:${input.login}`;
+  const held = cache.get(key);
+  if (held && now - held.at < held.ttl) return held.listing;
+  for (const [otherKey, other] of cache) if (now - other.at >= other.ttl) cache.delete(otherKey);
+  const listing = fetchUserOpenPullRequests(deps, input);
+  const entry = { at: now, ttl: PULL_REQUEST_LIST_TTL_MS, listing };
+  cache.set(key, entry);
+  listing.then(
+    (result) => {
+      if (result.failures.length > 0) entry.ttl = FAILED_LIST_TTL_MS;
+    },
+    () => {
+      if (cache.get(key) === entry) cache.delete(key);
+    },
+  );
+  return listing;
+}
+
+async function fetchUserOpenPullRequests(
   deps: { db: Db; github: GitHubClient },
   input: { userId: string; login: string },
-): Promise<{ pullRequests: ListedPullRequest[]; failures: InstallationFailure[] }> {
+): Promise<Listing> {
   const installations = await deps.db
     .select({ id: installation.id })
     .from(installation)
