@@ -1,15 +1,19 @@
 import Link from "next/link";
 import { Mark } from "../mark";
 import { describeRunnerStatus, type RunnerStatus } from "@/runner-status";
+import type { Theme } from "@/theme";
+import { ThemeChoice } from "../theme-choice";
 import { NavLinks } from "./nav-links";
 import { SignOutButton } from "./sign-out-button";
 
 export function TopBar({
   user,
   runner,
+  theme,
 }: {
   user: { name: string; email: string };
   runner: RunnerStatus;
+  theme: Theme;
 }) {
   const initial = user.name.slice(0, 1).toUpperCase();
   return (
@@ -35,6 +39,7 @@ export function TopBar({
               <b>{user.name}</b>
               {user.email}
             </div>
+            <ThemeChoice theme={theme} />
             <a href="https://github.com/settings/installations">Manage installation on GitHub</a>
             <SignOutButton />
           </div>
