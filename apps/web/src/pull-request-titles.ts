@@ -4,29 +4,45 @@ import { hold, type HoldStore } from "./hold";
 export type TitledReference = PullRequestReference & { installationId: string };
 
 export const TITLE_TTL_MS = 10 * 60_000;
-const held: HoldStore<string> = new Map();
+export const MISSING_TITLE_TTL_MS = 15_000;
+const held: HoldStore<string | undefined> = new Map();
 
 export async function pullRequestTitles(
   github: GitHubClient,
   references: TitledReference[],
-  memory: { cache?: HoldStore<string>; now?: number } = {},
+  memory: { cache?: HoldStore<string | undefined>; now?: number } = {},
 ): Promise<Map<string, string>> {
   const cache = memory.cache ?? held;
   const now = memory.now ?? Date.now();
-  const titles = new Map<string, string>();
-  const missing = new Map<string, TitledReference>();
-  for (const reference of references) {
-    const key = titleKey(reference);
-    if (titles.has(key) || missing.has(key)) continue;
+  const wanted = new Map<string, TitledReference>();
+  for (const reference of references) wanted.set(titleKey(reference), reference);
+  const missing = [...wanted].filter(([key]) => {
     const fresh = cache.get(key);
-    if (fresh && now - fresh.at < fresh.ttl) titles.set(key, await fresh.value);
-    else missing.set(key, reference);
-  }
-  const fetched = await fetchTitles(github, [...missing.values()]);
-  for (const [key, title] of fetched) {
-    titles.set(key, title);
-    hold(cache, key, { now, ttlMs: TITLE_TTL_MS }, async () => title);
-  }
+    return !(fresh && now - fresh.at < fresh.ttl);
+  });
+  const batch =
+    missing.length === 0
+      ? undefined
+      : fetchTitles(
+          github,
+          missing.map(([, r]) => r),
+        );
+  const titles = new Map<string, string>();
+  await Promise.all(
+    [...wanted.keys()].map(async (key) => {
+      const title = await hold(
+        cache,
+        key,
+        {
+          now,
+          ttlMs: TITLE_TTL_MS,
+          ttlAfter: (value) => (value === undefined ? MISSING_TITLE_TTL_MS : TITLE_TTL_MS),
+        },
+        () => batch!.then((fetched) => fetched.get(key)),
+      );
+      if (title !== undefined) titles.set(key, title);
+    }),
+  );
   return titles;
 }
 
