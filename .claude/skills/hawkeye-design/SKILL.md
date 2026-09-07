@@ -53,7 +53,7 @@ Design in monochrome on a warm neutral. Color is a secondary cue, always paired 
 - No green. A posted review, a passing verdict, an online runner are the normal state and stay neutral.
 - No blue. Focus rings use the foreground color.
 - Armed versus not armed is a filled versus hollow circle (`.hk-arm`), not a color.
-- Both themes always. Follow the system preference; a `data-theme` attribute on `<html>` overrides it from the account menu. Never ship a color that only exists in one theme.
+- Both themes always. Light is the default; the account menu's theme choice (Light, Dark, System) is kept in a cookie and stamped on `<html>` as `data-theme` by the server, so no page flashes; System stamps nothing and follows the media query. Never ship a color that only exists in one theme.
 
 ### Typography
 
@@ -104,7 +104,7 @@ Confirming an action is a state word changing, with at most a 160ms color transi
 
 ### Top bar
 
-One bar, 44px, with a hairline beneath it, on every page. Signed in: the wordmark, then Overview, Pull requests, Runners, Settings, then at the right an amber runner status only when a runner has waiting jobs, and the account name. The name opens a menu (`hk-menu`) holding the theme choice, the installation link and sign out, so Settings stays about review behavior. No avatar. The bar is sticky on dashboard pages and scrolls away on the landing. The current page is the foreground color; nothing is underlined. Under 760px the four words stay inline, the name collapses to its initial and the status word hides. Signed out: the wordmark, Source, and a Sign in button.
+One bar, 44px, with a hairline beneath it, on every page. Signed in: the wordmark, then Overview, Pull requests, Runners, Settings, then at the right an amber runner status only when a runner has waiting jobs, and the account name. The name opens a menu (`hk-menu`) holding the theme choice, the installation link and sign out, so Settings stays about review behavior. No avatar. The bar is sticky on dashboard pages and scrolls away on the landing. The current page is the foreground color; nothing is underlined. Under 760px the four words stay inline, the name collapses to its initial and the status word hides. Signed out: the wordmark, Source, the theme menu as a lone half-filled circle (`hk-menu[data-icon]`, labelled for assistive tech, the one icon without a visible word) holding the same three choices, and a Sign in button.
 
 ### Overview
 
@@ -164,7 +164,7 @@ Empty and failed are sentences (`.hk-state`), never illustrations or icon tiles.
 
 Tokens are `--hk-*`, classes are `hk-*`, both from `stylesheet.css` beside this file. The `hidden` attribute always hides under `.hk-root`, whatever display a class sets. Use the exact names; never invent a `hk-*` class or redeclare a `--hk-*` token in page CSS. Page-owned CSS may compose layout from public tokens only.
 
-Roots and shell: `hk-root`, `hk-topbar[data-sticky]`, `hk-wordmark`, `hk-nav`, `hk-topbar-end`, `hk-account-name`, `hk-account-initial`, `hk-menu` (a `<details>`), `hk-menu-panel`, `hk-menu-who`, `hk-menu-row`, `hk-progress`, `hk-page`.
+Roots and shell: `hk-root`, `hk-topbar[data-sticky]`, `hk-wordmark`, `hk-nav`, `hk-topbar-end`, `hk-account-name`, `hk-account-initial`, `hk-menu` (a `<details>`; `data-icon` for an icon-only summary), `hk-menu-panel`, `hk-menu-who`, `hk-menu-row`, `hk-progress`, `hk-page`.
 
 Type roles: `hk-headline` (landing only), `hk-display`, `hk-title`, `hk-heading`, `hk-lede`, `hk-body`, `hk-compact`, `hk-metadata`, `hk-label`, `hk-mono`, `hk-numeric`, `hk-muted`, `hk-prose`, `hk-visually-hidden`.
 

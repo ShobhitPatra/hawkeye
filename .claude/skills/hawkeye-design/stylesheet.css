@@ -337,6 +337,17 @@ html {
 .hk-menu[open] > summary {
   color: var(--hk-fg);
 }
+.hk-menu[data-icon] > summary {
+  padding: var(--hk-space-1);
+}
+.hk-menu[data-icon] > summary::after {
+  display: none;
+}
+.hk-menu[data-icon] > summary svg {
+  width: var(--hk-icon-size);
+  height: var(--hk-icon-size);
+  display: block;
+}
 .hk-menu-panel {
   position: absolute;
   right: 0;
@@ -367,6 +378,23 @@ html {
   background: none;
   border: 0;
   cursor: pointer;
+}
+.hk-menu-theme {
+  border: 0;
+  margin: 0;
+  gap: var(--hk-space-3);
+  padding-top: var(--hk-space-2);
+  padding-bottom: var(--hk-space-2);
+}
+.hk-menu-theme:not(:last-child) {
+  border-bottom: 1px solid var(--hk-line);
+  margin-bottom: var(--hk-space-1);
+}
+.hk-menu-theme legend {
+  float: left;
+  width: 100%;
+  padding: 0 0 var(--hk-space-1);
+  color: var(--hk-fg-2);
 }
 .hk-menu-who {
   color: var(--hk-fg-2);

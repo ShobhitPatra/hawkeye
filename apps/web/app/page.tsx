@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { HAWKEYE_REPOSITORY_URL } from "@hawkeye/core";
 import { localPath } from "@/local-path";
@@ -6,6 +7,9 @@ import { LandingHero } from "./landing-hero";
 import { Mark } from "./mark";
 import { RotatingWord } from "./rotating-word";
 import { SignInButton } from "./sign-in-button";
+import { parseTheme, THEME_COOKIE } from "@/theme";
+import { ThemeChoice } from "./theme-choice";
+import { ThemeIcon } from "./theme-icon";
 import "./landing.css";
 
 export default async function HomePage({
@@ -17,6 +21,7 @@ export default async function HomePage({
   const returnTo = localPath((await searchParams).returnTo);
   if (session) redirect(returnTo && returnTo !== "/" ? returnTo : "/overview");
   const signIn = returnTo ? { callbackURL: returnTo } : {};
+  const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
   return (
     <>
       <header className="hk-topbar">
@@ -26,6 +31,14 @@ export default async function HomePage({
         </a>
         <div className="hk-topbar-end">
           <a href={HAWKEYE_REPOSITORY_URL}>Source</a>
+          <details className="hk-menu" data-icon>
+            <summary aria-label="Theme" title="Theme">
+              <ThemeIcon />
+            </summary>
+            <div className="hk-menu-panel">
+              <ThemeChoice theme={theme} />
+            </div>
+          </details>
           <SignInButton {...signIn} />
         </div>
       </header>
