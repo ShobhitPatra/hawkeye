@@ -20,13 +20,12 @@ export async function pullRequestTitles(
     const fresh = cache.get(key);
     return !(fresh && now - fresh.at < fresh.ttl);
   });
-  const batch =
-    missing.length === 0
-      ? undefined
-      : fetchTitles(
-          github,
-          missing.map(([, r]) => r),
-        );
+  let batch: Promise<Map<string, string>> | undefined;
+  const fetchMissing = () =>
+    (batch ??= fetchTitles(
+      github,
+      missing.map(([, reference]) => reference),
+    ));
   const titles = new Map<string, string>();
   await Promise.all(
     [...wanted.keys()].map(async (key) => {
@@ -38,7 +37,7 @@ export async function pullRequestTitles(
           ttlMs: TITLE_TTL_MS,
           ttlAfter: (value) => (value === undefined ? MISSING_TITLE_TTL_MS : TITLE_TTL_MS),
         },
-        () => batch!.then((fetched) => fetched.get(key)),
+        () => fetchMissing().then((fetched) => fetched.get(key)),
       );
       if (title !== undefined) titles.set(key, title);
     }),
