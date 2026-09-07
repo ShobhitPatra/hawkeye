@@ -148,6 +148,6 @@ export function describePreparedRound(prepared: PreparedRound, home: string): st
     `  result    ${path(prepared.resultPath)}`,
     "",
     "Read the prompt, review the checkout, write the result, then",
-    `hawkeye-review show ${path(prepared.directory)}`,
+    `npx hawkeye-review show ${path(prepared.directory)}`,
   ];
 }

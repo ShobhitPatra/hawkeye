@@ -17,6 +17,7 @@ import {
   renderReviewSummary,
   runReview,
 } from "@hawkeye/core";
+import { alreadyReviewedLines, connectedLines } from "./cli-text.js";
 import { expandHome, loadConfig } from "./config.js";
 import { describePreparedRound, prepareRound } from "./local-review/prepare.js";
 import { dismissFinding, withdrawDismissal } from "./local-review/rounds.js";
@@ -114,6 +115,7 @@ export function createProgram(io: {
         },
       ) => {
         let runDirectory: string | undefined;
+        let logPath: string | undefined;
         const startedAt = Date.now();
         let maxTurns: number;
         let wallClockMinutes: number;
@@ -151,10 +153,11 @@ export function createProgram(io: {
             now: new Date(),
           });
           runDirectory = directory;
-          const logPath = join(directory, "log.txt");
+          const runLogPath = join(directory, "log.txt");
+          logPath = runLogPath;
           log = (line: string) => {
             progress.log(line);
-            appendFileSync(logPath, `${line}\n`);
+            appendFileSync(runLogPath, `${line}\n`);
           };
           log(`run directory: ${directory}`);
 
@@ -192,12 +195,8 @@ export function createProgram(io: {
           );
           progress.finish();
 
-          if (outcome.kind === "already-reviewed") {
-            io.stdout(
-              `${reference.owner}/${reference.repo}#${reference.number} at ${outcome.headSha.slice(0, 7)} is already reviewed.`,
-            );
-            io.stdout("Run again with --force to review it again.");
-          }
+          if (outcome.kind === "already-reviewed")
+            for (const line of alreadyReviewedLines(reference, outcome.headSha)) io.stdout(line);
           if (outcome.kind === "dry-run")
             io.stdout(
               options.full
@@ -222,8 +221,14 @@ export function createProgram(io: {
           }
         } catch (error) {
           progress.finish();
-          const failed = io.stderrStyle?.must("Review failed.") ?? "Review failed.";
-          log(`${failed} ${(error as Error).message}`);
+          const failed = `Review failed. ${(error as Error).message}`;
+          progress.log(
+            failed.replace(
+              "Review failed.",
+              io.stderrStyle?.must("Review failed.") ?? "Review failed.",
+            ),
+          );
+          if (logPath !== undefined) appendFileSync(logPath, `${failed}\n`);
           if (runDirectory) log(`The run is kept in ${shortenHome(runDirectory, homedir())}.`);
           process.exitCode = 1;
         }
@@ -323,9 +328,12 @@ export function createProgram(io: {
             ...(io.stderrStyle === undefined ? {} : { emphasize: io.stderrStyle.verdict }),
           }));
         await writeRunnerConfig(RUNNER_CONFIG_PATH, { controlPlaneUrl: options.url, token });
-        const who = options.token === undefined ? ` as ${options.name}` : "";
-        io.stdout(`Connected${who}. Token saved to ${shortenHome(RUNNER_CONFIG_PATH, homedir())}.`);
-        io.stdout("Start reviewing with: hawkeye-review runner");
+        for (const line of connectedLines({
+          runnerName: options.token === undefined ? options.name : undefined,
+          configPath: RUNNER_CONFIG_PATH,
+          home: homedir(),
+        }))
+          io.stdout(line);
       } catch (error) {
         io.stderr((error as Error).message);
         process.exitCode = 1;

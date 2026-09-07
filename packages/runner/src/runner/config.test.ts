@@ -35,7 +35,7 @@ describe("loadRunnerConfig", () => {
     await expect(
       loadRunnerConfig({ env: {}, configPath: "/none", readFile: missing }),
     ).rejects.toThrow(
-      /Not connected\. Run hawkeye-review runner login --url <control plane url> first, or set HAWKEYE_CONTROL_PLANE_URL\./,
+      /Not connected\. Run npx hawkeye-review runner login --url <control plane url> first, or set HAWKEYE_CONTROL_PLANE_URL\./,
     );
     await expect(
       loadRunnerConfig({

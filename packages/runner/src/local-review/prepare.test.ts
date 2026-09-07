@@ -92,7 +92,7 @@ describe("prepareRound", () => {
       `  result    ${join(directory, "result.json")}`,
       "",
       "Read the prompt, review the checkout, write the result, then",
-      `hawkeye-review show ${directory}`,
+      `npx hawkeye-review show ${directory}`,
     ]);
     expect(describePreparedRound(prepared, root)[1]).toBe(
       `  prompt    ~${join(directory, "prompt.md").slice(root.length)}`,

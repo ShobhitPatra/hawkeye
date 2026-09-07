@@ -52,7 +52,7 @@ export async function readRoundMeta(directory: string): Promise<RoundMeta> {
   const metaPath = join(directory, "meta.json");
   const raw = await readFile(metaPath, "utf8").catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT")
-      throw new Error(`No round at ${directory}. Run hawkeye-review prepare first.`);
+      throw new Error(`No round at ${directory}. Run npx hawkeye-review prepare first.`);
     throw error;
   });
   return parseRoundMeta(JSON.parse(raw), metaPath);

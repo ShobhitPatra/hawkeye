@@ -127,7 +127,7 @@ describe("showRound", () => {
   it("says there is no round when the directory has no meta", async () => {
     const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-round-")), "round-9");
     await expect(showRound(directory)).rejects.toThrow(
-      `No round at ${directory}. Run hawkeye-review prepare first.`,
+      `No round at ${directory}. Run npx hawkeye-review prepare first.`,
     );
   });
   it("names the meta file when it is not a round meta", async () => {
