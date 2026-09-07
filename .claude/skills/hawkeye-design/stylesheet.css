@@ -119,10 +119,12 @@
   box-sizing: border-box;
   min-width: 0;
 }
-html,
-.hk-root * {
+html {
   scrollbar-width: thin;
   scrollbar-color: var(--hk-line-2) transparent;
+}
+.hk-root * {
+  scrollbar-width: thin;
 }
 .hk-root ::-webkit-scrollbar {
   width: 8px;
