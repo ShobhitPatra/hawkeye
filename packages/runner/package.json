@@ -1,6 +1,6 @@
 {
   "name": "hawkeye-review",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Personal AI code reviewer on the Claude plan you already pay for: review pull requests locally, or run the Hawkeye daemon.",
   "keywords": [
     "ai",
