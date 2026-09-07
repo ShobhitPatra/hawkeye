@@ -53,7 +53,7 @@ Design in monochrome on a warm neutral. Color is a secondary cue, always paired 
 - No green. A posted review, a passing verdict, an online runner are the normal state and stay neutral.
 - No blue. Focus rings use the foreground color.
 - Armed versus not armed is a filled versus hollow circle (`.hk-arm`), not a color.
-- Both themes always. Light is the default; the account menu's theme choice (Light, Dark, System) is kept in a cookie and stamped on `<html>` as `data-theme` by the server, so no page flashes; System stamps nothing and follows the media query. Never ship a color that only exists in one theme.
+- Both themes always. The system preference is the default; the theme choice (Light, Dark, System) in the account menu and the landing bar is kept in a cookie and stamped on `<html>` as `data-theme` by the server, so no page flashes; System stamps nothing and follows the media query. Never ship a color that only exists in one theme.
 
 ### Typography
 

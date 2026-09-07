@@ -1,7 +1,7 @@
 export const THEMES = ["light", "dark", "system"] as const;
 export type Theme = (typeof THEMES)[number];
 export const THEME_COOKIE = "hawkeye-theme";
-export const DEFAULT_THEME: Theme = "light";
+export const DEFAULT_THEME: Theme = "system";
 
 export function parseTheme(value: string | undefined): Theme {
   return (THEMES as readonly string[]).includes(value ?? "") ? (value as Theme) : DEFAULT_THEME;
