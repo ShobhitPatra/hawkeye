@@ -13,7 +13,8 @@ export function ThemeChoice({ theme }: { theme: Theme }) {
     const attribute = themeAttribute(next);
     if (attribute) document.documentElement.dataset.theme = attribute;
     else delete document.documentElement.dataset.theme;
-    document.cookie = `${THEME_COOKIE}=${next}; path=/; max-age=${COOKIE_MAX_AGE_SECONDS}; samesite=lax`;
+    const secure = location.protocol === "https:" ? "; secure" : "";
+    document.cookie = `${THEME_COOKIE}=${next}; path=/; max-age=${COOKIE_MAX_AGE_SECONDS}; samesite=lax${secure}`;
   };
   return (
     <fieldset className="hk-choice hk-menu-theme">

@@ -164,7 +164,7 @@ Empty and failed are sentences (`.hk-state`), never illustrations or icon tiles.
 
 Tokens are `--hk-*`, classes are `hk-*`, both from `stylesheet.css` beside this file. The `hidden` attribute always hides under `.hk-root`, whatever display a class sets. Use the exact names; never invent a `hk-*` class or redeclare a `--hk-*` token in page CSS. Page-owned CSS may compose layout from public tokens only.
 
-Roots and shell: `hk-root`, `hk-topbar[data-sticky]`, `hk-wordmark`, `hk-nav`, `hk-topbar-end`, `hk-account-name`, `hk-account-initial`, `hk-menu` (a `<details>`; `data-icon` for an icon-only summary), `hk-menu-panel`, `hk-menu-who`, `hk-menu-row`, `hk-progress`, `hk-page`.
+Roots and shell: `hk-root`, `hk-topbar[data-sticky]`, `hk-wordmark`, `hk-nav`, `hk-topbar-end`, `hk-account-name`, `hk-account-initial`, `hk-menu` (a `<details>`; `data-icon` for an icon-only summary), `hk-menu-panel`, `hk-menu-who`, `hk-menu-theme`, `hk-menu-row`, `hk-progress`, `hk-page`.
 
 Type roles: `hk-headline` (landing only), `hk-display`, `hk-title`, `hk-heading`, `hk-lede`, `hk-body`, `hk-compact`, `hk-metadata`, `hk-label`, `hk-mono`, `hk-numeric`, `hk-muted`, `hk-prose`, `hk-visually-hidden`.
 

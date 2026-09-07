@@ -1,5 +1,5 @@
 /* Hawkeye design system. Plain CSS, no build step. Tokens are --hk-*, classes are hk-*.
-   Theme: follows the system; data-theme="light" | "dark" on <html> overrides it. */
+   Theme: light unless data-theme="dark" is stamped on <html>; without any data-theme it follows the system. */
 
 :root {
   color-scheme: light dark;
@@ -86,7 +86,11 @@
   }
 }
 
+:root[data-theme="light"] {
+  color-scheme: light;
+}
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --hk-bg: #131211;
   --hk-bg-2: #1b1a18;
   --hk-bg-3: #262421;
