@@ -1,21 +1,25 @@
 import type { ReviewTextStyle } from "@hawkeye/core";
 
-const PLAIN: ReviewTextStyle = {
+export type TerminalStyle = ReviewTextStyle & { warn(text: string): string };
+
+const PLAIN: TerminalStyle = {
   verdict: (text) => text,
   must: (text) => text,
   dim: (text) => text,
+  warn: (text) => text,
 };
 const ESC = "\u001b[";
 
 export function terminalStyle(input: {
   isTTY: boolean | undefined;
   env: Record<string, string | undefined>;
-}): ReviewTextStyle {
+}): TerminalStyle {
   if (!input.isTTY || input.env.NO_COLOR !== undefined || input.env.TERM === "dumb") return PLAIN;
   return {
     verdict: (text) => `${ESC}1m${text}${ESC}22m`,
     must: (text) => `${ESC}31m${text}${ESC}39m`,
     dim: (text) => `${ESC}2m${text}${ESC}22m`,
+    warn: (text) => `${ESC}33m${text}${ESC}39m`,
   };
 }
 
