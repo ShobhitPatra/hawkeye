@@ -65,7 +65,7 @@ export default async function HomePage({
               </p>
             </div>
             <div>
-              <p className="hk-claim">Claude Code reviews it under your login.</p>
+              <p className="hk-claim">Your coding agent reviews it under your login.</p>
               <p className="hk-detail">
                 Six lenses, three severities, one verdict. Only validated findings JSON leaves the
                 machine.
