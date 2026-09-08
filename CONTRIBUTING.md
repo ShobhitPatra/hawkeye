@@ -38,15 +38,7 @@ Run `pnpm format` before every commit. Add `--filter <package>` to any of them t
 - Put tests next to the file they test. No snapshot tests.
 - If your change makes any document wrong, fix the document in the same pull request.
 - Fill in the pull request template: what, why, how, impact, test plan, scope.
-
-## Writing code
-
-- Keep it small. Fix the cause, not the symptom.
-- Functions fail fast on bad input; they never guess or silently fall back.
-- No comments unless the code cannot say why. No comments that repeat the code.
-- Reuse what the repository already has before adding a new way to do the same thing.
-- No new dependencies without a reason, and never for a small feature.
-- Never remove or rename anything in the `core` exports or the runner API. Add; do not break.
+- Coding standards are in [AGENTS.md](AGENTS.md); Hawkeye's review checks against them.
 
 ## Where things live
 
