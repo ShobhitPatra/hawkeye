@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
+import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import type { Db } from "../db/client";
@@ -7,9 +8,22 @@ import * as schema from "../db/schema";
 
 const migrationsFolder = join(import.meta.dirname, "..", "..", "drizzle");
 
+let shared: { db: Db; tables: string[] } | undefined;
+
+// Vitest gives every test file its own module instance, so this is one database per file.
 export async function createTestDb(): Promise<Db> {
+  if (shared) {
+    await shared.db.execute(
+      sql.raw(`truncate table ${shared.tables.map((name) => `"${name}"`).join(", ")} cascade`),
+    );
+    return shared.db;
+  }
   const db = drizzle(new PGlite(), { schema });
   await migrate(db, { migrationsFolder });
+  const rows = await db.execute<{ table_name: string }>(
+    sql`select table_name from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'`,
+  );
+  shared = { db, tables: rows.rows.map((row) => row.table_name) };
   return db;
 }
 
