@@ -3,6 +3,7 @@
   flex-direction: column;
   gap: calc(var(--hk-space-8) + var(--hk-space-6));
   padding-top: calc(var(--hk-space-8) + var(--hk-space-6));
+  min-height: calc(100vh - 44px);
 }
 .ld-lead {
   display: flex;
@@ -405,6 +406,7 @@
   color: var(--hk-fg-2);
 }
 .ld-foot {
+  margin-top: auto;
   display: flex;
   flex-wrap: wrap;
   gap: var(--hk-space-2) var(--hk-space-5);
