@@ -405,6 +405,25 @@ html {
   padding: 0 0 var(--hk-space-1);
   color: var(--hk-fg-2);
 }
+.hk-menu-legal {
+  display: flex;
+  gap: var(--hk-space-3);
+  font-size: var(--hk-type-metadata);
+  line-height: var(--hk-leading-metadata);
+  color: var(--hk-fg-3);
+  border-top: 1px solid var(--hk-line);
+  margin-top: var(--hk-space-1);
+  padding-top: var(--hk-space-2);
+}
+.hk-menu-panel .hk-menu-legal a {
+  display: inline;
+  padding: 0;
+  color: var(--hk-fg-3);
+}
+.hk-menu-panel .hk-menu-legal a:hover {
+  color: var(--hk-fg);
+  background: none;
+}
 .hk-menu-who {
   color: var(--hk-fg-2);
   border-bottom: 1px solid var(--hk-line);
