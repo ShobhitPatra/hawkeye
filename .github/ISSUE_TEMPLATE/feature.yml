@@ -1,0 +1,16 @@
+name: Feature
+description: Something Hawkeye should do
+labels: [needs-triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What you cannot do today and why it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: shape
+    attributes:
+      label: Proposed shape
+      description: How it could work; the design document in docs/design.md says what Hawkeye is and is not.
