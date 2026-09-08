@@ -389,6 +389,9 @@
   padding-top: var(--hk-space-3);
   border-top: 1px solid var(--hk-line-2);
 }
+.ld-steps[data-plain] > div::before {
+  content: none;
+}
 .ld-steps > div::before {
   counter-increment: step;
   content: counter(step);
@@ -404,6 +407,10 @@
   font-size: var(--hk-type-compact);
   line-height: var(--hk-leading-compact);
   color: var(--hk-fg-2);
+}
+.ld-steps .hk-detail a {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 .ld-foot {
   margin-top: auto;

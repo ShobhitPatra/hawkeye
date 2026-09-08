@@ -6,7 +6,7 @@ import { getSession } from "@/session";
 import { LandingHero } from "./landing-hero";
 import { RotatingWord } from "./rotating-word";
 import { SignInButton } from "./sign-in-button";
-import { SiteFooter } from "./site-footer";
+import { CONTRIBUTING_URL, SELF_HOSTING_URL, SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
 import { parseTheme, THEME_COOKIE } from "@/theme";
 import "./landing.css";
@@ -107,6 +107,36 @@ export default async function HomePage({
             Install the GitHub App on a repo you admin, start the runner on your machine, open a
             pull request.
           </p>
+        </section>
+
+        <section className="ld-h" aria-labelledby="open-source">
+          <h2 className="hk-heading" id="open-source">
+            Open source, yours to run
+          </h2>
+          <div className="ld-steps" data-plain>
+            <div>
+              <p className="hk-claim">MIT, and reviewed by itself.</p>
+              <p className="hk-detail">
+                Every pull request to Hawkeye is reviewed by Hawkeye before a maintainer reads it.{" "}
+                <a href={HAWKEYE_REPOSITORY_URL}>Read the source</a>.
+              </p>
+            </div>
+            <div>
+              <p className="hk-claim">Run your own instance.</p>
+              <p className="hk-detail">
+                A Vercel deployment on Neon Postgres, or one machine with Docker Compose.{" "}
+                <a href={SELF_HOSTING_URL}>The self-hosting guide</a> takes an evening.
+              </p>
+            </div>
+            <div>
+              <p className="hk-claim">Contribute a lens, a harness, a fix.</p>
+              <p className="hk-detail">
+                Issues and pull requests are open; the{" "}
+                <a href={CONTRIBUTING_URL}>contributing guide</a> and the{" "}
+                <a href="/security">security policy</a> say how.
+              </p>
+            </div>
+          </div>
         </section>
 
         <SiteFooter />
