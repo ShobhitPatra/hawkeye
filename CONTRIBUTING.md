@@ -25,7 +25,7 @@ Run `pnpm format` before every commit. Add `--filter <package>` to any of them t
 ## Open a pull request
 
 - One change per pull request. If you spot something else to fix, open an issue for it.
-- Branch names describe the change: `feat/thread-scroll`, `fix/reconnect-backoff`.
+- Branch names describe the change: `feat/review-settings`, `fix/runner-reconnect`.
 - Commit subjects look like `feat(web): subject` or `fix(runner): subject`. Scopes: `docs`, `core`, `runner`, `web`, `ci`. One short line, no body.
 - Put tests next to the file they test. No snapshot tests.
 - If your change makes any document wrong, fix the document in the same pull request.
