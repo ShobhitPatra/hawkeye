@@ -1,11 +1,11 @@
 # Hawkeye
 
-Personal AI code reviewer: a hosted control plane plus a per-user runner that reviews armed pull requests on the user's own Claude/Codex plan and posts as a bot identity. Design lives in `README.md`.
+Personal AI code reviewer: a hosted control plane plus a per-user runner that reviews armed pull requests on the user's own Claude/Codex plan and posts as a bot identity. Design lives in `docs/design.md`; `README.md` is the public front door.
 
 ## Structure
 
 ```
-README.md          design document
+README.md          front door; docs/design.md is the design document
 workspace/         local-only scratch, ADRs, agent-skill config (gitignored)
 packages/core      review contract, harness interface, render, dedupe, posting
 packages/runner    hawkeye CLI (daemon in milestone 2)
