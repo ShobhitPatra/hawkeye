@@ -2,48 +2,44 @@
 
 # Hawkeye
 
-Code review on your own Claude plan. Open a pull request; a runner on your machine reads every push with your own login, and a review lands on the pull request as `hawkeye-review[bot]`: the verdict first, then findings with paths and lines, and silence where the code is fine.
+A code reviewer that runs on your own Claude subscription and comments on your pull requests.
 
-Nothing for repository admins to install, no API key, no model traffic through anyone's server. The hosted control plane holds the queue, the webhooks and the findings; the model runs where your login is.
+You open a pull request. A small program on your computer reads it with Claude Code, using the login you already have, and the review appears on the pull request as a comment from `hawkeye-review[bot]`: a verdict, then what to fix and where. When there is nothing to fix, it says so in one line.
 
-Status: preview. The hosted instance at [hawkeye-review.vercel.app](https://hawkeye-review.vercel.app) reviews the author's own repositories today; sign-in for other GitHub accounts is the next change ([#48](https://github.com/ShobhitPatra/hawkeye/issues/48)). Self-hosting works now. The CLI is [`hawkeye-review`](https://www.npmjs.com/package/hawkeye-review) on npm.
+No API key. No extra bill. Nobody in the middle: the model runs on your machine, and the server only keeps the queue and the results.
 
-## Try one review with no account
+## What a review looks like
+
+> ### Changes needed
+>
+> **AGENTS.md still says CI runs test and build on every PR.** `AGENTS.md:18`
+> This change makes that false for docs-only pull requests. Update the line in the same pull request.
+
+That is from a real review of this repository's own [pull request #109](https://github.com/ShobhitPatra/hawkeye/pull/109).
+
+## Try it once, no account needed
 
 ```sh
 npx hawkeye-review prepare https://github.com/owner/repo/pull/123
 ```
 
-It checks the pull request out and writes the review prompt into a round directory. Any agent session reads the prompt, reviews the checkout and writes `result.json`; `npx hawkeye-review show <round-dir>` prints the verdict and one line per finding. Nothing is posted. Needs Node 22, git 2.31 and a GitHub token (`--github-token`, `GITHUB_TOKEN`, or `gh auth token`).
+This downloads the pull request and writes a review prompt. Open that prompt in any AI coding session (Claude Code, Codex, Cursor), let it review the code, then run the `show` command it printed to read the verdict. Nothing is posted anywhere. You need Node 22, git, and a GitHub token (`gh auth token` is enough).
 
-## Run it on every push
+## Review every push
 
-1. Sign in with GitHub on the control plane and install the GitHub App on the repositories you want reviewed.
-2. On the machine that holds your Claude Code login, run `npx hawkeye-review runner login --url <control plane url>` once and approve the code in the browser.
-3. Leave `npx hawkeye-review runner` running. It claims a job, clones the pull request with a one-hour token the job carries, runs Claude Code with the review contract, and returns findings as JSON. The control plane posts the review.
-4. Turn reviews on for a pull request from the dashboard. Every later push is reviewed after a short quiet window; the review is edited in place, addressed findings are marked, and only new findings get new inline comments.
+1. Sign in with GitHub at [hawkeye-review.vercel.app](https://hawkeye-review.vercel.app) and install the GitHub App on your repositories.
+2. On the computer where Claude Code is logged in, run `npx hawkeye-review runner login --url https://hawkeye-review.vercel.app` and approve the code it shows.
+3. Run `npx hawkeye-review runner` and leave it open.
+4. On the dashboard, turn on reviews for a pull request. From then on, every push to it is reviewed, and the comment is updated in place.
 
-What each review cost, in turns and minutes, is on the dashboard. The budget is your plan's limits; you are responsible for staying within your plan's terms, and Hawkeye only drives the CLI you already run.
+The hosted site is a preview: today it lists only the repositories where you installed the App yourself ([#48](https://github.com/ShobhitPatra/hawkeye/issues/48) opens it up). You can also run everything yourself; see the [self-hosting guide](docs/self-hosting.md).
 
-## Self-host
+## What it costs
 
-The control plane is a Next.js app on Postgres, deployable to Vercel with a Neon database, or with Docker Compose. See the [design document's run section](docs/design.md#run-it) until the self-hosting guide lands.
+Nothing beyond your Claude plan. The dashboard shows what each review used, in turns and minutes.
 
-## How it reviews
+## More
 
-Six lenses (intent, behavior, blast radius, verification, fit, hygiene), severities defined by consequence (must fix, should fix, optional, inherited), one verdict (ship, mergeable, changes needed, blocked). A finding states what breaks and what to do; a review that finds nothing says so in one line. Repository content in the prompt is fenced as untrusted, and the checkout's agent instructions are removed before the review. The full contract, the data model and every decision are in the [design document](docs/design.md).
-
-## Principles
-
-- The model never runs hosted. The runner returns JSON; the control plane posts.
-- The reviewer is a bot identity. Nothing Hawkeye posts counts toward your contribution graph.
-- Shipped surfaces are append-only: the core exports and the runner to control plane contract only grow.
-- Open source under MIT; the hosted instance is one deployment of the same code.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md). Every pull request here is reviewed by Hawkeye before a maintainer reads it. Security reports go through the [security policy](SECURITY.md).
-
-## License
-
-[MIT](LICENSE)
+- [How it works and why](docs/design.md)
+- [Contributing](CONTRIBUTING.md) and the [security policy](SECURITY.md)
+- [MIT license](LICENSE)

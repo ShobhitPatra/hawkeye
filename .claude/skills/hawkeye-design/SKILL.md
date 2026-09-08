@@ -156,6 +156,16 @@ The daemon writes a log, read later as often as live: one line per state change,
 
 Everything else the CLI says is a sentence. `prepare` prints the round on one line, then `prompt`, `checkout` and `result` as labeled paths in a gutter, then the next command to run. `runner login` prints `Code XXXX-XXXX` with the code as the one bold thing, the approval link, that it is waiting and for how long, then `Connected as <name>. Token saved to <path>.` and the command to run next. A printed command is always `npx hawkeye-review …`, the way the README runs it. Errors carry no `error:` prefix, the exit code says that: what went wrong, that nothing was lost when that is true, and the next step, each its own sentence. A failed review starts with `Review failed.` in red and ends with where the run is kept. Paths under the home directory print with `~`.
 
+### README
+
+The README is for a developer who has thirty seconds and wants to know whether to try Hawkeye. It is not the design document; that is `docs/design.md`, linked once.
+
+- Plain words only. Say what a person sees: pull request, review, comment, finding, the program on your computer, the server, your Claude plan. Never control plane, runner, harness, arm, lens, contract, interdiff, job, webhook, or any identifier from the code.
+- Short sentences, one idea each. Under 60 lines and one screen on GitHub; everything else is a link.
+- Order: the mark lockup and the name; what it is in two sentences; one real review, quoted, verdict first, with a link to the pull request it came from; try it once with no account; review every push; what it costs; links. Nothing else.
+- The quoted review is real and short: the verdict word and one finding. Never a constructed example.
+- Same voice as every surface: no praise, no exclamation marks, no emoji, no em dashes, sentence case.
+
 ### Loading, empty and failed
 
 Empty and failed are sentences (`.hk-state`), never illustrations or icon tiles. Loading is the skeleton or the shimmering word. A page that fetches shows the progress line under the top bar with a sentence in the content area, never a blank page. What the database already knows paints first; a section that waits on GitHub streams in behind a skeleton of its own rows, so a slow GitHub call never holds the whole page.
