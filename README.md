@@ -1,47 +1,54 @@
 <picture>
   <source srcset=".github/banner-dark.svg" media="(prefers-color-scheme: dark)">
   <source srcset=".github/banner-light.svg" media="(prefers-color-scheme: light)">
-  <img src=".github/banner-light.svg" alt="hawkeye. Code review on your own Claude Code or Codex plan." width="100%">
+  <img src=".github/banner-light.svg" alt="hawkeye. Code review on your own Codex or Claude Code plan." width="100%">
 </picture>
 
-A code reviewer that runs on the Claude Code or Codex subscription you already pay for and comments on your pull requests.
+<br>
 
-You open a pull request. A small program on your computer reads it with your coding agent, using the login you already have, and the review appears on the pull request as a comment from `hawkeye-review[bot]`: a verdict, then what to fix and where. When there is nothing to fix, it says so in one line.
+Open a pull request. A runner on your machine reads every push with your own Codex or Claude Code login and posts one verdict as `hawkeye-review[bot]`. No token bill, no credentials in the cloud, and silence where the code is fine.
 
-No API key. No extra bill. Nobody in the middle: the model runs on your machine, and the server only keeps the queue and the results.
-
-## What a review looks like
-
-> ### Changes needed
->
-> **AGENTS.md still says CI runs test and build on every PR.** `AGENTS.md:18`
-> This change makes that false for docs-only pull requests. Update the line in the same pull request.
-
-That is from a real review of this repository's own [pull request #109](https://github.com/ShobhitPatra/hawkeye/pull/109).
-
-## Try it once, no account needed
+[Sign in with GitHub](https://hawkeye-review.vercel.app) to review every push, or try one review with no account:
 
 ```sh
 npx hawkeye-review prepare https://github.com/owner/repo/pull/123
 ```
 
-This downloads the pull request and writes a review prompt. Open that prompt in any AI coding session (Claude Code, Codex, Cursor), let it review the code, then run the `show` command it printed to read the verdict. Nothing is posted anywhere. You need Node 22, git, and a GitHub token (`gh auth token` is enough).
+## A real review
 
-## Review every push
+The first round on this repository's own [pull request #87](https://github.com/ShobhitPatra/hawkeye/pull/87) is a review the bot posted: a verdict, one line per finding with the file and line, the lenses behind a disclosure, and the round in the footer. The [landing page](https://hawkeye-review.vercel.app) replays it from open to posted.
 
-1. Sign in with GitHub at [hawkeye-review.vercel.app](https://hawkeye-review.vercel.app) and install the GitHub App on your repositories.
-2. On the computer where Claude Code is logged in, run `npx hawkeye-review runner login --url https://hawkeye-review.vercel.app` and approve the code it shows.
-3. Run `npx hawkeye-review runner` and leave it open.
-4. On the dashboard, turn on reviews for a pull request. From then on, every push to it is reviewed, and the comment is updated in place.
+## What happens when you open a pull request
 
-The hosted site is a preview: today it lists only the repositories where you installed the App yourself ([#48](https://github.com/ShobhitPatra/hawkeye/issues/48) opens it up), and the program on your computer drives Claude Code, with Codex next. Running your own copy is possible too; the [self-hosting guide](docs/self-hosting.md) covers it.
+1. **Every push queues one job for its head.** Pushes collapse to the latest head, so a busy branch never piles up reviews. The hosted control plane holds only the queue, webhooks and findings.
+2. **Your runner claims it and clones the branch.** One process on hardware you own. The control plane never sees a plan credential and never proxies model traffic.
+3. **Your coding agent reviews it under your login.** Six lenses, three severities, one verdict. Only validated findings JSON leaves the machine.
+4. **The comment lands as `hawkeye-review[bot]`.** A comment, never a block. On the next push, addressed findings resolve and only new ones are raised.
 
 ## What it costs
 
-Nothing beyond the plan you already pay for. The dashboard shows what each review used, in turns and minutes.
+Nothing beyond the plan you already pay for. Your plan's limits are the budget, and the dashboard shows what each review cost in turns and minutes.
 
-## More
+## Start with one pull request
 
-- [How it works and why](docs/design.md)
-- [Contributing](CONTRIBUTING.md) and the [security policy](SECURITY.md)
-- [MIT license](LICENSE)
+1. Sign in with GitHub at [hawkeye-review.vercel.app](https://hawkeye-review.vercel.app) and install the GitHub App on a repository you admin.
+2. On the machine where your coding agent is logged in, connect a runner and leave it running:
+
+   ```sh
+   npx hawkeye-review runner login --url https://hawkeye-review.vercel.app
+   npx hawkeye-review runner
+   ```
+
+3. Open a pull request, or turn on reviews for one on the dashboard.
+
+The hosted instance lists the repositories where you installed the App yourself; [#48](https://github.com/ShobhitPatra/hawkeye/issues/48) opens it up to more. Codex support is the next release; Claude Code works today.
+
+## Try one review with no account
+
+`npx hawkeye-review prepare <pr-url>` fetches the pull request and writes the review prompt into a round directory. Open the prompt in any coding agent session, let it review the checkout, then run the `show` command it printed to read the verdict. Nothing is posted anywhere. It needs Node 22, git, and a GitHub token (`gh auth token` is enough).
+
+## Open source, yours to run
+
+- MIT licensed, and every pull request to this repository is reviewed by Hawkeye itself before a maintainer reads it.
+- Run your own instance: the [self-hosting guide](docs/self-hosting.md) covers a Vercel deployment on Neon Postgres, or a single machine with Docker Compose.
+- Read [how it works and why](docs/design.md), the [contributing guide](CONTRIBUTING.md), and the [security policy](SECURITY.md).
