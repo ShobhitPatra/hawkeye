@@ -1,11 +1,11 @@
 # Hawkeye
 
-Personal AI code reviewer: a hosted control plane plus a per-user runner that reviews armed pull requests on the user's own Claude/Codex plan and posts as a bot identity. Design lives in `README.md`.
+Personal AI code reviewer: a hosted control plane plus a per-user runner that reviews armed pull requests on the user's own Claude/Codex plan and posts as a bot identity. Design lives in `docs/design.md`; `README.md` is the public front door.
 
 ## Structure
 
 ```
-README.md          design document
+README.md          front door; docs/design.md is the design document
 workspace/         local-only scratch, ADRs, agent-skill config (gitignored)
 packages/core      review contract, harness interface, render, dedupe, posting
 packages/runner    hawkeye CLI (daemon in milestone 2)
@@ -15,7 +15,7 @@ apps/web           Next.js control plane (Drizzle + Postgres)
 
 ## Commands
 
-pnpm install · pnpm lint (oxlint) · pnpm format (oxfmt; run before every commit) · pnpm typecheck · pnpm test (vitest) · pnpm build (tsup). CI (`.github/workflows/ci.yml`) runs install, lint, format:check, typecheck, test and build on every PR and push to main. Scope to one package with pnpm --filter <name>. Control plane: `pnpm --filter web dev|build|db:generate|db:migrate|auth:generate`, `docker compose up -d --wait db` (local Postgres). The web build fetches IBM Plex from Google Fonts through next/font, so it needs network access.
+pnpm install · pnpm lint (oxlint) · pnpm format (oxfmt; run before every commit) · pnpm typecheck · pnpm test (vitest) · pnpm build (tsup). CI (`.github/workflows/ci.yml`) runs install, lint, format:check, typecheck, test and build on every PR and push to main; on a PR that only touches Markdown, `docs/`, the templates, the funding file or the license, test and build report success without running. Scope to one package with pnpm --filter <name>. Control plane: `pnpm --filter web dev|build|db:generate|db:migrate|auth:generate`, `docker compose up -d --wait db` (local Postgres). The web build fetches IBM Plex from Google Fonts through next/font, so it needs network access.
 
 ## Rules
 
