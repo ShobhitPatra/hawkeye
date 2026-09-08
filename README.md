@@ -1,6 +1,8 @@
-<p><img src=".claude/skills/hawkeye-design/mark.svg" width="20" alt=""> <code>hawkeye</code></p>
-
-# Hawkeye
+<picture>
+  <source srcset=".github/banner-dark.svg" media="(prefers-color-scheme: dark)">
+  <source srcset=".github/banner-light.svg" media="(prefers-color-scheme: light)">
+  <img src=".github/banner-light.svg" alt="hawkeye. Code review on your own Claude plan." width="100%">
+</picture>
 
 A code reviewer that runs on your own Claude subscription and comments on your pull requests.
 
