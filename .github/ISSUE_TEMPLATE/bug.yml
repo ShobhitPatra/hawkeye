@@ -1,0 +1,23 @@
+name: Bug
+description: Something Hawkeye does wrong
+labels: [needs-triage]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: Hosted instance, self-hosted control plane, or the runner; the `hawkeye-review` version if the runner.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: A pull request link, a run directory listing, or log lines. Redact tokens.
