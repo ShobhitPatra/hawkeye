@@ -1,12 +1,12 @@
 <picture>
   <source srcset=".github/banner-dark.svg" media="(prefers-color-scheme: dark)">
   <source srcset=".github/banner-light.svg" media="(prefers-color-scheme: light)">
-  <img src=".github/banner-light.svg" alt="hawkeye. Code review on your own Codex or Claude Code plan." width="100%">
+  <img src=".github/banner-light.svg" alt="hawkeye. Code review on your own Claude Code or Codex plan." width="100%">
 </picture>
 
 <br>
 
-Open a pull request. A runner on your machine reads every push with your own Codex or Claude Code login and posts one verdict as `hawkeye-review[bot]`. No token bill, no credentials in the cloud, and silence where the code is fine.
+Open a pull request. A runner on your machine reads every push with the coding agent you already pay for, under your own login, and posts one verdict as `hawkeye-review[bot]`. No token bill, no credentials in the cloud, and silence where the code is fine.
 
 [Sign in with GitHub](https://hawkeye-review.vercel.app) to review every push, or try one review with no account:
 
@@ -41,7 +41,7 @@ Nothing beyond the plan you already pay for. Your plan's limits are the budget, 
 
 3. Open a pull request, or turn on reviews for one on the dashboard.
 
-The hosted instance lists the repositories where you installed the App yourself; [#48](https://github.com/ShobhitPatra/hawkeye/issues/48) opens it up to more. Codex support is the next release; Claude Code works today.
+The hosted instance lists the repositories where you installed the App yourself; [#48](https://github.com/ShobhitPatra/hawkeye/issues/48) opens it up to more. Claude Code works today; Codex support is the next release.
 
 ## Try one review with no account
 
