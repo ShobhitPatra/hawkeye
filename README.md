@@ -1,10 +1,10 @@
 <picture>
   <source srcset=".github/banner-dark.svg" media="(prefers-color-scheme: dark)">
   <source srcset=".github/banner-light.svg" media="(prefers-color-scheme: light)">
-  <img src=".github/banner-light.svg" alt="hawkeye. Code review on your own Claude or ChatGPT plan." width="100%">
+  <img src=".github/banner-light.svg" alt="hawkeye. Code review on your own Claude Code or Codex plan." width="100%">
 </picture>
 
-A code reviewer that runs on the Claude or ChatGPT subscription you already pay for and comments on your pull requests.
+A code reviewer that runs on the Claude Code or Codex subscription you already pay for and comments on your pull requests.
 
 You open a pull request. A small program on your computer reads it with your coding agent, using the login you already have, and the review appears on the pull request as a comment from `hawkeye-review[bot]`: a verdict, then what to fix and where. When there is nothing to fix, it says so in one line.
 
@@ -34,7 +34,7 @@ This downloads the pull request and writes a review prompt. Open that prompt in 
 3. Run `npx hawkeye-review runner` and leave it open.
 4. On the dashboard, turn on reviews for a pull request. From then on, every push to it is reviewed, and the comment is updated in place.
 
-The hosted site is a preview: today it lists only the repositories where you installed the App yourself ([#48](https://github.com/ShobhitPatra/hawkeye/issues/48) opens it up), and the program on your computer drives Claude Code, with Codex next. You can also run everything yourself; see the [self-hosting guide](docs/self-hosting.md).
+The hosted site is a preview: today it lists only the repositories where you installed the App yourself ([#48](https://github.com/ShobhitPatra/hawkeye/issues/48) opens it up), and the program on your computer drives Claude Code, with Codex next. Running your own copy is possible too; the [self-hosting guide](docs/self-hosting.md) covers it.
 
 ## What it costs
 
