@@ -2,7 +2,7 @@
 
 Hawkeye is two parts. The control plane is a Next.js app on Postgres: sign-in, the GitHub App webhook, the queue, the dashboard, and the posting of reviews. The runner is `npx hawkeye-review runner` on a machine with a Claude Code login; it never holds GitHub credentials of its own. This guide sets up the control plane; the runner is the same two commands whichever way you host it.
 
-The recommended shape is Vercel for the app and Neon for Postgres: both have free tiers, a fresh deployment takes under an hour, and it is how the hosted instance runs. A local machine with Docker Compose works for development and for trying it out.
+Most people should use the hosted instance at [hawkeye-review.vercel.app](https://hawkeye-review.vercel.app); this guide is for running your own. The shape is Vercel for the app and Neon for Postgres, which is how the hosted instance runs. A local machine with Docker Compose works for development.
 
 ## 1. Create a GitHub App
 
@@ -28,9 +28,7 @@ The control plane keeps a job queue that runners long-poll, so its compute stays
 
 ## 3. Deploy to Vercel
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FShobhitPatra%2Fhawkeye&root-directory=apps%2Fweb&install-command=pnpm%20install&build-command=pnpm%20--filter%20%40hawkeye%2Fcore%20build%20%26%26%20pnpm%20build&project-name=hawkeye&env=DATABASE_URL,BETTER_AUTH_SECRET,BETTER_AUTH_URL,GITHUB_CLIENT_ID,GITHUB_CLIENT_SECRET,GITHUB_WEBHOOK_SECRET,GITHUB_APP_ID,GITHUB_APP_PRIVATE_KEY&envDescription=Values%20from%20the%20GitHub%20App%20and%20Neon%3B%20see%20docs%2Fself-hosting.md)
-
-The button clones the repository and asks for the environment variables. Without it, import the repository by hand with Root Directory `apps/web`, Install Command `pnpm install`, Build Command `pnpm --filter @hawkeye/core build && pnpm build`. The environment:
+Import the repository into a Vercel project with Root Directory `apps/web`, Install Command `pnpm install`, Build Command `pnpm --filter @hawkeye/core build && pnpm build`. The environment:
 
 | Variable | Value |
 |---|---|
