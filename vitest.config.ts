@@ -7,5 +7,8 @@ export default defineConfig({
       "@/": new URL("./apps/web/src/", import.meta.url).pathname,
     },
   },
-  test: { include: ["packages/*/src/**/*.test.ts", "apps/*/{src,app}/**/*.test.ts"] },
+  test: {
+    include: ["packages/*/src/**/*.test.ts", "apps/*/{src,app}/**/*.test.ts"],
+    isolate: true,
+  },
 });
