@@ -22,6 +22,14 @@ pnpm build
 
 Run `pnpm format` before every commit. Add `--filter <package>` to any of them to run one package.
 
+## Open an issue
+
+- Use the issue forms: Bug for something Hawkeye does wrong, Feature for something it should do.
+- For a bug, say what you did, what you expected, and what happened. Add a pull request link or the run's log lines, with tokens removed. Say whether it was the hosted instance, your own instance, or the runner, and the `hawkeye-review` version.
+- For a feature, say what you cannot do today and why it matters. A rough idea of how it could work helps, but is not required.
+- Search open issues first; add to an existing one instead of opening a duplicate.
+- Security problems never go in an issue. Use the [security policy](SECURITY.md).
+
 ## Open a pull request
 
 - One change per pull request. If you spot something else to fix, open an issue for it.
