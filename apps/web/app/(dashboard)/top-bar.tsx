@@ -46,6 +46,7 @@ export function TopBar({
             <SignOutButton />
             <div className="hk-menu-legal">
               <a href="/security">Security</a>
+              <a href="/privacy">Privacy</a>
             </div>
           </div>
         </details>
