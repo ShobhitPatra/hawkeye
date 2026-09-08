@@ -20,10 +20,22 @@ jobs:
         gate: [lint, format:check, typecheck, test, build]
     steps:
       - uses: actions/checkout@v7
+      - id: changes
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files=$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --jq '.[].filename')
+          if printf '%s\n' "$files" | grep -qvE '^([^/]+\.md|docs/.*|\.github/ISSUE_TEMPLATE/.*|\.github/PULL_REQUEST_TEMPLATE\.md|\.github/FUNDING\.yml|LICENSE)$'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm ${{ matrix.gate }}
+      - if: steps.changes.outputs.code != 'false' || (matrix.gate != 'test' && matrix.gate != 'build')
+        run: pnpm ${{ matrix.gate }}
