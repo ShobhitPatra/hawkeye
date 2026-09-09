@@ -16,6 +16,7 @@ export function SiteFooter() {
       <a href={SELF_HOSTING_URL}>Self-host</a>
       <a href="/security">Security</a>
       <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
       <a href={NPM_URL}>npm: hawkeye-review</a>
     </footer>
   );
