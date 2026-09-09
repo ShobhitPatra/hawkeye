@@ -4,12 +4,11 @@ import { HAWKEYE_REPOSITORY_URL } from "@hawkeye/core";
 import { localPath } from "@/local-path";
 import { getSession } from "@/session";
 import { LandingHero } from "./landing-hero";
-import { Mark } from "./mark";
 import { RotatingWord } from "./rotating-word";
 import { SignInButton } from "./sign-in-button";
+import { SiteFooter } from "./site-footer";
+import { SiteHeader } from "./site-header";
 import { parseTheme, THEME_COOKIE } from "@/theme";
-import { ThemeChoice } from "./theme-choice";
-import { ThemeIcon } from "./theme-icon";
 import "./landing.css";
 
 export default async function HomePage({
@@ -24,24 +23,7 @@ export default async function HomePage({
   const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
   return (
     <>
-      <header className="hk-topbar">
-        <a className="hk-wordmark hk-lockup" href="/">
-          <Mark />
-          hawkeye
-        </a>
-        <div className="hk-topbar-end">
-          <a href={HAWKEYE_REPOSITORY_URL}>Source</a>
-          <details className="hk-menu" data-icon>
-            <summary aria-label="Theme" title="Theme">
-              <ThemeIcon />
-            </summary>
-            <div className="hk-menu-panel">
-              <ThemeChoice theme={theme} />
-            </div>
-          </details>
-          <SignInButton {...signIn} />
-        </div>
-      </header>
+      <SiteHeader theme={theme} {...signIn} />
       <main className="hk-page ld">
         <section className="ld-lead">
           <h1 className="hk-headline">
@@ -127,16 +109,7 @@ export default async function HomePage({
           </p>
         </section>
 
-        <footer className="ld-foot">
-          <span className="hk-mono hk-lockup">
-            <Mark />
-            hawkeye
-          </span>
-          <a href={HAWKEYE_REPOSITORY_URL}>Source, MIT</a>
-          <a href={`${HAWKEYE_REPOSITORY_URL}#run-it`}>Self-host with docker compose</a>
-          <a href="https://www.npmjs.com/package/hawkeye-review">npm: hawkeye-review</a>
-          <span className="ld-foot-end">Claude Code today, Codex next.</span>
-        </footer>
+        <SiteFooter />
       </main>
     </>
   );
