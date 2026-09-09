@@ -166,7 +166,7 @@ Dashboard pages stay fresh on their own: every 15 seconds while the tab is visib
 
 Tokens are `--hk-*`, classes are `hk-*`, both from `stylesheet.css` beside this file. The `hidden` attribute always hides under `.hk-root`, whatever display a class sets. Use the exact names; never invent a `hk-*` class or redeclare a `--hk-*` token in page CSS. Page-owned CSS may compose layout from public tokens only.
 
-Roots and shell: `hk-root`, `hk-topbar[data-sticky]`, `hk-wordmark`, `hk-nav`, `hk-topbar-end`, `hk-account-name`, `hk-account-initial`, `hk-fresh`, `hk-menu` (a `<details>`; `data-icon` for an icon-only summary), `hk-menu-panel`, `hk-menu-who`, `hk-menu-theme`, `hk-menu-row`, `hk-progress`, `hk-page`.
+Roots and shell: `hk-root`, `hk-topbar[data-sticky]`, `hk-footer`, `hk-wordmark`, `hk-nav`, `hk-topbar-end`, `hk-account-name`, `hk-account-initial`, `hk-fresh`, `hk-menu` (a `<details>`; `data-icon` for an icon-only summary), `hk-menu-panel`, `hk-menu-who`, `hk-menu-theme`, `hk-menu-row`, `hk-progress`, `hk-page`.
 
 Type roles: `hk-headline` (landing only), `hk-display`, `hk-title`, `hk-heading`, `hk-lede`, `hk-body`, `hk-compact`, `hk-metadata`, `hk-label`, `hk-mono`, `hk-numeric`, `hk-muted`, `hk-prose`, `hk-visually-hidden`.
 
@@ -188,7 +188,7 @@ Tables: `hk-table-header`, `hk-table-wrap`, `hk-table`, `hk-numeric`, `hk-cell-s
 
 Surfaces and states: `hk-surface`, `hk-disclosure`, `hk-rule`, `hk-state`, `hk-skeleton[data-rows]`.
 
-Tokens page CSS may read: `--hk-bg`, `--hk-bg-2`, `--hk-bg-3`, `--hk-fg`, `--hk-fg-2`, `--hk-fg-3`, `--hk-line`, `--hk-line-2`, `--hk-must`, `--hk-must-bg`, `--hk-warn`, `--hk-warn-bg`, `--hk-focus`, `--hk-on-fg`, `--hk-space-1` to `--hk-space-8`, `--hk-radius-control`, `--hk-radius-surface`, the `--hk-type-*`, `--hk-leading-*` and `--hk-weight-*` families, `--hk-measure`, `--hk-page-width`, `--hk-gutter-width`, `--hk-icon-size`, `--hk-icon-stroke`, `--hk-duration`, `--hk-ease`.
+Tokens page CSS may read: `--hk-bg`, `--hk-bg-2`, `--hk-bg-3`, `--hk-fg`, `--hk-fg-2`, `--hk-fg-3`, `--hk-line`, `--hk-line-2`, `--hk-must`, `--hk-must-bg`, `--hk-warn`, `--hk-warn-bg`, `--hk-focus`, `--hk-on-fg`, `--hk-space-1` to `--hk-space-8`, `--hk-radius-control`, `--hk-radius-surface`, the `--hk-type-*`, `--hk-leading-*` and `--hk-weight-*` families, `--hk-measure`, `--hk-page-width`, `--hk-topbar-height`, `--hk-gutter-width`, `--hk-icon-size`, `--hk-icon-stroke`, `--hk-duration`, `--hk-ease`.
 
 ## Never
 
