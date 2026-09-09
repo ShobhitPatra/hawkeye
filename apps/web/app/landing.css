@@ -389,6 +389,9 @@
   padding-top: var(--hk-space-3);
   border-top: 1px solid var(--hk-line-2);
 }
+.ld-steps[data-plain] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 .ld-steps[data-plain] > div::before {
   content: none;
 }
@@ -413,7 +416,7 @@
   text-underline-offset: 0.15em;
 }
 .ld-frame {
-  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -474,6 +477,9 @@
   .ld-steps {
     grid-template-columns: 1fr 1fr;
     gap: var(--hk-space-6);
+  }
+  .ld-steps[data-plain] {
+    grid-template-columns: 1fr;
   }
   .ld-stage {
     height: auto;

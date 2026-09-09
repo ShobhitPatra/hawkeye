@@ -6,7 +6,7 @@ import { getSession } from "@/session";
 import { LandingHero } from "./landing-hero";
 import { RotatingWord } from "./rotating-word";
 import { SignInButton } from "./sign-in-button";
-import { CONTRIBUTING_URL, SELF_HOSTING_URL, SiteFooter } from "./site-footer";
+import { CONTRIBUTING_URL, LICENSE_URL, SELF_HOSTING_URL, SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
 import { parseTheme, THEME_COOKIE } from "@/theme";
 import "./landing.css";
@@ -118,13 +118,13 @@ export default async function HomePage({
               <p className="hk-claim">MIT, and reviewed by itself.</p>
               <p className="hk-detail">
                 Every pull request to Hawkeye is reviewed by Hawkeye before a maintainer reads it.{" "}
-                <a href={HAWKEYE_REPOSITORY_URL}>Read the source</a>.
+                <a href={LICENSE_URL}>Read the license</a>.
               </p>
             </div>
             <div>
               <p className="hk-claim">Run your own instance.</p>
               <p className="hk-detail">
-                A Vercel deployment on Neon Postgres, or one machine with Docker Compose.{" "}
+                A Vercel deployment on Neon Postgres, the way the hosted instance runs.{" "}
                 <a href={SELF_HOSTING_URL}>The self-hosting guide</a> takes an evening.
               </p>
             </div>
