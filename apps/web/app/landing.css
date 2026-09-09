@@ -389,6 +389,12 @@
   padding-top: var(--hk-space-3);
   border-top: 1px solid var(--hk-line-2);
 }
+.ld-steps[data-plain] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.ld-steps[data-plain] > div::before {
+  content: none;
+}
 .ld-steps > div::before {
   counter-increment: step;
   content: counter(step);
@@ -404,6 +410,10 @@
   font-size: var(--hk-type-compact);
   line-height: var(--hk-leading-compact);
   color: var(--hk-fg-2);
+}
+.ld-steps .hk-detail a {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 .ld-frame {
   height: 100dvh;
@@ -467,6 +477,9 @@
   .ld-steps {
     grid-template-columns: 1fr 1fr;
     gap: var(--hk-space-6);
+  }
+  .ld-steps[data-plain] {
+    grid-template-columns: 1fr;
   }
   .ld-stage {
     height: auto;
