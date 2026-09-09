@@ -44,6 +44,9 @@ export function TopBar({
             <ThemeChoice theme={theme} />
             <a href="https://github.com/settings/installations">Manage installation on GitHub</a>
             <SignOutButton />
+            <div className="hk-menu-legal">
+              <a href="/security">Security</a>
+            </div>
           </div>
         </details>
       </div>
