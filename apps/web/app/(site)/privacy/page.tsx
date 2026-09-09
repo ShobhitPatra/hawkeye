@@ -14,13 +14,21 @@ export default function PrivacyPage() {
       <h2 className="hk-heading">What the control plane stores</h2>
       <ul>
         <li>
-          Your GitHub account as GitHub reports it at sign-in: name, email, login, and the sign-in
-          token GitHub issues, which is used only to keep you signed in.
+          Your GitHub account as GitHub reports it at sign-in: name, email, login, avatar URL, and
+          the sign-in token GitHub issues, which is used only to keep you signed in.
         </li>
-        <li>The GitHub App installations you link, by id.</li>
+        <li>
+          Each session: when it was created, the IP address it was opened from, and the browser's
+          user agent.
+        </li>
+        <li>
+          The GitHub App installations you link, by id, with the login and type of the account they
+          belong to.
+        </li>
         <li>
           The pull requests you turn reviews on for, as owner, repository and number, with your
-          settings for them.
+          settings for them, and your account-wide review settings, including any prompt text you
+          add.
         </li>
         <li>
           Each review job and run: when it ran, on which runner, how many turns it took, whether it
@@ -55,9 +63,9 @@ export default function PrivacyPage() {
       <p>
         Data is kept while your account exists. Uninstalling the GitHub App stops every review for
         that installation and marks it deleted here. To have your account and everything under it
-        removed, open an issue on the repository or write to the maintainer at the address in{" "}
-        <a href={`${HAWKEYE_REPOSITORY_URL}/blob/main/SECURITY.md`}>the security policy</a>; it is
-        done by hand within a week.
+        removed,{" "}
+        <a href={`${HAWKEYE_REPOSITORY_URL}/issues/new`}>open an issue on the repository</a> from
+        the GitHub account in question; it is done by hand within a week.
       </p>
       <h2 className="hk-heading">Your own instance</h2>
       <p>
