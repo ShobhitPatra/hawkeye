@@ -22,7 +22,7 @@ The first round on this repository's own [pull request #87](https://github.com/S
 
 1. **Every push queues one job for its head.** Pushes collapse to the latest head, so a busy branch never piles up reviews. The hosted control plane holds only the queue, webhooks and findings.
 2. **Your runner claims it and clones the branch.** One process on hardware you own. The control plane never sees a plan credential and never proxies model traffic.
-3. **Your coding agent reviews it under your login.** Six lenses, three severities, one verdict. Only validated findings JSON leaves the machine.
+3. **Your coding agent reviews it under your login.** Six lenses, four severities, one verdict. Only validated findings JSON leaves the machine.
 4. **The comment lands as `hawkeye-review[bot]`.** A comment, never a block. On the next push, addressed findings resolve and only new ones are raised.
 
 ## What it costs
@@ -39,7 +39,7 @@ Nothing beyond the plan you already pay for. Your plan's limits are the budget, 
    npx hawkeye-review runner
    ```
 
-3. Open a pull request, or turn on reviews for one on the dashboard.
+3. On the dashboard, turn on reviews for a pull request. From then on every push to it is reviewed, and the comment is updated in place.
 
 The hosted instance lists the repositories where you installed the App yourself; [#48](https://github.com/ShobhitPatra/hawkeye/issues/48) opens it up to more. Claude Code works today; Codex support is the next release.
 
