@@ -3,7 +3,7 @@
   flex-direction: column;
   gap: calc(var(--hk-space-8) + var(--hk-space-6));
   padding-top: calc(var(--hk-space-8) + var(--hk-space-6));
-  min-height: calc(100vh - 44px);
+  min-height: calc(100vh - var(--hk-topbar-height));
 }
 .ld-lead {
   display: flex;
@@ -405,17 +405,6 @@
   line-height: var(--hk-leading-compact);
   color: var(--hk-fg-2);
 }
-.ld-foot {
-  margin-top: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--hk-space-2) var(--hk-space-5);
-  font-size: var(--hk-type-compact);
-  line-height: var(--hk-leading-compact);
-  color: var(--hk-fg-2);
-  padding-top: var(--hk-space-5);
-  border-top: 1px solid var(--hk-line);
-}
 .ld-frame {
   height: 100vh;
   display: flex;
@@ -455,7 +444,7 @@
   padding-top: 0;
   padding-bottom: var(--hk-space-4);
 }
-.ld-frame-foot .ld-foot {
+.ld-frame-foot .hk-footer {
   margin-top: 0;
 }
 .ld-doc {
@@ -472,16 +461,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--hk-space-1);
-}
-.ld-foot a {
-  text-decoration: none;
-  transition: color var(--hk-duration) var(--hk-ease);
-}
-.ld-foot a:hover {
-  color: var(--hk-fg);
-}
-.ld-foot-end {
-  margin-left: auto;
 }
 
 @media (max-width: 900px) {
