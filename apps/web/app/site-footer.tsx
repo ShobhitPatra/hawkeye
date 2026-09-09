@@ -8,7 +8,7 @@ export const NPM_URL = "https://www.npmjs.com/package/hawkeye-review";
 
 export function SiteFooter() {
   return (
-    <footer className="ld-foot">
+    <footer className="hk-footer">
       <span className="hk-mono hk-lockup">
         <Mark />
         hawkeye
