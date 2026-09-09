@@ -406,7 +406,7 @@
   color: var(--hk-fg-2);
 }
 .ld-frame {
-  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
 }
