@@ -19,6 +19,8 @@ export type PullRequestDetails = {
 export type LinkedIssue = { number: number; title: string; body: string };
 export type CommitStatus = { state: "pending" | "success"; description: string; context: string };
 
+export type UserInstallation = { id: string; accountLogin: string; accountType: string };
+
 export type InstallationRepository = {
   owner: string;
   name: string;
@@ -86,6 +88,7 @@ export interface GitHubClient {
     token: string,
   ): Promise<void>;
   listInstallationRepositories(token: string): Promise<InstallationRepository[]>;
+  listUserInstallations(userToken: string): Promise<UserInstallation[]>;
   listOpenPullRequestsByAuthor(
     token: string,
     repositories: { owner: string; name: string }[],
@@ -390,6 +393,17 @@ export function createGitHubClient(input: {
           name: repository.name,
           fullName: repository.full_name,
           private: repository.private,
+        })),
+      );
+    },
+    async listUserInstallations(userToken) {
+      return paginate("/user/installations", userToken, (payload) =>
+        (
+          payload as { installations: { id: number; account: { login: string; type: string } }[] }
+        ).installations.map((entry) => ({
+          id: String(entry.id),
+          accountLogin: entry.account.login,
+          accountType: entry.account.type,
         })),
       );
     },

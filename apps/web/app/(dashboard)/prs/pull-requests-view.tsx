@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatUpdated } from "@/format-updated";
 import type { InstallationFailure, ListedPullRequest } from "@/pull-requests";
+import { refreshInstallationsAction } from "./actions";
 import type { PullRequestStatus } from "@/pull-request-status";
 import type { RunnerStatus } from "@/runner-status";
 import { PullRequestTable } from "./pull-request-table";
@@ -63,13 +64,16 @@ export function PullRequestsView({
 
       {pullRequests.length === 0 ? (
         <div className="hk-state">
-          <p>No open pull requests of yours in the repos this app is installed on.</p>
+          <p>No open pull requests of yours in the repositories this app is installed on.</p>
           <p>
             <a href="https://github.com/settings/installations">
-              Install the GitHub App on another repo
-            </a>{" "}
-            to see its pull requests here.
+              Install the GitHub App on another repository
+            </a>
+            , then refresh to see its pull requests here.
           </p>
+          <form action={refreshInstallationsAction}>
+            <button type="submit">Refresh</button>
+          </form>
         </div>
       ) : (
         <PullRequestTable

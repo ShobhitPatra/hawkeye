@@ -39,6 +39,7 @@ const github: GitHubClient = {
   review: unsupported(),
   createCommitStatus: unsupported(),
   listInstallationRepositories: unsupported(),
+  listUserInstallations: unsupported(),
   listOpenPullRequestsByAuthor: unsupported(),
 };
 

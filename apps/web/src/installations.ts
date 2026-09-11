@@ -1,4 +1,5 @@
-import { and, eq, isNull } from "drizzle-orm";
+import type { GitHubClient } from "@hawkeye/core";
+import { and, eq, isNull, notInArray } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { account, installation, installationUser } from "./db/schema";
 import type { WebhookEvent } from "./github/webhook-events";
@@ -59,4 +60,53 @@ export async function recordInstallation(db: Db, event: InstallationEvent) {
       set: { accountLogin, accountType, deletedAt: null },
     });
   await linkInstallationToUser(db, id, event.sender.id);
+}
+
+export type InstallationSync = { linked: number; unlinked: number };
+
+export async function syncUserInstallations(
+  db: Db,
+  github: Pick<GitHubClient, "listUserInstallations">,
+  input: { userId: string; token: string },
+): Promise<InstallationSync> {
+  const accessible = await github.listUserInstallations(input.token);
+  const ids = accessible.map((entry) => entry.id);
+  return db.transaction(async (tx) => {
+    for (const entry of accessible) {
+      await tx
+        .insert(installation)
+        .values({
+          id: entry.id,
+          accountLogin: entry.accountLogin,
+          accountType: entry.accountType,
+          deletedAt: null,
+        })
+        .onConflictDoUpdate({
+          target: installation.id,
+          set: {
+            accountLogin: entry.accountLogin,
+            accountType: entry.accountType,
+            deletedAt: null,
+          },
+        });
+    }
+    const linked =
+      ids.length === 0
+        ? []
+        : await tx
+            .insert(installationUser)
+            .values(ids.map((installationId) => ({ installationId, userId: input.userId })))
+            .onConflictDoNothing()
+            .returning({ installationId: installationUser.installationId });
+    const unlinked = await tx
+      .delete(installationUser)
+      .where(
+        and(
+          eq(installationUser.userId, input.userId),
+          ...(ids.length === 0 ? [] : [notInArray(installationUser.installationId, ids)]),
+        ),
+      )
+      .returning({ installationId: installationUser.installationId });
+    return { linked: linked.length, unlinked: unlinked.length };
+  });
 }

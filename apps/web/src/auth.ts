@@ -4,6 +4,7 @@ import { nextCookies } from "better-auth/next-js";
 import { getDb } from "./db";
 import * as schema from "./db/schema";
 import { env } from "./env";
+import { syncInstallationsForUser } from "./installation-sync";
 
 function createAuth() {
   return betterAuth({
@@ -12,6 +13,17 @@ function createAuth() {
     baseURL: env.betterAuthUrl(),
     user: { additionalFields: { githubLogin: { type: "string", required: false } } },
     databaseHooks: {
+      session: {
+        create: {
+          after: async (session) => {
+            await syncInstallationsForUser(session.userId).catch((error: unknown) => {
+              console.error(
+                `installations not synced for user ${session.userId}: ${error instanceof Error ? error.message : String(error)}`,
+              );
+            });
+          },
+        },
+      },
       user: {
         update: {
           before: async (user, context) => {

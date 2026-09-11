@@ -42,6 +42,7 @@ function fakeGitHub(overrides: Partial<GitHubClient> = {}): GitHubClient {
     review: unsupported(),
     createCommitStatus: unsupported(),
     listInstallationRepositories: unsupported(),
+    listUserInstallations: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
     ...overrides,
   };

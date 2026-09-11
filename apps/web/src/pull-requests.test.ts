@@ -45,6 +45,7 @@ function fakeGitHub(
   const github: GitHubClient = {
     installationTokenById,
     listInstallationRepositories,
+    listUserInstallations: vi.fn(async () => []),
     listOpenPullRequestsByAuthor,
     installationToken: unsupported(),
     pullRequest: unsupported(),

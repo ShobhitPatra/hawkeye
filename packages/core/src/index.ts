@@ -6,6 +6,7 @@ export { createGitHubClient, type CommitStatus, type GitHubClient } from "./gith
 export { GitHubRequestError, fetchPullRequestDetails, fetchLinkedIssue } from "./github/client.js";
 export type {
   InstallationRepository,
+  UserInstallation,
   LinkedIssue,
   OpenPullRequest,
   PullRequestDetails,

@@ -41,7 +41,7 @@ Nothing beyond the plan you already pay for. Your plan's limits are the budget, 
 
 3. On the dashboard, turn on reviews for a pull request. From then on every push to it is reviewed, and the comment is updated in place.
 
-The hosted instance lists the repositories where you installed the App yourself; [#48](https://github.com/ShobhitPatra/hawkeye/issues/48) opens it up to more. Claude Code works today; Codex support is the next release.
+The hosted instance shows every repository where the App is installed and your GitHub account has access. Claude Code works today; Codex support is the next release.
 
 ## Try one review with no account
 
