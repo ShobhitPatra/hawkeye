@@ -39,7 +39,7 @@ Nothing beyond the plan you already pay for. Your plan's limits are the budget, 
    npx hawkeye-review runner
    ```
 
-3. On the dashboard, turn on reviews for a pull request. From then on every push to it is reviewed, and the comment is updated in place.
+3. On the dashboard, turn on reviews for a pull request. From then on every push to it starts a review at once, and the comment is updated in place; a push during a review stops it and starts the next.
 
 The hosted instance shows every repository where the App is installed and your GitHub account has access. Claude Code works today; Codex support is the next release.
 

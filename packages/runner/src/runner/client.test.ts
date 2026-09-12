@@ -58,6 +58,13 @@ describe("createControlPlaneClient", () => {
       "invalid claimed job payload: previousRound.findings[0].severity",
     );
   });
+  it("reads whether a heartbeat says the job is superseded", async () => {
+    const { client: fresh } = client(() => Response.json({ ok: true, superseded: true }));
+    await expect(fresh.heartbeat("j1")).resolves.toEqual({ superseded: true });
+    const { client: old } = client(() => Response.json({ ok: true }));
+    await expect(old.heartbeat("j1")).resolves.toEqual({ superseded: false });
+  });
+
   it("returns nothing on 204", async () => {
     const { client: c } = client(() => new Response(null, { status: 204 }));
     expect(await c.claimJob()).toBeUndefined();

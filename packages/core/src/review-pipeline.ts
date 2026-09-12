@@ -8,6 +8,7 @@ import { removeTrustedConfig } from "./worktree/trusted-files.js";
 import type { createWorktree, readRepositoryRules } from "./worktree/worktree.js";
 
 export type ReviewPipelineInput = {
+  signal?: AbortSignal;
   cloneUrl: string;
   token: string;
   runDirectory: string;
@@ -70,6 +71,13 @@ export async function runReviewPipeline(
       }),
     );
 
+    if (input.signal?.aborted)
+      return {
+        status: "superseded",
+        turns: 0,
+        error: "superseded by a newer push",
+        diff: worktree.diff,
+      };
     const streamLines: string[] = [];
     const harnessResult = await deps.harness.run({
       cwd: worktree.path,
@@ -78,6 +86,7 @@ export async function runReviewPipeline(
       settingsPath,
       maxTurns: input.maxTurns,
       wallClockMs: input.wallClockMs,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
       onEvent: (event) => {
         if (event.type === "stdout") streamLines.push(event.line);
         if (event.type === "turn") {

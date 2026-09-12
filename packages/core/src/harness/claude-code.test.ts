@@ -70,6 +70,17 @@ describe("claude code harness", () => {
     expect(args[args.indexOf("--setting-sources") + 1]).toBe("user");
     expect(events).toContainEqual({ type: "turn", turns: 1 });
   });
+  it("stops with superseded when the signal aborts", async () => {
+    const exe = await fakeClaude("sleep 5");
+    const s = await scratch();
+    const control = new AbortController();
+    setTimeout(() => control.abort(), 50);
+    const result = await createClaudeCodeHarness({ executable: exe }).run(
+      input(s, { signal: control.signal }),
+    );
+    expect(result).toEqual({ status: "superseded", turns: 0 });
+  });
+
   it("reports error when the process exits without a result", async () => {
     const s = await scratch();
     const exe = await fakeClaude(`echo boom >&2; exit 3`);

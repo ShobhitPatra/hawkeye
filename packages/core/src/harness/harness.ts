@@ -3,7 +3,7 @@ export type HarnessEvent =
   | { type: "stdout"; line: string }
   | { type: "stderr"; line: string };
 export type HarnessResult = {
-  status: "ok" | "max-turns" | "timeout" | "error";
+  status: "ok" | "max-turns" | "timeout" | "error" | "superseded";
   turns: number;
   error?: string;
 };
@@ -14,6 +14,7 @@ export type HarnessRunInput = {
   settingsPath: string;
   maxTurns: number;
   wallClockMs: number;
+  signal?: AbortSignal;
   onEvent(event: HarnessEvent): void;
 };
 export interface HarnessSpec {
