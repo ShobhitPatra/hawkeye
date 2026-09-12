@@ -124,6 +124,15 @@ describe("runReviewJob", () => {
     expect((init!.headers as Record<string, string>).Authorization).toBe("Bearer ghs_t");
     expect(await readFile(join(i.runDirectory, "stream.jsonl"), "utf8")).toBe("{}");
   });
+  it("returns superseded without running the harness when the signal is already aborted", async () => {
+    const d = deps();
+    const control = new AbortController();
+    control.abort();
+    const outcome = await runReviewJob(await input({ signal: control.signal }), d);
+    expect(outcome).toMatchObject({ status: "superseded", turns: 0 });
+    expect(d.harness.run).not.toHaveBeenCalled();
+  });
+
   it("writes a prompt with the pull request text, linked issue, rules and diff", async () => {
     const d = deps();
     const i = await input({ contractOverride: "CUSTOM RULES" });

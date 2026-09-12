@@ -192,6 +192,31 @@ describe("runRunnerLoop", () => {
       beats.length,
     );
   });
+  it("stops the review and reports it superseded when a heartbeat says so", async () => {
+    let beats = 0;
+    const plane = await fakeControlPlane((received, response) => {
+      if (received.url === "/api/runner/jobs") return json(response, 200, claimedJob);
+      if (received.url.endsWith("/heartbeat"))
+        return json(response, 200, { ok: true, superseded: ++beats >= 2 });
+      if (received.url.endsWith("/result")) return json(response, 200, { ok: true });
+      return json(response, 200, { ok: true });
+    });
+    servers.push(plane.server);
+    const d = await deps(plane.baseUrl);
+    d.harness = {
+      name: "abortable",
+      run: (i) =>
+        new Promise((resolve) => {
+          i.signal?.addEventListener("abort", () => resolve({ status: "superseded", turns: 2 }));
+        }),
+    };
+    await runRunnerLoop(d, { once: true });
+    const result = plane.received.find((r) => r.url.endsWith("/result"));
+    expect(result?.body).toMatchObject({ status: "superseded", turns: 2 });
+    expect(d.reported.map((e) => e.state)).toContain("superseded");
+    expect(d.reported.map((e) => e.state)).not.toContain("failed");
+  });
+
   it("reports a harness failure with its status", async () => {
     const plane = await fakeControlPlane(scripted([claimedJob]));
     servers.push(plane.server);
@@ -383,7 +408,7 @@ describe("runRunnerLoop", () => {
         controller.abort();
         return undefined;
       },
-      heartbeat: async () => {},
+      heartbeat: async () => ({ superseded: false }),
       sendEvents: async () => {},
       sendResult: async () => ({ ok: true }),
     };

@@ -18,6 +18,7 @@ export type RunReviewJobInput = {
   wallClockMs: number;
   contractOverride?: string;
   previousRound?: { headSha: string; findings: PriorFinding[] };
+  signal?: AbortSignal;
 };
 export type RunReviewJobDependencies = {
   fetch: typeof fetch;
@@ -51,6 +52,7 @@ export async function runReviewJob(
       maxTurns: input.maxTurns,
       wallClockMs: input.wallClockMs,
       depth: pullRequest.commits + 1,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
       ...(input.previousRound === undefined ? {} : { previousRound: input.previousRound }),
       prompt: {
         repository: { owner: reference.owner, repo: reference.repo },

@@ -35,6 +35,7 @@ const RUN_FAILURE_LABELS: Record<Exclude<PullRequestRun["status"], "running" | "
   timeout: "ran out of time",
   error: "the harness failed",
   "invalid-output": "returned a result Hawkeye could not read",
+  superseded: "was superseded by a newer push",
 };
 
 export function runFailureLabel(status: PullRequestRun["status"]): string {

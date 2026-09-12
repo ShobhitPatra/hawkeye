@@ -19,7 +19,10 @@ export type RunnerEvent =
   | { state: "claimed"; subject: string; headSha: string }
   | { state: "reviewing"; runDirectory: string }
   | { state: "posted"; result: ReviewResult; turns: number; durationMs: number }
-  | { state: "skipped" | "failed" | "waiting" | "delivered" | "idle"; detail: string };
+  | {
+      state: "skipped" | "failed" | "waiting" | "delivered" | "idle" | "superseded";
+      detail: string;
+    };
 
 export type RunnerLoopDependencies = {
   client: ControlPlaneClient;
@@ -68,6 +71,7 @@ async function reportFor(
   claimed: ClaimedJob,
   deps: RunnerLoopDependencies,
   runDirectory: string,
+  signal: AbortSignal,
 ): Promise<RunResultReport> {
   const { job, pullRequest } = claimed;
   const contractOverride = deps.contractOverride ?? claimed.settings.promptOverride;
@@ -82,6 +86,7 @@ async function reportFor(
       wallClockMs: claimed.settings.wallClockMinutes * 60_000,
       ...(contractOverride === undefined ? {} : { contractOverride }),
       ...(claimed.previousRound === undefined ? {} : { previousRound: claimed.previousRound }),
+      signal,
     },
     {
       fetch: deps.fetch,
@@ -118,6 +123,10 @@ function reportAcknowledged(
   context: { headSha: string; durationMs: number },
   deps: RunnerLoopDependencies,
 ): void {
+  if (report.status === "superseded") {
+    deps.report({ state: "delivered", detail: "the newer push's review follows" });
+    return;
+  }
   if (report.status !== "ok" || report.result === undefined) {
     deps.report({ state: "delivered", detail: "the control plane recorded the failure" });
     return;
@@ -195,9 +204,18 @@ export async function runJob(
     subject: `${pullRequest.owner}/${pullRequest.repo}#${pullRequest.number}`,
     headSha: job.headSha,
   });
+  const control = new AbortController();
   const heartbeat = setInterval(() => {
     deps.client
       .heartbeat(job.id)
+      .then(({ superseded }) => {
+        if (!superseded || control.signal.aborted) return;
+        deps.report({
+          state: "superseded",
+          detail: "a newer push is waiting; stopping this review",
+        });
+        control.abort();
+      })
       .catch((error: Error) =>
         deps.report({ state: "waiting", detail: `heartbeat failed: ${error.message}` }),
       );
@@ -207,14 +225,14 @@ export async function runJob(
   try {
     runDirectory = await deps.createRunDirectory(pullRequest);
     deps.report({ state: "reviewing", runDirectory });
-    report = await reportFor(claimed, deps, runDirectory);
+    report = await reportFor(claimed, deps, runDirectory, control.signal);
   } catch (error) {
     report = { status: "error", turns: 0, error: (error as Error).message };
   } finally {
     clearInterval(heartbeat);
   }
   const durationMs = Date.now() - startedAt;
-  if (report.status !== "ok")
+  if (report.status !== "ok" && report.status !== "superseded")
     deps.report({
       state: "failed",
       detail: `${report.error ?? report.status} after ${turnsOf(report.turns)}${keptIn(runDirectory)}`,

@@ -19,9 +19,11 @@ export class ControlPlaneRequestError extends Error {
   }
 }
 
+export type HeartbeatAcknowledgement = { superseded: boolean };
+
 export type ControlPlaneClient = {
   claimJob(options?: { signal?: AbortSignal }): Promise<ClaimedJob | undefined>;
-  heartbeat(jobId: string): Promise<void>;
+  heartbeat(jobId: string): Promise<HeartbeatAcknowledgement>;
   sendEvents(runId: string, events: RunEvent[]): Promise<void>;
   sendResult(runId: string, report: RunResultReport): Promise<ResultAcknowledgement>;
 };
@@ -159,7 +161,13 @@ export function createControlPlaneClient(input: {
       return claimedJob(await response.json());
     },
     async heartbeat(jobId) {
-      await send("POST", `/api/runner/jobs/${encodeURIComponent(jobId)}/heartbeat`, {});
+      const response = await send(
+        "POST",
+        `/api/runner/jobs/${encodeURIComponent(jobId)}/heartbeat`,
+        {},
+      );
+      const payload = (await response.json().catch(() => ({}))) as { superseded?: unknown };
+      return { superseded: payload.superseded === true };
     },
     async sendEvents(runId, events) {
       await send("POST", `/api/runner/runs/${encodeURIComponent(runId)}/events`, events);

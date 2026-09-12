@@ -28,6 +28,7 @@ export const RUN_RESULT_STATUSES = [
   "timeout",
   "error",
   "invalid-output",
+  "superseded",
 ] as const;
 
 export type RunResultStatus = (typeof RUN_RESULT_STATUSES)[number];

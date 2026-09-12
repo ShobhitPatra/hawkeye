@@ -38,6 +38,7 @@ import {
   holdsJobClaim,
   releaseJob,
   requeueStaleJobs,
+  jobSuperseded,
 } from "./job-queue";
 import { closedPlaceholderFor, livingReviewFor, postReviewForRun } from "./review-posting";
 import {
@@ -45,6 +46,7 @@ import {
   markReviewing,
   NOT_COMPLETED_BODY,
   reviewingBlock,
+  SUPERSEDED_BODY,
 } from "./reviewing-line";
 import { requireRunner } from "./runner-auth";
 
@@ -236,7 +238,10 @@ export async function heartbeat(
     if (!existing) return Response.json({ error: "job not found" }, { status: 404 });
     return claimLost();
   }
-  return Response.json({ ok: true }, { status: 200 });
+  return Response.json(
+    { ok: true, superseded: await jobSuperseded(deps.db, beat) },
+    { status: 200 },
+  );
 }
 
 function parseEvents(payload: unknown): RunEvent[] {
@@ -370,11 +375,12 @@ export async function recordResult(
   };
   const { result } = report;
   if (report.status !== "ok" || !result) {
+    const superseded = report.status === "superseded";
     await setCommitStatus(
       deps.github,
       statusTarget,
       "success",
-      NOT_COMPLETED_DESCRIPTION,
+      superseded ? SUPERSEDED_DESCRIPTION : NOT_COMPLETED_DESCRIPTION,
       deps.log,
     );
     try {
@@ -386,7 +392,7 @@ export async function recordResult(
         runId,
         livingReviewId: living?.githubReviewId,
         placeholderReviewId: existing.placeholderReviewId,
-        closing: NOT_COMPLETED_BODY,
+        closing: superseded ? SUPERSEDED_BODY : NOT_COMPLETED_BODY,
       });
     } catch (error) {
       deps.log?.(
