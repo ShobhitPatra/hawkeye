@@ -517,6 +517,30 @@ describe("heartbeat", () => {
     expect(row?.heartbeatAt?.getTime()).toBeGreaterThan(now.getTime());
   });
 
+  it("says the job is superseded once a newer job exists for the arm", async () => {
+    const queued = await enqueue();
+    await claimJob(request("/api/runner/jobs"), claimDeps());
+    const first = await heartbeat(
+      request(`/api/runner/jobs/${queued.id}/heartbeat`, { method: "POST" }),
+      { db },
+      queued.id,
+    );
+    expect(await first.json()).toEqual({ ok: true, superseded: false });
+
+    await enqueueJob(db, {
+      armedPrId: "armed-1",
+      headSha: "c".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: now,
+    });
+    const second = await heartbeat(
+      request(`/api/runner/jobs/${queued.id}/heartbeat`, { method: "POST" }),
+      { db },
+      queued.id,
+    );
+    expect(await second.json()).toEqual({ ok: true, superseded: true });
+  });
+
   it("409s for a job the runner does not hold", async () => {
     const queued = await enqueue();
 
@@ -1059,6 +1083,27 @@ describe("recordResult", () => {
     expect(response.status).toBe(400);
     expect((await response.json()).error).toContain("commentable");
     expect(github.postReview).not.toHaveBeenCalled();
+  });
+
+  it("closes a superseded run with the superseded sentences", async () => {
+    const runId = await claimedRunId();
+    (github.postReview as ReturnType<typeof vi.fn>).mockClear();
+
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, { status: "superseded", turns: 2 }),
+      { db, github },
+      runId,
+    );
+
+    expect(github.postReview).not.toHaveBeenCalled();
+    expect(github.createCommitStatus).toHaveBeenCalledWith(
+      { owner: "octo", repo: "a", number: 1 },
+      "a".repeat(40),
+      { state: "success", description: "Superseded by a newer push", context: "hawkeye" },
+      "ghs_token",
+    );
+    const [row] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
+    expect(row?.status).toBe("superseded");
   });
 
   it("does not post for a non-ok status", async () => {

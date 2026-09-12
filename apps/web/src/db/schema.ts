@@ -15,7 +15,7 @@ import { user } from "./auth-schema";
 
 export const DEFAULT_MAX_TURNS = 40;
 export const DEFAULT_WALL_CLOCK_MINUTES = 15;
-export const DEFAULT_QUIET_WINDOW_SECONDS = 180;
+export const DEFAULT_QUIET_WINDOW_SECONDS = 0;
 
 export * from "./auth-schema";
 
@@ -27,6 +27,7 @@ export const runStatus = pgEnum("run_status", [
   "timeout",
   "error",
   "invalid-output",
+  "superseded",
 ]);
 export const findingSeverity = pgEnum("finding_severity", [
   "must_fix",

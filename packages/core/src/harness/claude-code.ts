@@ -58,7 +58,7 @@ export function createClaudeCodeHarness(
 
       let turns = 0;
       let lastMessageId: string | undefined;
-      let stopReason: "max-turns" | "timeout" | undefined;
+      let stopReason: "max-turns" | "timeout" | "superseded" | undefined;
       const stderrTail: string[] = [];
 
       child.stdin!.on("error", (error: Error) => {
@@ -76,13 +76,16 @@ export function createClaudeCodeHarness(
           child.kill(signal);
         }
       };
-      const terminate = (reason: "max-turns" | "timeout") => {
+      const terminate = (reason: "max-turns" | "timeout" | "superseded") => {
         if (stopReason) return;
         stopReason = reason;
         killGroup("SIGTERM");
         setTimeout(() => killGroup("SIGKILL"), KILL_GRACE_MS).unref();
       };
       const timer = setTimeout(() => terminate("timeout"), input.wallClockMs);
+      const abort = () => terminate("superseded");
+      if (input.signal?.aborted) abort();
+      else input.signal?.addEventListener("abort", abort, { once: true });
 
       createInterface({ input: child.stdout! }).on("line", (line) => {
         input.onEvent({ type: "stdout", line });
@@ -110,7 +113,10 @@ export function createClaudeCodeHarness(
       const exitCode = await new Promise<number | null>((resolve, reject) => {
         child.on("error", reject);
         child.on("close", (code) => resolve(code));
-      }).finally(() => clearTimeout(timer));
+      }).finally(() => {
+        clearTimeout(timer);
+        input.signal?.removeEventListener("abort", abort);
+      });
 
       const hasResult = await exists(input.resultPath);
       if (hasResult) return { status: "ok", turns };

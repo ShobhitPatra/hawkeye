@@ -243,7 +243,7 @@ describe("schema migrations", () => {
       userId: "u3",
       maxTurns: 40,
       wallClockMinutes: 15,
-      quietWindowSeconds: 180,
+      quietWindowSeconds: 0,
       reviewDrafts: false,
     });
 

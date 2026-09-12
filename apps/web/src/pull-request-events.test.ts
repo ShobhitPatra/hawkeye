@@ -74,7 +74,7 @@ function jobs() {
 }
 
 describe("handlePullRequestEvent", () => {
-  it("queues a job for the merge base after the default quiet window", async () => {
+  it("queues a job for the merge base with no wait by default", async () => {
     const armed = await seedArmedPullRequest(db);
     const before = Date.now();
     const result = await handlePullRequestEvent({ db, github: fakeGitHub() }, event());
@@ -85,7 +85,8 @@ describe("handlePullRequestEvent", () => {
       { armedPrId: armed.armedPrId, headSha: "h".repeat(40), baseSha: "m".repeat(40) },
     ]);
     const delay = rows[0]!.notBefore.getTime() - before;
-    expect(delay).toBeGreaterThanOrEqual(179_000);
+    expect(delay).toBeGreaterThanOrEqual(0);
+    expect(delay).toBeLessThan(1_000);
     expect(delay).toBeLessThanOrEqual(200_000);
   });
 

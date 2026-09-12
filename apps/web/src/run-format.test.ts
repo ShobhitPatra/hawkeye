@@ -17,6 +17,7 @@ describe("run formatting", () => {
   });
   it("names every failure status in plain words and refuses the others", () => {
     expect(runFailureLabel("timeout")).toBe("ran out of time");
+    expect(runFailureLabel("superseded")).toBe("was superseded by a newer push");
     expect(runFailureLabel("invalid-output")).toBe("returned a result Hawkeye could not read");
     expect(() => runFailureLabel("ok")).toThrow();
   });

@@ -1,5 +1,6 @@
 import type { ReviewResult, RunResultStatus } from "@hawkeye/core";
 import { and, eq, inArray, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import { armedPr, job, run } from "./db/schema";
 import type { Job } from "./jobs";
@@ -205,4 +206,23 @@ export async function completeRun(
       .returning();
     return completed;
   });
+}
+
+export async function jobSuperseded(
+  db: Db,
+  current: Pick<Job, "id" | "armedPrId">,
+): Promise<boolean> {
+  const own = alias(job, "own");
+  const [newer] = await db
+    .select({ id: job.id })
+    .from(job)
+    .innerJoin(own, eq(own.id, current.id))
+    .where(
+      and(
+        eq(job.armedPrId, current.armedPrId),
+        sql`(${job.createdAt}, ${job.id}) > (${own.createdAt}, ${own.id})`,
+      ),
+    )
+    .limit(1);
+  return newer !== undefined;
 }
