@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
 import { syncInstallationsForUser } from "./installation-sync";
@@ -34,6 +34,11 @@ beforeAll(async () => {
 });
 
 describe("syncInstallationsForUser", () => {
+  beforeEach(() => {
+    getAccessToken.mockClear();
+    listUserInstallations.mockClear();
+  });
+
   it("resolves a fresh token for the user's GitHub account and syncs with it", async () => {
     const headers = new Headers({ cookie: "session=abc" });
     await expect(syncInstallationsForUser(deps(), "u-1", headers)).resolves.toEqual({
@@ -52,6 +57,6 @@ describe("syncInstallationsForUser", () => {
     await expect(syncInstallationsForUser(deps(), "u-2")).rejects.toThrow(
       "user u-2 has no GitHub account",
     );
-    expect(getAccessToken).toHaveBeenCalledTimes(1);
+    expect(getAccessToken).not.toHaveBeenCalled();
   });
 });
