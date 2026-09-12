@@ -6,7 +6,7 @@ import { getSession } from "@/session";
 import { LandingHero } from "./landing-hero";
 import { RotatingWord } from "./rotating-word";
 import { SignInButton } from "./sign-in-button";
-import { CONTRIBUTING_URL, LICENSE_URL, SELF_HOSTING_URL, SiteFooter } from "./site-footer";
+import { CONTRIBUTING_URL, REVIEWS_URL, SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
 import { parseTheme, THEME_COOKIE } from "@/theme";
 import "./landing.css";
@@ -111,21 +111,21 @@ export default async function HomePage({
 
         <section className="ld-h" aria-labelledby="open-source">
           <h2 className="hk-heading" id="open-source">
-            Open source, yours to run
+            Open source, and reviewed by itself
           </h2>
           <div className="ld-steps" data-plain>
             <div>
               <p className="hk-claim">MIT, and reviewed by itself.</p>
               <p className="hk-detail">
                 Every pull request to Hawkeye is reviewed by Hawkeye before a maintainer reads it.{" "}
-                <a href={LICENSE_URL}>Read the license</a>.
+                <a href={REVIEWS_URL}>Read the reviews</a>.
               </p>
             </div>
             <div>
-              <p className="hk-claim">Run your own instance.</p>
+              <p className="hk-claim">Hosted for you, in preview.</p>
               <p className="hk-detail">
-                A Vercel deployment on Neon Postgres, the way the hosted instance runs.{" "}
-                <a href={SELF_HOSTING_URL}>The self-hosting guide</a> takes an evening.
+                hawkeye-review.vercel.app runs the code in this repository. Sign in with GitHub,
+                install the App, and it is yours.
               </p>
             </div>
             <div>
