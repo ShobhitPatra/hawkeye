@@ -11,6 +11,10 @@ export type InstallationSyncDeps = {
   github: Pick<GitHubClient, "listUserInstallations">;
 };
 
+export function describeSyncFailure(userId: string, error: unknown): string {
+  return `installations not synced for user ${userId}: ${error instanceof Error ? error.message : String(error)}`;
+}
+
 export async function syncInstallationsForUser(
   deps: InstallationSyncDeps,
   userId: string,

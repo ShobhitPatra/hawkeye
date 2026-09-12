@@ -71,6 +71,7 @@ beforeAll(async () => {
   await db.insert(schema.user).values([
     { id: "user-1", name: "octocat", email: "octocat@example.com", githubLogin: "octocat" },
     { id: "user-2", name: "hubot", email: "hubot@example.com", githubLogin: "hubot" },
+    { id: "user-3", name: "alice", email: "alice@example.com", githubLogin: "alice" },
   ]);
   await db.insert(schema.installation).values([
     { id: "10", accountLogin: "octo", accountType: "Organization" },
@@ -182,22 +183,29 @@ describe("listUserOpenPullRequests", () => {
     ).rejects.toThrow("db down");
     expect(cache.size).toBe(0);
   });
-  it("syncs installations once per held listing and lists what is linked afterwards", async () => {
+  it("syncs installations once per held listing and lists what the sync linked", async () => {
     const cache = new Map();
-    const { github, installationTokenById } = fakeGitHub({}, {});
-    const syncInstallations = vi.fn(async () => ({ linked: 0, unlinked: 0 }));
-    await listUserOpenPullRequests(
-      { db, github, syncInstallations, cache },
-      { userId: "user-1", login: "alice", now: 0 },
+    const { github } = fakeGitHub(
+      { "token-14": [repository("fresh", "repo")] },
+      { "token-14": [pullRequest("fresh", 9, "2026-08-09T00:00:00Z")] },
     );
+    const syncInstallations = vi.fn(async () => {
+      await db
+        .insert(schema.installation)
+        .values({ id: "14", accountLogin: "fresh", accountType: "Organization" });
+      await db.insert(schema.installationUser).values({ installationId: "14", userId: "user-3" });
+      return { linked: 1, unlinked: 0 };
+    });
+    const found = await listUserOpenPullRequests(
+      { db, github, syncInstallations, cache },
+      { userId: "user-3", login: "alice", now: 0 },
+    );
+    expect(found.pullRequests.map((pr) => pr.installationId)).toEqual(["14"]);
     await listUserOpenPullRequests(
       { db, github, syncInstallations, cache },
-      { userId: "user-1", login: "alice", now: 30_000 },
+      { userId: "user-3", login: "alice", now: 30_000 },
     );
     expect(syncInstallations).toHaveBeenCalledTimes(1);
-    expect(syncInstallations.mock.invocationCallOrder[0]!).toBeLessThan(
-      installationTokenById.mock.invocationCallOrder[0]!,
-    );
   });
   it("lists the linked installations when the sync fails", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});

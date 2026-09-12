@@ -2,6 +2,7 @@ import type { GitHubClient, OpenPullRequest } from "@hawkeye/core";
 import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { hold, type HoldStore } from "./hold";
+import { describeSyncFailure } from "./installation-sync";
 import { installation, installationUser } from "./db/schema";
 
 export interface ListedPullRequest extends OpenPullRequest {
@@ -50,9 +51,7 @@ async function fetchUserOpenPullRequests(
   input: { userId: string; login: string },
 ): Promise<Listing> {
   await deps.syncInstallations?.().catch((error: unknown) => {
-    console.error(
-      `installations not synced for user ${input.userId}: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    console.error(describeSyncFailure(input.userId, error));
   });
   const installations = await deps.db
     .select({ id: installation.id })
