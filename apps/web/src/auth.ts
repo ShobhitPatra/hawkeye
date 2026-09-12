@@ -4,6 +4,7 @@ import { nextCookies } from "better-auth/next-js";
 import { getDb } from "./db";
 import * as schema from "./db/schema";
 import { env } from "./env";
+import { createGitHubAppClient } from "./github/app";
 import { syncInstallationsForUser } from "./installation-sync";
 
 function createAuth() {
@@ -16,7 +17,10 @@ function createAuth() {
       session: {
         create: {
           after: async (session) => {
-            await syncInstallationsForUser(session.userId).catch((error: unknown) => {
+            await syncInstallationsForUser(
+              { auth: getAuth(), db: getDb(), github: createGitHubAppClient({ fetch }) },
+              session.userId,
+            ).catch((error: unknown) => {
               console.error(
                 `installations not synced for user ${session.userId}: ${error instanceof Error ? error.message : String(error)}`,
               );

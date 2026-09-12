@@ -7,6 +7,7 @@ import { assertPullRequestInInstallation } from "@/arm-guard";
 import { armPullRequest, disarmPullRequest } from "@/arming";
 import { resolveReviewTarget } from "@/review-target";
 import { enqueueJob } from "@/jobs";
+import { getAuth } from "@/auth";
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
 import { installationBelongsToUser } from "@/installations";
@@ -53,7 +54,11 @@ export async function disarmAction(formData: FormData) {
 
 export async function refreshInstallationsAction() {
   const session = await requireSession();
-  await syncInstallationsForUser(session.user.id, await headers());
+  await syncInstallationsForUser(
+    { auth: getAuth(), db: getDb(), github: createGitHubAppClient({ fetch }) },
+    session.user.id,
+    await headers(),
+  );
   revalidatePath("/prs");
   revalidatePath("/overview");
 }
