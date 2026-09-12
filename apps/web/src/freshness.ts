@@ -1,4 +1,4 @@
-export const REFRESH_INTERVAL_MS = 15_000;
+export const REFRESH_INTERVAL_MS = 30_000;
 export const REFRESH_DEBOUNCE_MS = 1_000;
 
 export function shouldRefresh(input: {
