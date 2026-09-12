@@ -6,6 +6,7 @@ import * as schema from "./db/schema";
 import { env } from "./env";
 import { createGitHubAppClient } from "./github/app";
 import { syncInstallationsForUser } from "./installation-sync";
+import { forgetUserListings } from "./pull-requests";
 
 function createAuth() {
   return betterAuth({
@@ -20,11 +21,15 @@ function createAuth() {
             await syncInstallationsForUser(
               { auth: getAuth(), db: getDb(), github: createGitHubAppClient({ fetch }) },
               session.userId,
-            ).catch((error: unknown) => {
-              console.error(
-                `installations not synced for user ${session.userId}: ${error instanceof Error ? error.message : String(error)}`,
-              );
-            });
+            )
+              .then((synced) => {
+                if (synced.linked > 0 || synced.unlinked > 0) forgetUserListings(session.userId);
+              })
+              .catch((error: unknown) => {
+                console.error(
+                  `installations not synced for user ${session.userId}: ${error instanceof Error ? error.message : String(error)}`,
+                );
+              });
           },
         },
       },

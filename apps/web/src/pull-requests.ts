@@ -24,7 +24,12 @@ export function forgetUserListings(userId: string, cache: HoldStore<Listing> = l
 }
 
 export async function listUserOpenPullRequests(
-  deps: { db: Db; github: GitHubClient; cache?: HoldStore<Listing> },
+  deps: {
+    db: Db;
+    github: GitHubClient;
+    syncInstallations?: () => Promise<unknown>;
+    cache?: HoldStore<Listing>;
+  },
   input: { userId: string; login: string; now?: number },
 ): Promise<Listing> {
   return hold(
@@ -41,9 +46,14 @@ export async function listUserOpenPullRequests(
 }
 
 async function fetchUserOpenPullRequests(
-  deps: { db: Db; github: GitHubClient },
+  deps: { db: Db; github: GitHubClient; syncInstallations?: () => Promise<unknown> },
   input: { userId: string; login: string },
 ): Promise<Listing> {
+  await deps.syncInstallations?.().catch((error: unknown) => {
+    console.error(
+      `installations not synced for user ${input.userId}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  });
   const installations = await deps.db
     .select({ id: installation.id })
     .from(installation)
