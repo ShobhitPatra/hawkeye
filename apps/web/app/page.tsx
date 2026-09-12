@@ -115,7 +115,7 @@ export default async function HomePage({
           </h2>
           <div className="ld-steps" data-plain>
             <div>
-              <p className="hk-claim">MIT, and reviewed by itself.</p>
+              <p className="hk-claim">MIT licensed.</p>
               <p className="hk-detail">
                 Every pull request to Hawkeye is reviewed by Hawkeye before a maintainer reads it.{" "}
                 <a href={REVIEWS_URL}>Read the reviews</a>.
@@ -124,8 +124,8 @@ export default async function HomePage({
             <div>
               <p className="hk-claim">Hosted for you, in preview.</p>
               <p className="hk-detail">
-                hawkeye-review.vercel.app runs the code in this repository. Sign in with GitHub,
-                install the App, and it is yours.
+                hawkeye-review.vercel.app runs the same code you can read on GitHub. Sign in with
+                GitHub, install the App, and it is yours.
               </p>
             </div>
             <div>
