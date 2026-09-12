@@ -87,7 +87,6 @@ describe("handlePullRequestEvent", () => {
     const delay = rows[0]!.notBefore.getTime() - before;
     expect(delay).toBeGreaterThanOrEqual(0);
     expect(delay).toBeLessThan(1_000);
-    expect(delay).toBeLessThanOrEqual(200_000);
   });
 
   it("collapses a second push onto the waiting job", async () => {
