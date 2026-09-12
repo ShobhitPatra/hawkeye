@@ -541,6 +541,23 @@ describe("heartbeat", () => {
     expect(await second.json()).toEqual({ ok: true, superseded: true });
   });
 
+  it("does not count a newer job for the same head as superseding", async () => {
+    const queued = await enqueue();
+    await claimJob(request("/api/runner/jobs"), claimDeps());
+    await enqueueJob(db, {
+      armedPrId: "armed-1",
+      headSha: queued.headSha,
+      baseSha: "b".repeat(40),
+      notBefore: now,
+    });
+    const response = await heartbeat(
+      request(`/api/runner/jobs/${queued.id}/heartbeat`, { method: "POST" }),
+      { db },
+      queued.id,
+    );
+    expect(await response.json()).toEqual({ ok: true, superseded: false });
+  });
+
   it("409s for a job the runner does not hold", async () => {
     const queued = await enqueue();
 

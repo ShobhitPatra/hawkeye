@@ -1,5 +1,5 @@
 import type { ReviewResult, RunResultStatus } from "@hawkeye/core";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import { armedPr, job, run } from "./db/schema";
@@ -220,6 +220,7 @@ export async function jobSuperseded(
     .where(
       and(
         eq(job.armedPrId, current.armedPrId),
+        ne(job.headSha, own.headSha),
         sql`(${job.createdAt}, ${job.id}) > (${own.createdAt}, ${own.id})`,
       ),
     )
