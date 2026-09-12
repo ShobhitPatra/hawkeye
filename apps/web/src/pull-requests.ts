@@ -2,6 +2,7 @@ import type { GitHubClient, OpenPullRequest } from "@hawkeye/core";
 import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { hold, type HoldStore } from "./hold";
+import { describeSyncFailure } from "./installation-sync";
 import { installation, installationUser } from "./db/schema";
 
 export interface ListedPullRequest extends OpenPullRequest {
@@ -24,7 +25,12 @@ export function forgetUserListings(userId: string, cache: HoldStore<Listing> = l
 }
 
 export async function listUserOpenPullRequests(
-  deps: { db: Db; github: GitHubClient; cache?: HoldStore<Listing> },
+  deps: {
+    db: Db;
+    github: GitHubClient;
+    syncInstallations?: () => Promise<unknown>;
+    cache?: HoldStore<Listing>;
+  },
   input: { userId: string; login: string; now?: number },
 ): Promise<Listing> {
   return hold(
@@ -41,9 +47,12 @@ export async function listUserOpenPullRequests(
 }
 
 async function fetchUserOpenPullRequests(
-  deps: { db: Db; github: GitHubClient },
+  deps: { db: Db; github: GitHubClient; syncInstallations?: () => Promise<unknown> },
   input: { userId: string; login: string },
 ): Promise<Listing> {
+  await deps.syncInstallations?.().catch((error: unknown) => {
+    console.error(describeSyncFailure(input.userId, error));
+  });
   const installations = await deps.db
     .select({ id: installation.id })
     .from(installation)

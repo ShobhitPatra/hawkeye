@@ -1,5 +1,8 @@
+import { headers } from "next/headers";
+import { getAuth } from "@/auth";
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
+import { syncInstallationsForUser } from "@/installation-sync";
 import { listPullRequestStatuses } from "@/pull-request-status";
 import { listUserOpenPullRequests } from "@/pull-requests";
 import { requestRunnerStatus } from "@/request-runner-status";
@@ -25,9 +28,20 @@ export default async function PullRequestsPage() {
   }
 
   const db = getDb();
+  const github = createGitHubAppClient({ fetch });
+  const requestHeaders = await headers();
   const [{ pullRequests, failures }, statuses, runner] = await Promise.all([
     listUserOpenPullRequests(
-      { db, github: createGitHubAppClient({ fetch }) },
+      {
+        db,
+        github,
+        syncInstallations: () =>
+          syncInstallationsForUser(
+            { auth: getAuth(), db, github },
+            session.user.id,
+            requestHeaders,
+          ),
+      },
       { userId: session.user.id, login },
     ),
     listPullRequestStatuses(db, session.user.id),

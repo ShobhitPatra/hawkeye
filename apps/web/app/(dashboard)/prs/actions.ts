@@ -1,17 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { parseArmInput, parsePullRequestInput } from "@/arm-input";
 import { assertPullRequestInInstallation } from "@/arm-guard";
 import { armPullRequest, disarmPullRequest } from "@/arming";
 import { resolveReviewTarget } from "@/review-target";
 import { enqueueJob } from "@/jobs";
-import { getAuth } from "@/auth";
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
 import { installationBelongsToUser } from "@/installations";
-import { syncInstallationsForUser } from "@/installation-sync";
 import { requireSession } from "@/session";
 
 export async function armAction(formData: FormData) {
@@ -50,15 +47,4 @@ export async function disarmAction(formData: FormData) {
 
   await disarmPullRequest(getDb(), { ...input, userId: session.user.id });
   revalidatePath("/prs");
-}
-
-export async function refreshInstallationsAction() {
-  const session = await requireSession();
-  await syncInstallationsForUser(
-    { auth: getAuth(), db: getDb(), github: createGitHubAppClient({ fetch }) },
-    session.user.id,
-    await headers(),
-  );
-  revalidatePath("/prs");
-  revalidatePath("/overview");
 }

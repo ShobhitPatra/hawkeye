@@ -4,13 +4,16 @@ import type { getAuth } from "./auth";
 import type { Db } from "./db/client";
 import { account } from "./db/schema";
 import { type InstallationSync, syncUserInstallations } from "./installations";
-import { forgetUserListings } from "./pull-requests";
 
 export type InstallationSyncDeps = {
   auth: Pick<ReturnType<typeof getAuth>, "api">;
   db: Db;
   github: Pick<GitHubClient, "listUserInstallations">;
 };
+
+export function describeSyncFailure(userId: string, error: unknown): string {
+  return `installations not synced for user ${userId}: ${error instanceof Error ? error.message : String(error)}`;
+}
 
 export async function syncInstallationsForUser(
   deps: InstallationSyncDeps,
@@ -26,7 +29,5 @@ export async function syncInstallationsForUser(
     body: { accountId: githubAccount.id, userId },
     ...(headers ? { headers } : {}),
   });
-  const synced = await syncUserInstallations(deps.db, deps.github, { userId, token: accessToken });
-  if (synced.linked > 0 || synced.unlinked > 0) forgetUserListings(userId);
-  return synced;
+  return syncUserInstallations(deps.db, deps.github, { userId, token: accessToken });
 }

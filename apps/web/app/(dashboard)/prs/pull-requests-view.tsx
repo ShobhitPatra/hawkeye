@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { formatUpdated } from "@/format-updated";
 import type { InstallationFailure, ListedPullRequest } from "@/pull-requests";
-import { refreshInstallationsAction } from "./actions";
 import type { PullRequestStatus } from "@/pull-request-status";
 import type { RunnerStatus } from "@/runner-status";
 import { PullRequestTable } from "./pull-request-table";
@@ -69,11 +68,8 @@ export function PullRequestsView({
             <a href="https://github.com/settings/installations">
               Install the GitHub App on another repository
             </a>
-            , then refresh to see its pull requests here.
+            ; its pull requests appear here within a minute.
           </p>
-          <form action={refreshInstallationsAction}>
-            <button type="submit">Refresh</button>
-          </form>
         </div>
       ) : (
         <PullRequestTable
