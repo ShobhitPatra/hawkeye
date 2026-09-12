@@ -2,7 +2,7 @@ import type { GitHubClient, InstallationRepository, OpenPullRequest } from "@haw
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
-import { listUserOpenPullRequests } from "./pull-requests";
+import { forgetUserListings, listUserOpenPullRequests } from "./pull-requests";
 import { createTestDb } from "./test/pglite";
 
 let db: Db;
@@ -45,6 +45,7 @@ function fakeGitHub(
   const github: GitHubClient = {
     installationTokenById,
     listInstallationRepositories,
+    listUserInstallations: vi.fn(async () => []),
     listOpenPullRequestsByAuthor,
     installationToken: unsupported(),
     pullRequest: unsupported(),
@@ -234,5 +235,22 @@ describe("listUserOpenPullRequests", () => {
     expect(found.failures).toEqual([
       { installationId: "10", message: "installation token minting failed" },
     ]);
+  });
+});
+
+describe("forgetUserListings", () => {
+  it("drops only the user's held listings", () => {
+    const cache = new Map([
+      [
+        "u-1:octocat",
+        { at: 0, ttl: 60_000, value: Promise.resolve({ pullRequests: [], failures: [] }) },
+      ],
+      [
+        "u-2:hubot",
+        { at: 0, ttl: 60_000, value: Promise.resolve({ pullRequests: [], failures: [] }) },
+      ],
+    ]);
+    forgetUserListings("u-1", cache);
+    expect([...cache.keys()]).toEqual(["u-2:hubot"]);
   });
 });

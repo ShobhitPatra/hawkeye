@@ -6,6 +6,7 @@ import { ThemeChoice } from "../theme-choice";
 import { LiveRefresh } from "./live-refresh";
 import { NavLinks } from "./nav-links";
 import { SignOutButton } from "./sign-out-button";
+import { refreshInstallationsAction } from "./prs/actions";
 
 export function TopBar({
   user,
@@ -43,6 +44,9 @@ export function TopBar({
             </div>
             <ThemeChoice theme={theme} />
             <a href="https://github.com/settings/installations">Manage installation on GitHub</a>
+            <form action={refreshInstallationsAction}>
+              <button type="submit">Refresh installations</button>
+            </form>
             <SignOutButton />
             <div className="hk-menu-legal">
               <a href="/security">Security</a>

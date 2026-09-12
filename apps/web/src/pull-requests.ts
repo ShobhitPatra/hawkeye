@@ -19,6 +19,10 @@ export const FAILED_LIST_TTL_MS = 15_000;
 type Listing = { pullRequests: ListedPullRequest[]; failures: InstallationFailure[] };
 const listings: HoldStore<Listing> = new Map();
 
+export function forgetUserListings(userId: string, cache: HoldStore<Listing> = listings) {
+  for (const key of cache.keys()) if (key.startsWith(`${userId}:`)) cache.delete(key);
+}
+
 export async function listUserOpenPullRequests(
   deps: { db: Db; github: GitHubClient; cache?: HoldStore<Listing> },
   input: { userId: string; login: string; now?: number },

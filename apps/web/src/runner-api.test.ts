@@ -32,6 +32,7 @@ function createGitHub(): GitHubClient {
     review: vi.fn(async () => ({ body: "" })),
     createCommitStatus: vi.fn(async () => {}),
     listInstallationRepositories: unsupported(),
+    listUserInstallations: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
   };
 }
