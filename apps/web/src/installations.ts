@@ -69,7 +69,9 @@ export async function syncUserInstallations(
   github: Pick<GitHubClient, "listUserInstallations">,
   input: { userId: string; token: string },
 ): Promise<InstallationSync> {
-  const accessible = await github.listUserInstallations(input.token);
+  const accessible = (await github.listUserInstallations(input.token)).filter(
+    (entry) => !entry.suspended,
+  );
   const ids = accessible.map((entry) => entry.id);
   return db.transaction(async (tx) => {
     for (const entry of accessible) {

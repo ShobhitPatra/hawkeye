@@ -19,7 +19,12 @@ export type PullRequestDetails = {
 export type LinkedIssue = { number: number; title: string; body: string };
 export type CommitStatus = { state: "pending" | "success"; description: string; context: string };
 
-export type UserInstallation = { id: string; accountLogin: string; accountType: string };
+export type UserInstallation = {
+  id: string;
+  accountLogin: string;
+  accountType: string;
+  suspended: boolean;
+};
 
 export type InstallationRepository = {
   owner: string;
@@ -399,11 +404,18 @@ export function createGitHubClient(input: {
     async listUserInstallations(userToken) {
       return paginate("/user/installations", userToken, (payload) =>
         (
-          payload as { installations: { id: number; account: { login: string; type: string } }[] }
+          payload as {
+            installations: {
+              id: number;
+              account: { login: string; type: string };
+              suspended_at: string | null;
+            }[];
+          }
         ).installations.map((entry) => ({
           id: String(entry.id),
           accountLogin: entry.account.login,
           accountType: entry.account.type,
+          suspended: entry.suspended_at !== null,
         })),
       );
     },

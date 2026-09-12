@@ -77,16 +77,20 @@ describe("createGitHubClient", () => {
         json: {
           total_count: 2,
           installations: [
-            { id: 155, account: { login: "octo", type: "Organization" } },
-            { id: 9, account: { login: "hubot", type: "User" } },
+            { id: 155, account: { login: "octo", type: "Organization" }, suspended_at: null },
+            {
+              id: 9,
+              account: { login: "hubot", type: "User" },
+              suspended_at: "2026-09-01T00:00:00Z",
+            },
           ],
         },
       }),
     });
     const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
     await expect(client.listUserInstallations("gho_user")).resolves.toEqual([
-      { id: "155", accountLogin: "octo", accountType: "Organization" },
-      { id: "9", accountLogin: "hubot", accountType: "User" },
+      { id: "155", accountLogin: "octo", accountType: "Organization", suspended: false },
+      { id: "9", accountLogin: "hubot", accountType: "User", suspended: true },
     ]);
     expect((calls[0]!.init.headers as Record<string, string>).Authorization).toBe(
       "Bearer gho_user",

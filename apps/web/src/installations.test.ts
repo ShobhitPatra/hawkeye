@@ -138,42 +138,59 @@ describe("installationBelongsToUser", () => {
 describe("syncUserInstallations", () => {
   const listUserInstallations = vi.fn();
   const github = { listUserInstallations };
+  const octo = { id: "500", accountLogin: "octo", accountType: "Organization", suspended: false };
+  const sam = { id: "501", accountLogin: "sam", accountType: "User", suspended: false };
 
   beforeAll(async () => {
-    await db.insert(schema.user).values({ id: "u-sync", name: "sam", email: "sam@example.com" });
+    await db.insert(schema.user).values([
+      { id: "u-link", name: "sam", email: "link@example.com" },
+      { id: "u-drop", name: "sam", email: "drop@example.com" },
+      { id: "u-none", name: "sam", email: "none@example.com" },
+      { id: "u-suspended", name: "sam", email: "suspended@example.com" },
+    ]);
   });
 
   it("links every accessible installation, upserting ones the webhook never delivered", async () => {
-    listUserInstallations.mockResolvedValueOnce([
-      { id: "500", accountLogin: "octo", accountType: "Organization" },
-      { id: "501", accountLogin: "sam", accountType: "User" },
-    ]);
+    listUserInstallations.mockResolvedValueOnce([octo, sam]);
     await expect(
-      syncUserInstallations(db, github, { userId: "u-sync", token: "gho_x" }),
+      syncUserInstallations(db, github, { userId: "u-link", token: "gho_x" }),
     ).resolves.toEqual({ linked: 2, unlinked: 0 });
     expect(listUserInstallations).toHaveBeenCalledWith("gho_x");
     expect(await readInstallation("501")).toMatchObject({ accountLogin: "sam", deletedAt: null });
-    expect(await installationBelongsToUser(db, "500", "u-sync")).toBe(true);
-    expect(await installationBelongsToUser(db, "501", "u-sync")).toBe(true);
+    expect(await installationBelongsToUser(db, "500", "u-link")).toBe(true);
+    expect(await installationBelongsToUser(db, "501", "u-link")).toBe(true);
   });
 
   it("unlinks installations the account can no longer reach and keeps the rest", async () => {
-    listUserInstallations.mockResolvedValueOnce([
-      { id: "500", accountLogin: "octo", accountType: "Organization" },
-    ]);
+    listUserInstallations.mockResolvedValueOnce([octo, sam]).mockResolvedValueOnce([octo]);
+    await syncUserInstallations(db, github, { userId: "u-drop", token: "gho_x" });
     await expect(
-      syncUserInstallations(db, github, { userId: "u-sync", token: "gho_x" }),
+      syncUserInstallations(db, github, { userId: "u-drop", token: "gho_x" }),
     ).resolves.toEqual({ linked: 0, unlinked: 1 });
-    expect(await installationBelongsToUser(db, "500", "u-sync")).toBe(true);
-    expect(await installationBelongsToUser(db, "501", "u-sync")).toBe(false);
+    expect(await installationBelongsToUser(db, "500", "u-drop")).toBe(true);
+    expect(await installationBelongsToUser(db, "501", "u-drop")).toBe(false);
     expect(await readInstallation("501")).toMatchObject({ deletedAt: null });
   });
 
   it("unlinks everything when the account can reach no installation", async () => {
-    listUserInstallations.mockResolvedValueOnce([]);
+    listUserInstallations.mockResolvedValueOnce([octo]).mockResolvedValueOnce([]);
+    await syncUserInstallations(db, github, { userId: "u-none", token: "gho_x" });
     await expect(
-      syncUserInstallations(db, github, { userId: "u-sync", token: "gho_x" }),
+      syncUserInstallations(db, github, { userId: "u-none", token: "gho_x" }),
     ).resolves.toEqual({ linked: 0, unlinked: 1 });
-    expect(await installationBelongsToUser(db, "500", "u-sync")).toBe(false);
+    expect(await installationBelongsToUser(db, "500", "u-none")).toBe(false);
+  });
+
+  it("treats a suspended installation as unreachable and leaves its row alone", async () => {
+    await recordInstallation(db, installationEvent("created", 777, 1));
+    await recordInstallation(db, installationEvent("suspend", 777, 1));
+    listUserInstallations.mockResolvedValueOnce([
+      { id: "777", accountLogin: "octo", accountType: "Organization", suspended: true },
+    ]);
+    await expect(
+      syncUserInstallations(db, github, { userId: "u-suspended", token: "gho_x" }),
+    ).resolves.toEqual({ linked: 0, unlinked: 0 });
+    expect((await readInstallation("777"))?.deletedAt).not.toBeNull();
+    expect(await installationBelongsToUser(db, "777", "u-suspended")).toBe(false);
   });
 });
