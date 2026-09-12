@@ -50,7 +50,7 @@ import {
 } from "./reviewing-line";
 import { requireRunner } from "./runner-auth";
 
-export const DEFAULT_CLAIM_POLL_INTERVAL_MS = 2_000;
+export const DEFAULT_CLAIM_POLL_INTERVAL_MS = 5_000;
 export const DEFAULT_CLAIM_POLL_TOTAL_MS = 25_000;
 
 export type ClaimDeps = {
