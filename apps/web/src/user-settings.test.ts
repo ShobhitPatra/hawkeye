@@ -122,9 +122,9 @@ describe("runner settings", () => {
     expect((await readRunnerSettings(db, "u1")).model).toBeNull();
   });
 
-  it("refuses to read a model it does not know", async () => {
+  it("returns a stored model that has left the list, so the page can say so", async () => {
     await db.insert(schema.userSettings).values({ userId: "u1", model: "haiku" });
-    await expect(readRunnerSettings(db, "u1")).rejects.toThrow("unknown model setting: haiku");
+    expect((await readRunnerSettings(db, "u1")).model).toBe("haiku");
   });
 
   it("parses the radios and the limits", () => {

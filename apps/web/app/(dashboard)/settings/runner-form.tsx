@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import {
+  isModelChoice,
   MAX_TURNS_RANGE,
   MODELS,
   type RunnerSettings,
@@ -14,6 +15,7 @@ export function RunnerForm({ settings }: { settings: RunnerSettings }) {
     saveRunnerSettingsAction,
     {},
   );
+  const retired = settings.model !== null && !isModelChoice(settings.model);
   return (
     <form action={formAction} className="hk-section">
       <fieldset className="hk-choice" data-stack>
@@ -34,6 +36,12 @@ export function RunnerForm({ settings }: { settings: RunnerSettings }) {
           The CLI's default
         </label>
       </fieldset>
+      {retired && (
+        <p className="hk-help">
+          Your saved model, {settings.model}, is no longer in the list; reviews still ask for it
+          until you choose another and save.
+        </p>
+      )}
       <p className="hk-help">
         Passed to the claude CLI as --model on every review from the next claim. A runner started
         with --model keeps that model instead.

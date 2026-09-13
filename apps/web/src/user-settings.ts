@@ -7,10 +7,9 @@ import {
   userSettings,
 } from "./db/schema";
 import {
+  isModelChoice,
   MAX_QUIET_WINDOW_SECONDS,
   MAX_TURNS_RANGE,
-  MODEL_CHOICES,
-  type ModelChoice,
   type ReviewSettings,
   type RunnerSettings,
   WALL_CLOCK_MINUTES_RANGE,
@@ -67,10 +66,6 @@ export const DEFAULT_RUNNER_SETTINGS: RunnerSettings = {
   wallClockMinutes: DEFAULT_WALL_CLOCK_MINUTES,
 };
 
-function isModelChoice(value: string): value is ModelChoice {
-  return (MODEL_CHOICES as readonly string[]).includes(value);
-}
-
 export async function readRunnerSettings(db: Db, userId: string): Promise<RunnerSettings> {
   const [row] = await db
     .select({
@@ -80,11 +75,7 @@ export async function readRunnerSettings(db: Db, userId: string): Promise<Runner
     })
     .from(userSettings)
     .where(eq(userSettings.userId, userId));
-  if (!row) return DEFAULT_RUNNER_SETTINGS;
-  if (row.model !== null && !isModelChoice(row.model)) {
-    throw new Error(`user ${userId} has an unknown model setting: ${row.model}`);
-  }
-  return { model: row.model, maxTurns: row.maxTurns, wallClockMinutes: row.wallClockMinutes };
+  return row ?? DEFAULT_RUNNER_SETTINGS;
 }
 
 export async function saveRunnerSettings(
