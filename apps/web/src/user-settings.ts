@@ -1,14 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { DEFAULT_QUIET_WINDOW_SECONDS, userSettings } from "./db/schema";
-
-export const MAX_QUIET_WINDOW_SECONDS = 600;
-
-export type ReviewSettings = {
-  autoReview: boolean;
-  reviewDrafts: boolean;
-  quietWindowSeconds: number;
-};
+import { MAX_QUIET_WINDOW_SECONDS, type ReviewSettings } from "./review-settings";
 
 export const DEFAULT_REVIEW_SETTINGS: ReviewSettings = {
   autoReview: true,

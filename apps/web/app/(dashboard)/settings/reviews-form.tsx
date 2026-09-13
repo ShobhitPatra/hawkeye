@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { MAX_QUIET_WINDOW_SECONDS, type ReviewSettings } from "@/user-settings";
+import { MAX_QUIET_WINDOW_SECONDS, type ReviewSettings } from "@/review-settings";
 import { type SaveState, saveReviewSettingsAction } from "./actions";
 
 export function ReviewsForm({ settings }: { settings: ReviewSettings }) {
@@ -30,6 +30,7 @@ export function ReviewsForm({ settings }: { settings: ReviewSettings }) {
             name="quietWindowSeconds"
             type="number"
             inputMode="numeric"
+            required
             min={0}
             max={MAX_QUIET_WINDOW_SECONDS}
             step={1}
@@ -38,8 +39,7 @@ export function ReviewsForm({ settings }: { settings: ReviewSettings }) {
           <span className="hk-compact hk-muted">seconds</span>
         </div>
         <p className="hk-help">
-          0 reviews each push at once. A wait lets a burst of pushes become one review; a pull
-          request can carry its own wait, which wins.
+          0 reviews each push at once. A wait lets a burst of pushes become one review.
         </p>
       </div>
       <div className="hk-action-row">
