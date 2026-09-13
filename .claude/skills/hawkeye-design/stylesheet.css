@@ -809,6 +809,10 @@ html {
   width: 14px;
   height: 14px;
 }
+.hk-choice[data-stack] {
+  flex-direction: column;
+  gap: var(--hk-space-2);
+}
 .hk-textarea {
   min-height: 160px;
   padding: var(--hk-space-2) var(--hk-space-3);
