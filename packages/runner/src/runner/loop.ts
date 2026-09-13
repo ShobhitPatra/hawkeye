@@ -14,15 +14,17 @@ export const DEFAULT_RETRY_DELAY_MS = 5_000;
 export const DEFAULT_EMPTY_POLL_DELAY_MS = 1_000;
 export const DEFAULT_RESULT_RETRY_DELAYS_MS = [2_000, 4_000, 8_000];
 export const ONCE_CLAIM_ATTEMPTS = 3;
+export const DEFAULT_CONCURRENCY = 1;
 
-export type RunnerEvent =
+export type RunnerEvent = { slot?: number } & (
   | { state: "claimed"; subject: string; headSha: string }
   | { state: "reviewing"; runDirectory: string }
   | { state: "posted"; result: ReviewResult; turns: number; durationMs: number }
   | {
       state: "skipped" | "failed" | "waiting" | "delivered" | "idle" | "superseded";
       detail: string;
-    };
+    }
+);
 
 export type RunnerLoopDependencies = {
   client: ControlPlaneClient;
@@ -32,7 +34,7 @@ export type RunnerLoopDependencies = {
   createRunDirectory(reference: ClaimedJob["pullRequest"]): Promise<string>;
   fetch: typeof fetch;
   report(event: RunnerEvent): void;
-  log(line: string): void;
+  log(line: string, runDirectory?: string): void;
   contractOverride?: string;
   signal?: AbortSignal;
   heartbeatIntervalMs?: number;
@@ -94,7 +96,7 @@ async function reportFor(
       harness: deps.harness,
       createWorktree: deps.createWorktree,
       readRepositoryRules: deps.readRepositoryRules,
-      log: deps.log,
+      log: (line) => deps.log(line, runDirectory),
       onTurn: () => {
         deps.client
           .sendEvents(job.runId, [{ type: "turn", at: new Date().toISOString() }])
@@ -196,8 +198,13 @@ async function deliverResult(
 
 export async function runJob(
   claimed: ClaimedJob,
-  deps: RunnerLoopDependencies,
+  loopDeps: RunnerLoopDependencies,
+  slot?: number,
 ): Promise<"delivered" | "dropped" | "undelivered"> {
+  const deps: RunnerLoopDependencies =
+    slot === undefined
+      ? loopDeps
+      : { ...loopDeps, report: (event) => loopDeps.report({ ...event, slot }) };
   const { job, pullRequest } = claimed;
   const startedAt = Date.now();
   deps.report({
@@ -247,7 +254,16 @@ export async function runRunnerLoop(
 ): Promise<void> {
   const sleep = deps.sleep ?? sleepFor;
   let failedClaims = 0;
+  let concurrency = DEFAULT_CONCURRENCY;
+  const running = new Map<number, Promise<unknown>>();
+  const freeSlot = () => {
+    for (let slot = 1; ; slot += 1) if (!running.has(slot)) return slot;
+  };
   while (!deps.signal?.aborted) {
+    if (running.size >= concurrency) {
+      await Promise.race(running.values());
+      continue;
+    }
     let claimed: ClaimedJob | undefined;
     try {
       claimed = await deps.client.claimJob(deps.signal ? { signal: deps.signal } : {});
@@ -276,10 +292,17 @@ export async function runRunnerLoop(
       await sleep(deps.emptyPollDelayMs ?? DEFAULT_EMPTY_POLL_DELAY_MS, deps.signal);
       continue;
     }
-    const delivery = await runJob(claimed, deps);
     if (options.once) {
+      const delivery = await runJob(claimed, deps);
       if (delivery === "undelivered") throw new Error("the result was not delivered");
       return;
     }
+    concurrency = claimed.settings.concurrency ?? DEFAULT_CONCURRENCY;
+    const slot = freeSlot();
+    const finished = runJob(claimed, deps, concurrency > 1 ? slot : undefined).finally(() =>
+      running.delete(slot),
+    );
+    running.set(slot, finished);
   }
+  await Promise.all(running.values());
 }

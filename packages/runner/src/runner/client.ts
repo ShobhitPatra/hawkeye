@@ -97,6 +97,7 @@ function claimedJob(payload: unknown): ClaimedJob {
   const promptOverride = settings.promptOverride;
   const model = settings.model;
   const harness = settings.harness;
+  const concurrency = settings.concurrency;
   return {
     job: {
       id: text(job.id, "job.id"),
@@ -118,6 +119,9 @@ function claimedJob(payload: unknown): ClaimedJob {
         : { promptOverride: text(promptOverride, "settings.promptOverride") }),
       ...(model === undefined ? {} : { model: text(model, "settings.model") }),
       ...(harness === undefined ? {} : { harness: text(harness, "settings.harness") }),
+      ...(concurrency === undefined
+        ? {}
+        : { concurrency: integer(concurrency, "settings.concurrency") }),
     },
     ...(root.previousRound === undefined
       ? {}

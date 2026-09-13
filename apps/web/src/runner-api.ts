@@ -13,6 +13,7 @@ import { and, desc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import {
+  DEFAULT_CONCURRENCY,
   DEFAULT_HARNESS,
   armedPr,
   DEFAULT_MAX_TURNS,
@@ -86,6 +87,7 @@ async function settingsFor(db: Db, userId: string): Promise<ClaimedJob["settings
     ...(row?.promptOverride ? { promptOverride: row.promptOverride } : {}),
     ...(row?.model ? { model: row.model } : {}),
     harness: row?.harness ?? DEFAULT_HARNESS,
+    concurrency: row?.concurrency ?? DEFAULT_CONCURRENCY,
   };
 }
 

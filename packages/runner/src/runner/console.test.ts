@@ -43,6 +43,22 @@ describe("runnerConsole", () => {
       "10:06:43  idle       no job queued",
     ]);
   });
+  it("prefixes the slot when a job carries one and logs into that job's run directory", () => {
+    const c = console();
+    c.report({ state: "claimed", subject: "o/r#7", headSha: "a".repeat(40), slot: 2 });
+    c.report({ state: "reviewing", runDirectory: "/home/u/runs/2", slot: 2 });
+    c.log("turn 1", "/home/u/runs/1");
+    c.log("turn 1", "/home/u/runs/2");
+    expect(c.lines).toEqual([
+      "10:06:43  claimed    [2] o/r#7 at aaaaaaa",
+      "10:06:43  reviewing  [2] ~/runs/2",
+    ]);
+    expect(c.files).toEqual({
+      "/home/u/runs/1/log.txt": "turn 1\n",
+      "/home/u/runs/2/log.txt": "turn 1\n",
+    });
+  });
+
   it("colors only the time, the failed and waiting words and the verdict", () => {
     const c = console({
       dim: (text) => `<d>${text}</d>`,

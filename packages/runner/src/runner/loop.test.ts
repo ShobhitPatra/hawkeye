@@ -171,6 +171,55 @@ describe("runRunnerLoop", () => {
     const harnessInput = (d.harness.run as ReturnType<typeof vi.fn>).mock.calls[0]![0];
     expect(harnessInput).toMatchObject({ maxTurns: 3, wallClockMs: 60_000, model: "sonnet" });
   });
+  it("runs up to the job's concurrency at once and numbers the slots", async () => {
+    const second: ClaimedJob = {
+      ...claimedJob,
+      job: { ...claimedJob.job, id: "job-2", runId: "run-2" },
+      pullRequest: { owner: "o", repo: "r", number: 8 },
+    };
+    const withPool = (job: ClaimedJob) => ({
+      ...job,
+      settings: { ...job.settings, concurrency: 2 },
+    });
+    const plane = await fakeControlPlane(scripted([withPool(claimedJob), withPool(second)]));
+    servers.push(plane.server);
+    const stop = new AbortController();
+    const d = await deps(plane.baseUrl, { signal: stop.signal });
+    let started = 0;
+    let release: () => void = () => {};
+    const bothStarted = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    d.harness = {
+      name: "gate",
+      run: async (i) => {
+        started += 1;
+        if (started === 2) release();
+        await bothStarted;
+        await writeFile(i.resultPath, JSON.stringify(review));
+        return { status: "ok", turns: 1 };
+      },
+    };
+    const loop = runRunnerLoop(d);
+    await bothStarted;
+    stop.abort();
+    await loop;
+    const claimedEvents = d.reported.filter((event) => event.state === "claimed");
+    expect(claimedEvents.map((event) => event.slot)).toEqual([1, 2]);
+    expect(
+      d.reported.filter((event) => event.state === "posted").map((event) => event.slot),
+    ).toEqual([1, 2]);
+    expect(plane.received.filter((r) => r.url.endsWith("/result"))).toHaveLength(2);
+  });
+
+  it("runs one job at a time and carries no slot when concurrency is one", async () => {
+    const plane = await fakeControlPlane(scripted([claimedJob]));
+    servers.push(plane.server);
+    const d = await deps(plane.baseUrl);
+    await runRunnerLoop(d, { once: true });
+    expect(d.reported.every((event) => event.slot === undefined)).toBe(true);
+  });
+
   it("heartbeats while the review runs", async () => {
     const plane = await fakeControlPlane(scripted([claimedJob]));
     servers.push(plane.server);
