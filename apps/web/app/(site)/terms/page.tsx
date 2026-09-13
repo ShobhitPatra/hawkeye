@@ -12,9 +12,11 @@ export default function TermsPage() {
       </p>
       <h2 className="hk-heading">What you get</h2>
       <p>
-        A free, hosted control plane that queues reviews for the pull requests you choose and posts
-        them on GitHub as the Hawkeye bot. It is offered as it is, without warranty of any kind, and
-        it may change, pause or stop; when it stops, this page and the repository say so first.
+        A free, hosted control plane that queues a review for every pull request you open in a
+        repository you linked, and for any other pull request you turn on, and posts the reviews on
+        GitHub as the Hawkeye bot. Reviews start without a click, so each pull request you open
+        spends your plan. It is offered as it is, without warranty of any kind, and it may change,
+        pause or stop; when it stops, this page and the repository say so first.
       </p>
       <h2 className="hk-heading">What you are responsible for</h2>
       <ul>
@@ -23,8 +25,9 @@ export default function TermsPage() {
           your own login, so staying within that plan's terms is yours to keep.
         </li>
         <li>
-          Your repositories. Turn reviews on only for pull requests you may share with a reviewer
-          running on your machine, and install the App only where you are allowed to.
+          Your repositories. Install the App, and link it, only where you may share the code with a
+          reviewer running on your machine; every pull request you open there is reviewed until you
+          pause it.
         </li>
         <li>
           Your runner tokens and sign-in. Revoke a token from the runners page if a machine is lost.
