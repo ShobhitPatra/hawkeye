@@ -126,7 +126,7 @@ describe("claimJob", () => {
     expect(body.job.headSha).toBe("a".repeat(40));
     expect(body.pullRequest).toEqual({ owner: "octo", repo: "a", number: 1 });
     expect(body.installationToken).toBe("ghs_token");
-    expect(body.settings).toEqual({ maxTurns: 40, wallClockMinutes: 15 });
+    expect(body.settings).toEqual({ maxTurns: 40, wallClockMinutes: 15, harness: "claude-code" });
     expect(github.installationTokenById).toHaveBeenCalledWith("10");
     expect(github.createCommitStatus).toHaveBeenCalledWith(
       { owner: "octo", repo: "a", number: 1 },
@@ -258,12 +258,19 @@ describe("claimJob", () => {
       maxTurns: 7,
       wallClockMinutes: 3,
       promptOverride: "be brief",
+      model: "claude-opus-5",
     });
 
     const response = await claimJob(request("/api/runner/jobs"), claimDeps());
 
     expect(await response.json()).toMatchObject({
-      settings: { maxTurns: 7, wallClockMinutes: 3, promptOverride: "be brief" },
+      settings: {
+        maxTurns: 7,
+        wallClockMinutes: 3,
+        promptOverride: "be brief",
+        model: "claude-opus-5",
+        harness: "claude-code",
+      },
     });
   });
 

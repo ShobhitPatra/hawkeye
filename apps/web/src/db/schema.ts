@@ -16,6 +16,7 @@ import { user } from "./auth-schema";
 export const DEFAULT_MAX_TURNS = 40;
 export const DEFAULT_WALL_CLOCK_MINUTES = 15;
 export const DEFAULT_QUIET_WINDOW_SECONDS = 0;
+export const DEFAULT_HARNESS = "claude-code";
 
 export * from "./auth-schema";
 
@@ -201,6 +202,8 @@ export const userSettings = pgTable("user_settings", {
   quietWindowSeconds: integer("quiet_window_s").notNull().default(DEFAULT_QUIET_WINDOW_SECONDS),
   reviewDrafts: boolean("review_drafts").notNull().default(false),
   autoReview: boolean("auto_review").notNull().default(true),
+  model: text("model"),
+  harness: text("harness").notNull().default(DEFAULT_HARNESS),
 });
 
 export const runnerLogin = pgTable("runner_login", {

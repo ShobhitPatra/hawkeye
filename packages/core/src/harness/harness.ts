@@ -14,6 +14,7 @@ export type HarnessRunInput = {
   settingsPath: string;
   maxTurns: number;
   wallClockMs: number;
+  model?: string;
   signal?: AbortSignal;
   onEvent(event: HarnessEvent): void;
 };

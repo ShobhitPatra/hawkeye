@@ -95,6 +95,8 @@ function claimedJob(payload: unknown): ClaimedJob {
   const pullRequest = record(root.pullRequest, "pullRequest");
   const settings = record(root.settings, "settings");
   const promptOverride = settings.promptOverride;
+  const model = settings.model;
+  const harness = settings.harness;
   return {
     job: {
       id: text(job.id, "job.id"),
@@ -114,6 +116,8 @@ function claimedJob(payload: unknown): ClaimedJob {
       ...(promptOverride === undefined
         ? {}
         : { promptOverride: text(promptOverride, "settings.promptOverride") }),
+      ...(model === undefined ? {} : { model: text(model, "settings.model") }),
+      ...(harness === undefined ? {} : { harness: text(harness, "settings.harness") }),
     },
     ...(root.previousRound === undefined
       ? {}
