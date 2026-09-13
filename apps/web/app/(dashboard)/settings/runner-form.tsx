@@ -38,8 +38,8 @@ export function RunnerForm({ settings }: { settings: RunnerSettings }) {
       </fieldset>
       {retired && (
         <p className="hk-help">
-          Your saved model, {settings.model}, is no longer in the list; reviews still ask for it
-          until you choose another and save.
+          Your saved model, {settings.model}, is no longer in the list. Reviews still ask for it;
+          saving switches to the choice above, or to the CLI's default if none is picked.
         </p>
       )}
       <p className="hk-help">
