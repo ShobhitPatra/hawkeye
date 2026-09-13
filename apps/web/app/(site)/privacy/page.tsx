@@ -26,9 +26,11 @@ export default function PrivacyPage() {
           belong to.
         </li>
         <li>
-          The pull requests you turn reviews on for, as owner, repository and number, with your
-          settings for them, and your account-wide review settings, including any prompt text you
-          add.
+          The pull requests with reviews on, as owner, repository and number: every pull request you
+          open in a repository the App is installed on and you have linked, which is turned on for
+          you when GitHub reports it opened, and any you turn on yourself. Each carries your
+          settings for it, and your account-wide review settings, including any prompt text you add.
+          Pausing a pull request on the dashboard keeps its row and stops its reviews.
         </li>
         <li>
           Each review job and run: when it ran, on which runner, how many turns it took, whether it
