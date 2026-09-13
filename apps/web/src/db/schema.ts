@@ -200,6 +200,7 @@ export const userSettings = pgTable("user_settings", {
   wallClockMinutes: integer("wall_clock_min").notNull().default(DEFAULT_WALL_CLOCK_MINUTES),
   quietWindowSeconds: integer("quiet_window_s").notNull().default(DEFAULT_QUIET_WINDOW_SECONDS),
   reviewDrafts: boolean("review_drafts").notNull().default(false),
+  autoReview: boolean("auto_review").notNull().default(true),
 });
 
 export const runnerLogin = pgTable("runner_login", {

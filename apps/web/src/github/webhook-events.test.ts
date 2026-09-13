@@ -83,6 +83,7 @@ function pullRequestPayload(
       merged: false,
       head: { sha: "h".repeat(40) },
       base: { sha: "b".repeat(40) },
+      user: { id: 501 },
       ...pullRequestOverrides,
     },
   };
@@ -100,6 +101,7 @@ describe("parseWebhookEvent for pull_request", () => {
       draft: false,
       merged: false,
       installationId: "10",
+      authorId: "501",
     });
   });
 

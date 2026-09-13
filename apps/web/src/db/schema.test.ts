@@ -245,6 +245,7 @@ describe("schema migrations", () => {
       wallClockMinutes: 15,
       quietWindowSeconds: 0,
       reviewDrafts: false,
+      autoReview: true,
     });
 
     await db.insert(schema.installationUser).values({ installationId: "3", userId: "u3" });

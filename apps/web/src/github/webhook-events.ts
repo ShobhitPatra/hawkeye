@@ -15,6 +15,7 @@ export type PullRequestEvent = {
   draft: boolean;
   merged: boolean;
   installationId: string;
+  authorId: string;
 };
 
 export type WebhookEvent =
@@ -87,6 +88,7 @@ function parsePullRequestEvent(payload: unknown): WebhookEvent {
       merged?: unknown;
       head?: { sha?: unknown };
       base?: { sha?: unknown };
+      user?: { id?: unknown };
     };
   };
 
@@ -113,7 +115,9 @@ function parsePullRequestEvent(payload: unknown): WebhookEvent {
     !pullRequest.head ||
     typeof pullRequest.head.sha !== "string" ||
     !pullRequest.base ||
-    typeof pullRequest.base.sha !== "string"
+    typeof pullRequest.base.sha !== "string" ||
+    !pullRequest.user ||
+    typeof pullRequest.user.id !== "number"
   ) {
     throw new Error("pull_request webhook payload is missing required pull request fields");
   }
@@ -128,6 +132,7 @@ function parsePullRequestEvent(payload: unknown): WebhookEvent {
     draft: pullRequest.draft,
     merged: pullRequest.merged === true,
     installationId: String(body.installation.id),
+    authorId: String(pullRequest.user.id),
   };
 }
 
