@@ -128,7 +128,7 @@ Security, Privacy and Terms are prose pages for a signed-out visitor, laid out a
 
 ### Settings
 
-Settings are a column of sections, each a heading, one sentence, and the control. Theme is three radio choices (System, Light, Dark). The contract override is a mono textarea with a sentence that it is appended to the review prompt on every run, and a link to the repo-level file. Save is a primary button per section in an action row; the sentence beside it states the last save or the result, no toast.
+Settings are a column of sections, each a heading, one sentence, and the controls, at `/settings`, the fourth word in the top bar. Sections exist only for settings the product acts on. Reviews is the first: two checkboxes stacked (`hk-choice[data-stack]`), "Review my pull requests automatically" and "Review drafts too", then the field "Wait after a push" as a whole number with the unit word beside it and a help line under it. Theme stays in the account menu. When they exist: the contract override is a mono textarea with a sentence that it is appended to the review prompt on every run, and a link to the repo-level file; the runner section holds the model and the limits. Save is a primary button per section in an action row; the sentence beside it states the result ("Saved. Applies from the next pull request event.") or the refusal in one sentence, no toast.
 
 ### Runners and connect
 
@@ -180,7 +180,7 @@ Verdict: `hk-verdict[data-verdict]`, `hk-verdict-word`, `hk-verdict-why`.
 
 Margin column: `hk-margin`, `hk-entry[data-severity]`, `hk-gutter`, `hk-severity[data-severity]`, `hk-lens`, `hk-entry-body`, `hk-claim`, `hk-path` (wrap the text in `<bdi>`), `hk-detail`, `hk-group-heading`.
 
-Controls: `hk-button[data-variant="primary"]`, `hk-review` with `hk-review-control[data-on][data-pending]`, `hk-review-word`, `hk-review-next`, `hk-input`, `hk-textarea`, `hk-choice`, `hk-field`, `hk-field-wide`, `hk-form-row`, `hk-action-row`, `hk-help`, `hk-link` (on an `<a>` inside `hk-root` only: forces the underline back inside any context that removes it, the top bar, navigation, crumbs, tables and the menu; a bare link in running text already underlines).
+Controls: `hk-button[data-variant="primary"]`, `hk-review` with `hk-review-control[data-on][data-pending]`, `hk-review-word`, `hk-review-next`, `hk-input`, `hk-textarea`, `hk-choice` (`data-stack` for a column), `hk-field`, `hk-field-wide`, `hk-form-row`, `hk-action-row`, `hk-help`, `hk-link` (on an `<a>` inside `hk-root` only: forces the underline back inside any context that removes it, the top bar, navigation, crumbs, tables and the menu; a bare link in running text already underlines).
 
 Code and sections: `hk-code`, `hk-code-row`, `hk-section`, `hk-steps` (an `<ol>` whose items carry `hk-step-body`).
 

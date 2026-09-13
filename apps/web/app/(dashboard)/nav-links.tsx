@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/overview", label: "Overview" },
   { href: "/prs", label: "Pull requests" },
   { href: "/runners", label: "Runners" },
+  { href: "/settings", label: "Settings" },
 ] as const;
 
 export function NavLinks() {
