@@ -147,6 +147,7 @@ describe("createControlPlaneClient", () => {
       [{ ...job, settings: { ...job.settings, model: 5 } }, "settings.model"],
       [{ ...job, settings: { ...job.settings, harness: true } }, "settings.harness"],
       [{ ...job, settings: { ...job.settings, concurrency: "2" } }, "settings.concurrency"],
+      [{ ...job, settings: { ...job.settings, concurrency: 0 } }, "settings.concurrency"],
     ];
     for (const [payload, field] of cases) {
       const { client: c } = client(() => Response.json(payload));

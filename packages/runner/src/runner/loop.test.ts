@@ -213,10 +213,37 @@ describe("runRunnerLoop", () => {
   });
 
   it("runs one job at a time and carries no slot when concurrency is one", async () => {
-    const plane = await fakeControlPlane(scripted([claimedJob]));
+    const second: ClaimedJob = {
+      ...claimedJob,
+      job: { ...claimedJob.job, id: "job-2", runId: "run-2" },
+      pullRequest: { owner: "o", repo: "r", number: 8 },
+    };
+    const plane = await fakeControlPlane(scripted([claimedJob, second]));
     servers.push(plane.server);
-    const d = await deps(plane.baseUrl);
-    await runRunnerLoop(d, { once: true });
+    const stop = new AbortController();
+    const d = await deps(plane.baseUrl, { signal: stop.signal });
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let runs = 0;
+    d.harness = {
+      name: "gate",
+      run: async (i) => {
+        runs += 1;
+        if (runs === 1) await gate;
+        await writeFile(i.resultPath, JSON.stringify(review));
+        return { status: "ok", turns: 1 };
+      },
+    };
+    const loop = runRunnerLoop(d);
+    await vi.waitFor(() => expect(runs).toBe(1));
+    expect(plane.received.filter((r) => r.url === "/api/runner/jobs")).toHaveLength(1);
+    release();
+    await vi.waitFor(() => expect(runs).toBe(2));
+    stop.abort();
+    await loop;
+    expect(d.reported.filter((event) => event.state === "claimed")).toHaveLength(2);
     expect(d.reported.every((event) => event.slot === undefined)).toBe(true);
   });
 
