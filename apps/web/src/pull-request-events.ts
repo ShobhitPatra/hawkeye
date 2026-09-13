@@ -3,18 +3,20 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { armedPr, job, userSettings } from "./db/schema";
 import type { PullRequestEvent } from "./github/webhook-events";
+import { armForAuthor } from "./auto-review";
 import { enqueueJob } from "./jobs";
 import { quietWindowSeconds } from "./quiet-window";
 import { resolveReviewTarget, type ReviewTarget } from "./review-target";
 
 export type PullRequestEventResult = {
+  armed: number;
   enqueued: number;
   disarmed: number;
   cancelled: number;
   ignored?: string;
 };
 
-const REVIEW_ACTIONS = new Set(["synchronize", "ready_for_review"]);
+const REVIEW_ACTIONS = new Set(["opened", "synchronize", "ready_for_review"]);
 
 function activeRows(event: PullRequestEvent) {
   return and(
@@ -50,16 +52,19 @@ export async function handlePullRequestEvent(
           ),
         )
         .returning({ id: job.id });
-      return { enqueued: 0, disarmed: disarmed.length, cancelled: cancelled.length };
+      return { armed: 0, enqueued: 0, disarmed: disarmed.length, cancelled: cancelled.length };
     });
   }
 
   if (!REVIEW_ACTIONS.has(event.action)) {
-    return { enqueued: 0, disarmed: 0, cancelled: 0, ignored: event.action };
+    return { armed: 0, enqueued: 0, disarmed: 0, cancelled: 0, ignored: event.action };
   }
 
+  const newlyArmed = await armForAuthor(db, event);
+  const armedCount = newlyArmed ? 1 : 0;
+
   const armed = await db.select().from(armedPr).where(activeRows(event));
-  if (armed.length === 0) return { enqueued: 0, disarmed: 0, cancelled: 0 };
+  if (armed.length === 0) return { armed: armedCount, enqueued: 0, disarmed: 0, cancelled: 0 };
 
   const reference = {
     owner: event.repository.owner,
@@ -69,7 +74,7 @@ export async function handlePullRequestEvent(
   const token = await github.installationTokenById(event.installationId);
   const current = await github.pullRequest(reference, token);
   if (current.headSha !== event.headSha) {
-    return { enqueued: 0, disarmed: 0, cancelled: 0, ignored: "stale head" };
+    return { armed: armedCount, enqueued: 0, disarmed: 0, cancelled: 0, ignored: "stale head" };
   }
 
   let pendingTarget: Promise<ReviewTarget> | undefined;
@@ -99,5 +104,5 @@ export async function handlePullRequestEvent(
     enqueued += 1;
   }
 
-  return { enqueued, disarmed: 0, cancelled: 0 };
+  return { armed: armedCount, enqueued, disarmed: 0, cancelled: 0 };
 }

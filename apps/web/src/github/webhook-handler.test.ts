@@ -129,6 +129,7 @@ describe("handleWebhook", () => {
           merged: false,
           head: { sha: "h".repeat(40) },
           base: { sha: "b".repeat(40) },
+          user: { id: 501 },
         },
       }),
       { secret, db, github },
@@ -137,6 +138,7 @@ describe("handleWebhook", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       ok: true,
+      armed: 0,
       enqueued: 1,
       disarmed: 0,
       cancelled: 0,

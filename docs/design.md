@@ -112,9 +112,9 @@ Prompt overrides: a per-user override in the dashboard (taste), plus an optional
 
 ## Triggers
 
-- Arm reviews now, then on every `pull_request.synchronize` and `ready_for_review` to the armed PR. `reopened` does not trigger (head unchanged).
+- A pull request `opened` by a signed-in user in an installation linked to them turns reviews on and queues the first review, unless the user turned automatic review off (`user_settings.auto_review`, default on; the control arrives with the Settings page). Nothing is armed retroactively, and a pull request the user paused stays paused. Turning on from the dashboard reviews now; then every `pull_request.synchronize` and `ready_for_review` to the armed PR reviews again. `reopened` does not trigger (head unchanged).
 - `closed` / `merged` auto-disarms.
-- Draft PRs can be armed; reviews start when ready unless the user opts in to draft reviews.
+- Draft PRs can be armed; reviews start when ready unless the user opts in to draft reviews. A draft opened by a linked user is left alone until `ready_for_review`, which turns it on then, unless the user reviews drafts, in which case it turns on at open. The opening date is not checked, by choice: a draft that was already open when this shipped also turns on when it becomes ready, the one case where an older pull request is armed.
 - Runner offline → jobs queue, collapsed per PR to the latest head; no expiry. Dashboard: "runner offline, N PRs waiting".
 
 ## Data model
@@ -193,7 +193,7 @@ Hosted: a Vercel project with a Neon Postgres and the same env, configured with 
 - Control plane posts; runner returns JSON only.
 - Identity: GitHub App first; `hawkeye[bot]` hosted, `hawkeye-<handle>[bot]` self-hosted; others' private repos out of scope; machine user later.
 - Contributions: nothing Hawkeye posts counts toward the user's contribution graph. Accepted: bot identity over green squares.
-- Trigger: arm from the dashboard, automatic on every push. Quiet window default 3 min.
+- Trigger: automatic from open for the author's own pull requests (per-user switch, default on), or from the dashboard; then every push. Quiet window default 0.
 - Hosting: Next.js + Postgres, deployable to Vercel + Neon and as a single Docker Compose. No Workers/D1 (locks self-hosters to one vendor).
 - Runner ↔ control plane: long-poll with a runner token; results via POST. Clone with a 1h App installation token shipped in the job.
 - Review contract: all six lenses by default; overrides per user and per repo.

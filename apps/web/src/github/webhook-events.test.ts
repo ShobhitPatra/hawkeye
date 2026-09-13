@@ -83,6 +83,7 @@ function pullRequestPayload(
       merged: false,
       head: { sha: "h".repeat(40) },
       base: { sha: "b".repeat(40) },
+      user: { id: 501 },
       ...pullRequestOverrides,
     },
   };
@@ -100,6 +101,7 @@ describe("parseWebhookEvent for pull_request", () => {
       draft: false,
       merged: false,
       installationId: "10",
+      authorId: "501",
     });
   });
 
@@ -164,6 +166,12 @@ describe("parseWebhookEvent for pull_request", () => {
   it("throws when the head sha is missing", () => {
     const payload = pullRequestPayload();
     delete (payload.pull_request as Record<string, unknown>).head;
+    expect(() => parseWebhookEvent("pull_request", payload)).toThrow(/pull request/);
+  });
+
+  it("throws when the author is missing", () => {
+    const payload = pullRequestPayload();
+    delete (payload.pull_request as Record<string, unknown>).user;
     expect(() => parseWebhookEvent("pull_request", payload)).toThrow(/pull request/);
   });
 
