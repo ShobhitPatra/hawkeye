@@ -138,4 +138,41 @@ describe("claude code harness", () => {
     expect(args[at + 1]).toBe("opus");
     expect(() => createClaudeCodeHarness({ model: " " })).toThrow("model must not be empty");
   });
+
+  it("names a refused model and where to change it", async () => {
+    const s = await scratch();
+    const exe = await fakeClaude(
+      `echo '[claude-code:unrecognized_model] {"model":"claude-fable-5-1"}' >&2; exit 1`,
+    );
+    await expect(
+      createClaudeCodeHarness({ executable: exe }).run({ ...input(s), model: "claude-fable-5-1" }),
+    ).resolves.toMatchObject({
+      status: "error",
+      error: "Model claude-fable-5-1 was refused by the claude CLI; choose another in Settings.",
+    });
+    await expect(
+      createClaudeCodeHarness({ executable: exe, model: "claude-fable-5-1" }).run(input(s)),
+    ).resolves.toMatchObject({
+      error:
+        "Model claude-fable-5-1 was refused by the claude CLI; start the runner with another --model or without it.",
+    });
+  });
+
+  it("uses the job's model unless the harness was started with one", async () => {
+    const s = await scratch();
+    const exe = await fakeClaude(
+      `printf '%s\\n' "$@" > "$(dirname "$0")/args"; echo '{"type":"result"}'; exit 0`,
+    );
+    const modelArgument = async () => {
+      const args = (await readFile(join(exe, "..", "args"), "utf8")).split("\n");
+      return args[args.indexOf("--model") + 1];
+    };
+    await createClaudeCodeHarness({ executable: exe }).run({ ...input(s), model: "sonnet" });
+    expect(await modelArgument()).toBe("sonnet");
+    await createClaudeCodeHarness({ executable: exe, model: "opus" }).run({
+      ...input(s),
+      model: "sonnet",
+    });
+    expect(await modelArgument()).toBe("opus");
+  });
 });

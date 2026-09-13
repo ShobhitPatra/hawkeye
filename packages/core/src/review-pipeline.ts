@@ -14,6 +14,7 @@ export type ReviewPipelineInput = {
   runDirectory: string;
   maxTurns: number;
   wallClockMs: number;
+  model?: string;
   depth?: number;
   previousRound?: { headSha: string; findings: PriorFinding[] };
   prompt: Omit<PromptInput, "repositoryRules" | "diff" | "resultPath" | "previousRound">;
@@ -86,6 +87,7 @@ export async function runReviewPipeline(
       settingsPath,
       maxTurns: input.maxTurns,
       wallClockMs: input.wallClockMs,
+      ...(input.model === undefined ? {} : { model: input.model }),
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       onEvent: (event) => {
         if (event.type === "stdout") streamLines.push(event.line);

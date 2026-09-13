@@ -84,6 +84,7 @@ async function reportFor(
       runDirectory,
       maxTurns: claimed.settings.maxTurns,
       wallClockMs: claimed.settings.wallClockMinutes * 60_000,
+      ...(claimed.settings.model === undefined ? {} : { model: claimed.settings.model }),
       ...(contractOverride === undefined ? {} : { contractOverride }),
       ...(claimed.previousRound === undefined ? {} : { previousRound: claimed.previousRound }),
       signal,

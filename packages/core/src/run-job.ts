@@ -16,6 +16,7 @@ export type RunReviewJobInput = {
   runDirectory: string;
   maxTurns: number;
   wallClockMs: number;
+  model?: string;
   contractOverride?: string;
   previousRound?: { headSha: string; findings: PriorFinding[] };
   signal?: AbortSignal;
@@ -51,6 +52,7 @@ export async function runReviewJob(
       runDirectory: input.runDirectory,
       maxTurns: input.maxTurns,
       wallClockMs: input.wallClockMs,
+      ...(input.model === undefined ? {} : { model: input.model }),
       depth: pullRequest.commits + 1,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       ...(input.previousRound === undefined ? {} : { previousRound: input.previousRound }),

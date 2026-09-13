@@ -13,6 +13,7 @@ import { and, desc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import {
+  DEFAULT_HARNESS,
   armedPr,
   DEFAULT_MAX_TURNS,
   DEFAULT_WALL_CLOCK_MINUTES,
@@ -83,6 +84,8 @@ async function settingsFor(db: Db, userId: string): Promise<ClaimedJob["settings
     maxTurns: row?.maxTurns ?? DEFAULT_MAX_TURNS,
     wallClockMinutes: row?.wallClockMinutes ?? DEFAULT_WALL_CLOCK_MINUTES,
     ...(row?.promptOverride ? { promptOverride: row.promptOverride } : {}),
+    ...(row?.model ? { model: row.model } : {}),
+    harness: row?.harness ?? DEFAULT_HARNESS,
   };
 }
 

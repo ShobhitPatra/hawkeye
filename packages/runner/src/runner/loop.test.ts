@@ -19,7 +19,7 @@ const claimedJob: ClaimedJob = {
   job: { id: "job-1", runId: "run-1", headSha: "a".repeat(40), baseSha: "b".repeat(40) },
   pullRequest: { owner: "o", repo: "r", number: 7 },
   installationToken: "ghs_job",
-  settings: { maxTurns: 3, wallClockMinutes: 1, promptOverride: "ignored" },
+  settings: { maxTurns: 3, wallClockMinutes: 1, promptOverride: "ignored", model: "sonnet" },
 };
 
 type Received = { method: string; url: string; authorization?: string; body: unknown };
@@ -169,7 +169,7 @@ describe("runRunnerLoop", () => {
     expect(d.logged).toContain("turn 1");
     expect(d.reported[2]).toMatchObject({ state: "posted", result: review, turns: 1 });
     const harnessInput = (d.harness.run as ReturnType<typeof vi.fn>).mock.calls[0]![0];
-    expect(harnessInput).toMatchObject({ maxTurns: 3, wallClockMs: 60_000 });
+    expect(harnessInput).toMatchObject({ maxTurns: 3, wallClockMs: 60_000, model: "sonnet" });
   });
   it("heartbeats while the review runs", async () => {
     const plane = await fakeControlPlane(scripted([claimedJob]));

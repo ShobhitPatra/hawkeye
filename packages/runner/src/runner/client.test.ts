@@ -144,6 +144,8 @@ describe("createControlPlaneClient", () => {
       [{ ...job, installationToken: null }, "installationToken"],
       [{ ...job, settings: { maxTurns: 10, wallClockMinutes: 1.5 } }, "settings.wallClockMinutes"],
       [{ ...job, settings: { ...job.settings, promptOverride: 5 } }, "settings.promptOverride"],
+      [{ ...job, settings: { ...job.settings, model: 5 } }, "settings.model"],
+      [{ ...job, settings: { ...job.settings, harness: true } }, "settings.harness"],
     ];
     for (const [payload, field] of cases) {
       const { client: c } = client(() => Response.json(payload));

@@ -18,6 +18,8 @@ export type ClaimedJob = {
     maxTurns: number;
     wallClockMinutes: number;
     promptOverride?: string;
+    model?: string;
+    harness?: string;
   };
   previousRound?: { headSha: string; findings: PriorFinding[] };
 };
