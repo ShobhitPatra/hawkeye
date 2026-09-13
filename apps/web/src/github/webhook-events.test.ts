@@ -169,6 +169,12 @@ describe("parseWebhookEvent for pull_request", () => {
     expect(() => parseWebhookEvent("pull_request", payload)).toThrow(/pull request/);
   });
 
+  it("throws when the author is missing", () => {
+    const payload = pullRequestPayload();
+    delete (payload.pull_request as Record<string, unknown>).user;
+    expect(() => parseWebhookEvent("pull_request", payload)).toThrow(/pull request/);
+  });
+
   it("throws when the action is missing", () => {
     const payload = pullRequestPayload();
     delete (payload as Record<string, unknown>).action;
