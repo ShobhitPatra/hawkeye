@@ -1,5 +1,5 @@
 import type { ReviewResult, RunResultStatus } from "@hawkeye/core";
-import { and, eq, inArray, ne, sql, type SQLWrapper } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, sql, type SQLWrapper } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import { armedPr, job, run } from "./db/schema";
@@ -219,6 +219,15 @@ export async function completeRun(
       .returning();
     return completed;
   });
+}
+
+export async function userHasReviewsOn(db: Db, userId: string): Promise<boolean> {
+  const [armed] = await db
+    .select({ id: armedPr.id })
+    .from(armedPr)
+    .where(and(eq(armedPr.userId, userId), isNull(armedPr.disarmedAt)))
+    .limit(1);
+  return armed !== undefined;
 }
 
 export async function newerRunIsLive(

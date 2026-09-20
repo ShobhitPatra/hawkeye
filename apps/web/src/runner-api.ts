@@ -2,6 +2,7 @@ import {
   type ClaimedJob,
   findingId,
   type GitHubClient,
+  HONORS_RETRY_AFTER_HEADER,
   type PriorFinding,
   RUN_RESULT_STATUSES,
   parseReviewResult,
@@ -42,6 +43,7 @@ import {
   requeueStaleJobs,
   jobSuperseded,
   newerRunIsLive,
+  userHasReviewsOn,
 } from "./job-queue";
 import { closedPlaceholderFor, livingReviewFor, postReviewForRun } from "./review-posting";
 import {
@@ -55,6 +57,7 @@ import { requireRunner } from "./runner-auth";
 
 export const DEFAULT_CLAIM_POLL_INTERVAL_MS = 5_000;
 export const DEFAULT_CLAIM_POLL_TOTAL_MS = 25_000;
+export const IDLE_RETRY_AFTER_SECONDS = 60;
 
 export type ClaimDeps = {
   db: Db;
@@ -148,6 +151,16 @@ async function previousRoundFor(db: Db, armedPrId: string): Promise<ClaimedJob["
 export async function claimJob(request: Request, deps: ClaimDeps): Promise<Response> {
   const runner = await requireRunner(request, deps.db);
   if (runner instanceof Response) return runner;
+
+  if (
+    request.headers.get(HONORS_RETRY_AFTER_HEADER) === "1" &&
+    !(await userHasReviewsOn(deps.db, runner.userId))
+  ) {
+    return new Response(null, {
+      status: 204,
+      headers: { "Retry-After": String(IDLE_RETRY_AFTER_SECONDS) },
+    });
+  }
 
   const now = deps.now ?? (() => new Date());
   const sleep = deps.sleep ?? sleepFor;

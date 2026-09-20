@@ -25,6 +25,8 @@ export type ClaimedJob = {
   previousRound?: { headSha: string; findings: PriorFinding[] };
 };
 
+export const HONORS_RETRY_AFTER_HEADER = "X-Hawkeye-Honors-Retry-After";
+
 export const RUN_RESULT_STATUSES = [
   "ok",
   "max-turns",
