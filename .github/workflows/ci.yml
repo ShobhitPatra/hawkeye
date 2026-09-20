@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - id: changes
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && (matrix.gate == 'test' || matrix.gate == 'build')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
