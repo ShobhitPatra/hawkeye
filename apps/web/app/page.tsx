@@ -23,7 +23,7 @@ export default async function HomePage({
   const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
   return (
     <>
-      <SiteHeader theme={theme} {...signIn} />
+      <SiteHeader theme={theme} signedIn={false} {...signIn} />
       <main className="hk-page ld">
         <section className="ld-lead">
           <h1 className="hk-headline">

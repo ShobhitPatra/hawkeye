@@ -11,7 +11,7 @@ export async function SiteFrame({ children }: { children: ReactNode }) {
   const theme = parseTheme(cookieStore.get(THEME_COOKIE)?.value);
   return (
     <div className="ld-frame">
-      <SiteHeader theme={theme} signedIn={session !== null} />
+      <SiteHeader theme={theme} signedIn={Boolean(session)} />
       <div className="ld-scroll">
         <main className="hk-page">{children}</main>
       </div>

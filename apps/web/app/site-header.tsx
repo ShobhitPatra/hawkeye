@@ -8,11 +8,11 @@ import { ThemeIcon } from "./theme-icon";
 export function SiteHeader({
   theme,
   callbackURL,
-  signedIn = false,
+  signedIn,
 }: {
   theme: Theme;
   callbackURL?: string;
-  signedIn?: boolean;
+  signedIn: boolean;
 }) {
   return (
     <header className="hk-topbar">
