@@ -14,4 +14,5 @@ export const env = {
   githubAppId: () => required("GITHUB_APP_ID"),
   githubAppPrivateKey: () => required("GITHUB_APP_PRIVATE_KEY"),
   cronSecret: () => process.env.CRON_SECRET,
+  adminLogins: () => process.env.ADMIN_LOGINS,
 };

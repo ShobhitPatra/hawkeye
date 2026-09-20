@@ -55,7 +55,12 @@ export default function PrivacyPage() {
           Your repository. The runner clones it on your machine; only the validated findings JSON
           leaves it.
         </li>
-        <li>Analytics. There is no tracking script and no third-party analytics.</li>
+        <li>
+          Analytics. There is no tracking script and no third-party analytics. The operator counts,
+          from the rows listed above, how many accounts signed in, installed the App, connected a
+          runner, had it come online and got a first review, by the week they signed in. The counts
+          never leave the database they are read from.
+        </li>
       </ul>
       <h2 className="hk-heading">Where it lives</h2>
       <p>

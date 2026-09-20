@@ -99,6 +99,7 @@ export const runner = pgTable("runner", {
     .references(() => user.id),
   name: text("name").notNull(),
   tokenHash: text("token_hash").notNull().unique(),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   ...timestamps,

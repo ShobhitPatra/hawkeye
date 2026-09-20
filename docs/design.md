@@ -447,6 +447,8 @@ The response says `posted`, `already-posted`, `superseded` or `failed`.
 
 The header shows how many pull requests have reviews on and are in review and whether a runner is online, with an offline sentence linking to `/connect` when jobs are waiting.
 
+**`/admin/funnel`** exists only for the GitHub logins listed in `ADMIN_LOGINS` (comma separated, empty by default, so a deployment that sets nothing has no such page and it answers 404). It counts, from rows the control plane already stores, how many accounts signed in, installed the App, connected a runner, had a runner come online (`runner.first_seen_at`, stamped on a runner's first authenticated request) and got a first posted review, all time and by the week the account signed in (weeks start on Monday, in UTC), with each step's share of the step before. The steps nest: an account counts at a step only if it also reached every step before it, so a share never passes 100%. Nothing is sent to any analytics service; there is none.
+
 ### Hosting
 
 A Vercel project with a Neon Postgres and the same env, configured with Root Directory `apps/web`, Install Command `pnpm install` (pnpm installs the whole workspace from any package in it) and Build Command `pnpm --filter @hawkeye/core build && pnpm build` — both run from `apps/web`; the filter finds the workspace root on its own. Run `pnpm --filter web db:migrate` against Neon before the first deploy.

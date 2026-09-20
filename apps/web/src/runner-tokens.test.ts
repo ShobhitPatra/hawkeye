@@ -82,6 +82,19 @@ describe("authenticateRunner", () => {
     expect(authenticated?.lastSeenAt).toBeInstanceOf(Date);
   });
 
+  it("stamps first seen once and keeps it while last seen moves on", async () => {
+    const { runner, token } = await createRunnerToken(db, { userId: "user-1", name: "laptop" });
+    expect(runner.firstSeenAt).toBeNull();
+
+    const first = await authenticateRunner(db, `Bearer ${token}`);
+    expect(first?.firstSeenAt).toEqual(first?.lastSeenAt);
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const second = await authenticateRunner(db, `Bearer ${token}`);
+    expect(second?.firstSeenAt).toEqual(first?.firstSeenAt);
+    expect(second!.lastSeenAt!.getTime()).toBeGreaterThan(first!.lastSeenAt!.getTime());
+  });
+
   it("rejects an unknown, malformed or revoked token", async () => {
     const { runner, token } = await createRunnerToken(db, { userId: "user-1", name: "laptop" });
 
