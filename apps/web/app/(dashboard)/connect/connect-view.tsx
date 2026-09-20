@@ -35,7 +35,7 @@ export function ConnectView({
           A review runs a coding agent on that machine, as you, over code you did not write. Its
           editing and web tools are removed; the shell stays, so connect a machine whose files you
           would let that code read.{" "}
-          <a href={`${HAWKEYE_REPOSITORY_URL}#what-the-runner-can-reach`}>
+          <a href={`${HAWKEYE_REPOSITORY_URL}/blob/main/README.md#what-the-runner-can-reach`}>
             What the runner can reach
           </a>
           .
@@ -61,7 +61,7 @@ export function ConnectView({
         <li>
           <div className="hk-step-body">
             <p>
-              Start the runner. Leave it running; it polls for jobs and reviews your pull requests
+              Start the runner. Leave it running; it polls for jobs and reviews armed pull requests
               as they change.
             </p>
             <div className="hk-code-row">
