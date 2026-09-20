@@ -136,7 +136,7 @@ Settings are a column of sections, each a heading, one sentence, and the control
 
 ### Runners and connect
 
-Runners are a table like any list: name, state word, last heartbeat, created. Revoke is a plain button in the row, never red; the confirmation is a sentence. A token shown once sits in a code block with a copy button beside it and one sentence saying it will not be shown again. The connect page is a numbered sequence, because it is one: run the command, type the code, approve. The command is a code block with a copy button. A pending approval names the runner and when it asked, and tells the user to approve only their own machine.
+Runners are a table like any list: name, state word, last heartbeat, created. Revoke is a plain button in the row, never red; the confirmation is a sentence. A token shown once sits in a code block with a copy button beside it and one sentence saying it will not be shown again. The connect page is a numbered sequence, because it is one: run the command, type the code, approve. Its lede has a second paragraph at the same quiet size that says what connecting grants: a review runs a coding agent on that machine, as the user, over code they did not write; the editing and web tools are removed and the shell stays; it links the README's "What the runner can reach". A sentence, never a callout. The command is a code block with a copy button. A pending approval names the runner and when it asked, and tells the user to approve only their own machine.
 
 ### The review comment
 
