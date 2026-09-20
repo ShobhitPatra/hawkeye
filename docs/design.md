@@ -47,7 +47,7 @@ Two halves.
 
 **Control plane** — a hosted Next.js app with a small Postgres. GitHub App webhooks, the PR list across your repos, **Arm**, a job queue, run history, findings. It never runs a model and never sees a plan credential. You can use the official instance or `docker compose up` your own.
 
-**Runner** — one Node process on hardware you own (laptop daemon or a VPS image). It holds a connection to the control plane, clones the PR head into a temp worktree, runs the Claude Code CLI headless (`claude -p`) under your own login with a strict [review contract](#the-review-contract), and returns validated findings JSON. The control plane renders and posts the review.
+**Runner** — one Node process on hardware you own (laptop daemon or a VPS image). It long-polls the control plane for jobs, clones the PR head into a temp worktree, runs the Claude Code CLI headless (`claude -p`) under your own login with a strict [review contract](#the-review-contract), and returns validated findings JSON. The control plane renders and posts the review.
 
 Armable = any PR where the chosen identity can comment; the default list is PRs you authored.
 
@@ -70,10 +70,12 @@ GitHub only lets an account comment on a PR if that account has access to the re
 
 | Where the PR lives | Posts as | Admin action needed |
 |---|---|---|
-| A repo with the Hawkeye App installed | The App — `hawkeye-review[bot]` on the official instance, `hawkeye-<handle>[bot]` on a self-hosted one | The App is installed once, by whoever admins the repo |
-| Any other PR you can see | **You**, the person who asked for the review | None |
+| A repo with the Hawkeye App installed | The App — `hawkeye[bot]` on the official instance (currently `hawkeye-review[bot]`), `hawkeye-<handle>[bot]` on a self-hosted one | The App is installed once, by whoever admins the repo |
+| Any other PR you can see *(planned, milestone 4)* | **You**, the person who asked for the review | None |
 
 **Resolution order:** an App installation exists on the repo → post as the bot; else → post as the requesting user. There is no third case and no machine user.
+
+Only the first row exists today: every trigger is an App webhook, the clone token is an installation token, and the control plane posts with one. The second row needs all three replaced, and its credential is undecided — see [open question 3](#open-questions).
 
 Posting as the user is what makes a review possible on a repo nobody will install an App on — your employer's monorepo, a public project you contribute to but do not maintain. It works because Hawkeye only ever posts `COMMENT`: GitHub's code review limits restrict *approving* and *requesting changes* to accounts with explicit access, while commenting stays open to anyone who can see the pull request.
 
@@ -91,7 +93,7 @@ GitHub App ─────── webhooks ──▶ Control plane   (Next.js + P
                                     · renders + posts reviews, resolves addressed findings
                                     · runs, findings, turns used, runner status
                                            ▲                 │
-                       findings JSON +     │                 │  job available
+                       findings JSON +     │                 │  runner long-polls /jobs
                        run events          │                 ▼  (runner token; no inbound ports)
                                    Runner   (one Node process, Docker-able; laptop → VPS)
                                      · shallow worktree of PR head (App installation token, 1h)
@@ -227,6 +229,8 @@ The control plane runs two workloads with opposite shapes, and they must not sha
 | Right runtime | serverless | a long-lived process |
 
 Serverless is close to ideal for the first column and close to worst-case for the second: a held connection bills for its whole life while doing nothing, and a per-connection poll loop makes database load a function of *user count × time* rather than of work.
+
+**Today.** The claim endpoint long-polls inside a serverless function: up to 25 s per call, a queue check every 5 s, and the stale-claim sweep once per claim call. That is the shape this section replaces. Everything below is the target; the code does not yet follow the first rule.
 
 **Target shape.** Next.js stays on serverless for the dashboard, auth and webhook ingest. The runner channel moves to one always-on process that holds the idle connections in memory, with **a single `LISTEN` connection for the whole fleet** and in-memory fanout by user. The webhook that enqueues a job issues `NOTIFY`; the waiting runner is woken. Database work becomes proportional to pushes rather than to connected runners.
 
@@ -406,7 +410,7 @@ With a runner token:
 
 | Endpoint | Behaviour |
 |---|---|
-| `GET /api/runner/jobs` | Returns the claimed job with a fresh installation token, the pull request coordinates, the user's review settings and — from the second round of an arm on — the previous round (the last posted round's findings with stable ids, plus the arm's still-open findings), or 204 when nothing is queued |
+| `GET /api/runner/jobs` | Long-polls for up to 25 s, checking the queue every 5 s, and sweeps stale claims once per call. Returns the claimed job with a fresh installation token, the pull request coordinates, the user's review settings and — from the second round of an arm on — the previous round (the last posted round's findings with stable ids, plus the arm's still-open findings), or 204 when nothing is queued |
 | `POST /api/runner/jobs/<id>/heartbeat` | Keeps the claim alive (a claim without a heartbeat for 5 minutes goes back to the queue) and answers `{ ok, superseded }`, true once a newer job exists for the same arm |
 | `POST /api/runner/runs/<id>/events` | Accepts `{ type, at, data }` entries and counts the `turn` ones |
 | `POST /api/runner/runs/<id>/result` | Posts `{ status, turns, result?, error?, commentable? }`, storing the review result and closing the run and the job |
@@ -448,7 +452,7 @@ A Vercel project with a Neon Postgres and the same env, configured with Root Dir
 ## Milestones
 
 1. **Runner alone, manual.** `hawkeye review <pr-url>` from a laptop: worktree → `claude -p` → findings → posted via the same `core` posting module, using a locally held App key. Proves contract and identity. Dogfood. **(shipped)**
-2. **Control plane + arm.** Next.js app with GitHub sign-in, App webhooks, PR list, Arm, jobs; runner becomes a daemon that connects with a runner token; reviews on every push with quiet window and interdiff; control plane posts. **(in progress)**
+2. **Control plane + arm.** Next.js app with GitHub sign-in, App webhooks, PR list, Arm, jobs; runner becomes a daemon that long-polls with a runner token; reviews on every push with quiet window and interdiff; control plane posts. **(in progress)**
 3. **Multi-user + OSS release.** Official hosted instance, Codex harness, self-host docs (`docker compose`, App Manifest flow at `/setup`), public repo under MIT.
 4. **Always-on + polish.** Runner Docker image for a VPS, run history and budget view, re-review-now, reviewing pull requests you do not own.
 
@@ -457,11 +461,11 @@ A Vercel project with a Neon Postgres and the same env, configured with Root Dir
 - **Open source** (MIT); official hosted instance run by the author; self-hostable end to end.
 - **Split brain:** hosted control plane + user-owned runner; the model never runs hosted.
 - **Control plane posts;** runner returns JSON only.
-- **Identity:** the App where it is installed (`hawkeye[bot]` hosted, `hawkeye-<handle>[bot]` self-hosted), else the requesting user. No machine user.
+- **Identity:** the App where it is installed (`hawkeye[bot]` hosted, currently `hawkeye-review[bot]`; `hawkeye-<handle>[bot]` self-hosted), else the requesting user. No machine user.
 - **Contributions:** a review the App posts does not touch the user's contribution graph; a review posted as the user appears in their review activity like any other. Accepted, because the footer carries the distinction.
 - **Trigger:** automatic from open for the author's own pull requests (per-user switch, default on), or from the dashboard; then every push. Quiet window default 0.
 - **Hosting:** Next.js + Postgres, deployable to Vercel + Neon and as a single Docker Compose. No Workers/D1 (locks self-hosters to one vendor).
-- **Runner channel:** the control plane tells the runner a job is ready; the runner claims it over HTTP with a runner token and posts results back. Clone with a 1h App installation token shipped in the job. The connection is held by a long-lived process, not a serverless function — see [The runner channel](#the-runner-channel).
+- **Runner channel:** today the runner long-polls with a runner token and posts results back; clone with a 1h App installation token shipped in the job. The target is a ready signal from a long-lived process rather than a poll held by a serverless function — see [The runner channel](#the-runner-channel).
 - **The job carries the user's settings:** turn and wall-clock limits, the prompt override, the model (one of a fixed list of pinned versions the web keeps and the claude CLI accepts, else the CLI default; a daemon started with `--model` keeps its own; a new model is added to the list and shipped) and the harness name (`claude-code` until a second harness exists).
 - **Review contract:** all six lenses by default; overrides per user and per repo.
 - **Subscription terms:** the user is responsible for staying within their plan's terms; Hawkeye only drives the CLI they already run. Stated in the README and on the runner-setup page.
@@ -470,6 +474,7 @@ A Vercel project with a Neon Postgres and the same env, configured with Root Dir
 
 1. **Name collision.** "Hawkeye" is a common product name (and a Marvel character); fine for OSS. Register the `hawkeye` GitHub App slug and the `hawkeye-review` handle now.
 2. **The harness trust boundary.** The review runs `bypassPermissions` with Bash over a checkout of code the user did not write, with their own environment and filesystem in reach. Reviewing pull requests you do not own widens that from code you trust to code anyone can send you, so the boundary has to be closed before that ships.
+3. **Posting as the user.** Sign-in uses the App's OAuth client, and a GitHub App user token reaches only repositories the App is installed on, so it cannot post on the repositories this identity exists for. The second identity needs another credential (an OAuth App grant, or a fine-grained token the user supplies), a trigger that is not a webhook (polling the user's open pull requests, or review-now from the dashboard), and a clone path that uses it. Undecided; nothing is built on the second row until it is.
 
 ## Name
 
