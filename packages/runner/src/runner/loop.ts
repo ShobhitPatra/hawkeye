@@ -258,6 +258,7 @@ export async function runRunnerLoop(
   const sleep = deps.sleep ?? sleepFor;
   let failedClaims = 0;
   let concurrency = DEFAULT_CONCURRENCY;
+  let lastWaitMs: number | undefined;
   const running = new Map<number, { subject: string; finished: Promise<unknown>; stop(): void }>();
   const freeSlot = () => {
     for (let slot = 1; ; slot += 1) if (!running.has(slot)) return slot;
@@ -268,8 +269,11 @@ export async function runRunnerLoop(
       continue;
     }
     let claimed: ClaimedJob | undefined;
+    let waitMs = deps.emptyPollDelayMs ?? DEFAULT_EMPTY_POLL_DELAY_MS;
     try {
-      claimed = await deps.client.claimJob(deps.signal ? { signal: deps.signal } : {});
+      const answer = await deps.client.claimJob(deps.signal ? { signal: deps.signal } : {});
+      if (answer !== undefined && "retryAfterMs" in answer) waitMs = answer.retryAfterMs;
+      else claimed = answer;
     } catch (error) {
       if (isAbort(error) && deps.signal?.aborted) return;
       if (error instanceof ControlPlaneRequestError && error.status === 401) throw error;
@@ -292,7 +296,13 @@ export async function runRunnerLoop(
         deps.report({ state: "idle", detail: "no job queued" });
         return;
       }
-      await sleep(deps.emptyPollDelayMs ?? DEFAULT_EMPTY_POLL_DELAY_MS, deps.signal);
+      if (waitMs !== lastWaitMs && waitMs > (deps.emptyPollDelayMs ?? DEFAULT_EMPTY_POLL_DELAY_MS))
+        deps.report({
+          state: "idle",
+          detail: `no pull request has reviews on; asking again every ${waitMs / 1000}s`,
+        });
+      lastWaitMs = waitMs;
+      await sleep(waitMs, deps.signal);
       continue;
     }
     if (options.once) {
@@ -300,6 +310,7 @@ export async function runRunnerLoop(
       if (delivery === "undelivered") throw new Error("the result was not delivered");
       return;
     }
+    lastWaitMs = undefined;
     concurrency = claimed.settings.concurrency ?? DEFAULT_CONCURRENCY;
     const { owner, repo, number } = claimed.pullRequest;
     const subject = `${owner}/${repo}#${number}`;

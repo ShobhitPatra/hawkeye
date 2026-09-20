@@ -57,6 +57,7 @@ export {
   verdictFor,
 } from "./contract/schema.js";
 export {
+  HONORS_RETRY_AFTER_HEADER,
   RUN_RESULT_STATUSES,
   type ClaimedJob,
   type RunResultStatus,
