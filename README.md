@@ -48,7 +48,7 @@ Run the runner on a machine, or under a user, whose files you are willing to hav
 You need a machine with Node 22 or newer, git 2.31 or newer, and [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) installed and signed in (run `claude` once and check it answers). Nothing else is installed; `npx` fetches the runner each time.
 
 1. **Sign in** with GitHub at [hawkeye-review.vercel.app](https://hawkeye-review.vercel.app).
-2. **Install the GitHub App** on a repository you admin: open [github.com/apps/hawkeye-review](https://github.com/apps/hawkeye-review), choose Install, and pick the repositories. The App is how the review gets posted: it reads the repository and its pull requests, and writes review comments and commit statuses.
+2. **Install the GitHub App** on a repository you admin: open [github.com/apps/hawkeye-review](https://github.com/apps/hawkeye-review), choose Install, and pick the repositories. The App is how the review gets posted: it reads the repository, its issues and its pull requests, and writes review comments and commit statuses. Signing in also shares the email address on your GitHub account.
 3. **Connect a runner** on that machine:
 
    ```sh
@@ -63,9 +63,9 @@ You need a machine with Node 22 or newer, git 2.31 or newer, and [Claude Code](h
    ```
 
    The Runners page shows it online within a minute. If the machine sleeps or the terminal closes, reviews wait in the queue and run when it is back.
-5. **Open a pull request** in a repository you installed the App on. Within a minute its checks show `hawkeye` as "Reviewing on <your machine>", and a few minutes later the review is posted as a comment. Every later push is reviewed again, and the same comment is updated in place.
+5. **Open a pull request of your own**, not a draft, in a repository you installed the App on. A draft is reviewed once you mark it ready, unless you turn on "Review drafts too" in Settings. Within a minute its checks show `hawkeye` as "Reviewing on <your machine>", and a few minutes later the review is posted as a comment. Every later push is reviewed again, and the same comment is updated in place.
 
-To stop: Pause on the Pull requests page stops one pull request; Settings turns automatic review off for all of them; closing the terminal stops the runner.
+To stop: Pause on the Pull requests page stops one pull request. Settings turns automatic review off for the pull requests you open from then on; ones already being reviewed keep going until you pause them. Closing the terminal stops the runner, and queued reviews wait for it.
 
 If nothing happens, the Runners page says whether your runner is online, and each pull request's page on the dashboard lists its runs with the reason when one failed.
 
