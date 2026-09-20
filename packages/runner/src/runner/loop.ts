@@ -34,7 +34,7 @@ export type RunnerLoopDependencies = {
   createRunDirectory(reference: ClaimedJob["pullRequest"]): Promise<string>;
   fetch: typeof fetch;
   report(event: RunnerEvent): void;
-  log(line: string, runDirectory?: string): void;
+  log(line: string, runDirectory: string): void;
   contractOverride?: string;
   signal?: AbortSignal;
   heartbeatIntervalMs?: number;
@@ -199,8 +199,9 @@ async function deliverResult(
 export async function runJob(
   claimed: ClaimedJob,
   loopDeps: RunnerLoopDependencies,
-  slot?: number,
+  options: { slot?: number; superseded?: AbortSignal } = {},
 ): Promise<"delivered" | "dropped" | "undelivered"> {
+  const { slot } = options;
   const deps: RunnerLoopDependencies =
     slot === undefined
       ? loopDeps
@@ -213,16 +214,17 @@ export async function runJob(
     headSha: job.headSha,
   });
   const control = new AbortController();
+  const supersede = () => {
+    if (control.signal.aborted) return;
+    deps.report({ state: "superseded", detail: "a newer push is waiting; stopping this review" });
+    control.abort();
+  };
+  options.superseded?.addEventListener("abort", supersede, { once: true });
   const heartbeat = setInterval(() => {
     deps.client
       .heartbeat(job.id)
       .then(({ superseded }) => {
-        if (!superseded || control.signal.aborted) return;
-        deps.report({
-          state: "superseded",
-          detail: "a newer push is waiting; stopping this review",
-        });
-        control.abort();
+        if (superseded) supersede();
       })
       .catch((error: Error) =>
         deps.report({ state: "waiting", detail: `heartbeat failed: ${error.message}` }),
@@ -238,6 +240,7 @@ export async function runJob(
     report = { status: "error", turns: 0, error: (error as Error).message };
   } finally {
     clearInterval(heartbeat);
+    options.superseded?.removeEventListener("abort", supersede);
   }
   const durationMs = Date.now() - startedAt;
   if (report.status !== "ok" && report.status !== "superseded")
@@ -255,13 +258,13 @@ export async function runRunnerLoop(
   const sleep = deps.sleep ?? sleepFor;
   let failedClaims = 0;
   let concurrency = DEFAULT_CONCURRENCY;
-  const running = new Map<number, Promise<unknown>>();
+  const running = new Map<number, { subject: string; finished: Promise<unknown>; stop(): void }>();
   const freeSlot = () => {
     for (let slot = 1; ; slot += 1) if (!running.has(slot)) return slot;
   };
   while (!deps.signal?.aborted) {
     if (running.size >= concurrency) {
-      await Promise.race(running.values());
+      await Promise.race([...running.values()].map((job) => job.finished));
       continue;
     }
     let claimed: ClaimedJob | undefined;
@@ -298,11 +301,16 @@ export async function runRunnerLoop(
       return;
     }
     concurrency = claimed.settings.concurrency ?? DEFAULT_CONCURRENCY;
+    const { owner, repo, number } = claimed.pullRequest;
+    const subject = `${owner}/${repo}#${number}`;
+    for (const older of running.values()) if (older.subject === subject) older.stop();
     const slot = freeSlot();
-    const finished = runJob(claimed, deps, concurrency > 1 ? slot : undefined).finally(() =>
-      running.delete(slot),
-    );
-    running.set(slot, finished);
+    const superseded = new AbortController();
+    const finished = runJob(claimed, deps, {
+      ...(concurrency > 1 ? { slot } : {}),
+      superseded: superseded.signal,
+    }).finally(() => running.delete(slot));
+    running.set(slot, { subject, finished, stop: () => superseded.abort() });
   }
-  await Promise.all(running.values());
+  await Promise.all([...running.values()].map((job) => job.finished));
 }

@@ -212,6 +212,57 @@ describe("runRunnerLoop", () => {
     expect(plane.received.filter((r) => r.url.endsWith("/result"))).toHaveLength(2);
   });
 
+  it("stops a running review as soon as it claims a newer job for the same pull request", async () => {
+    const pool = (job: ClaimedJob) => ({ ...job, settings: { ...job.settings, concurrency: 2 } });
+    const newer: ClaimedJob = {
+      ...claimedJob,
+      job: { ...claimedJob.job, id: "job-2", runId: "run-2", headSha: "c".repeat(40) },
+    };
+    let reviewing = false;
+    let served = 0;
+    const plane = await fakeControlPlane((received, response) => {
+      if (received.url === "/api/runner/jobs") {
+        if (served === 0 || (served === 1 && reviewing)) {
+          served += 1;
+          return json(response, 200, pool(served === 1 ? claimedJob : newer));
+        }
+        return json(response, 204);
+      }
+      return json(response, 200, { ok: true, posted: "posted" });
+    });
+    servers.push(plane.server);
+    const stop = new AbortController();
+    const d = await deps(plane.baseUrl, { signal: stop.signal, heartbeatIntervalMs: 60_000 });
+    d.harness = {
+      name: "until-stopped",
+      run: async (i) => {
+        if (!reviewing) {
+          reviewing = true;
+          await new Promise<void>((resolve) =>
+            i.signal?.addEventListener("abort", () => resolve(), { once: true }),
+          );
+          return { status: "superseded", turns: 0 };
+        }
+        await writeFile(i.resultPath, JSON.stringify(review));
+        return { status: "ok", turns: 1 };
+      },
+    };
+    const loop = runRunnerLoop(d);
+    await vi.waitFor(() =>
+      expect(plane.received.filter((r) => r.url.endsWith("/result"))).toHaveLength(2),
+    );
+    stop.abort();
+    await loop;
+    const results = plane.received.filter((r) => r.url.endsWith("/result"));
+    expect(results.map((r) => [r.url, (r.body as { status: string }).status])).toEqual(
+      expect.arrayContaining([
+        ["/api/runner/runs/run-1/result", "superseded"],
+        ["/api/runner/runs/run-2/result", "ok"],
+      ]),
+    );
+    expect(d.reported.some((event) => event.state === "superseded" && event.slot === 1)).toBe(true);
+  });
+
   it("runs one job at a time and carries no slot when concurrency is one", async () => {
     const second: ClaimedJob = {
       ...claimedJob,

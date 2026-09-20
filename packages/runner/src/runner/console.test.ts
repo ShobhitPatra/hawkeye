@@ -75,13 +75,12 @@ describe("runnerConsole", () => {
       "<d>10:06:43</d>  posted     <b>Blocked</b> · 1 finding · <r>1 must fix</r> · 1 turn · 0m 01s",
     ]);
   });
-  it("sends detail lines to the run's log file once a run directory is known", () => {
+  it("sends detail lines to the log file of the run they belong to", () => {
     const c = console();
-    c.log("before any run");
     c.report({ state: "reviewing", runDirectory: "/home/u/r" });
-    c.log("turn 1");
-    c.log("turn 2");
-    expect(c.lines).toEqual(["before any run", "10:06:43  reviewing  ~/r"]);
+    c.log("turn 1", "/home/u/r");
+    c.log("turn 2", "/home/u/r");
+    expect(c.lines).toEqual(["10:06:43  reviewing  ~/r"]);
     expect(c.files).toEqual({ "/home/u/r/log.txt": "turn 1\nturn 2\n" });
   });
 });
