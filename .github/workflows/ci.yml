@@ -13,9 +13,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checks:
+  gate:
+    name: ${{ matrix.gate }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        gate: [lint, format:check, typecheck, test, build]
     steps:
       - uses: actions/checkout@v7
       - id: changes
@@ -34,15 +39,6 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - id: install
-        run: pnpm install --frozen-lockfile
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: pnpm lint
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: pnpm format:check
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: pnpm typecheck
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.changes.outputs.code != 'false' }}
-        run: pnpm test
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.changes.outputs.code != 'false' }}
-        run: pnpm build
+      - run: pnpm install --frozen-lockfile
+      - if: steps.changes.outputs.code != 'false' || (matrix.gate != 'test' && matrix.gate != 'build')
+        run: pnpm ${{ matrix.gate }}
