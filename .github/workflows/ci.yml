@@ -1,35 +1,49 @@
 name: ci
 
 on:
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  checks:
+  gate:
+    name: ${{ matrix.gate }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        gate: [lint, format:check, typecheck]
+        include:
+          - gate: test
+            skipped_for_docs: true
+          - gate: build
+            skipped_for_docs: true
     steps:
       - uses: actions/checkout@v7
+      - id: changes
+        if: github.event_name == 'pull_request' && matrix.skipped_for_docs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files=$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --jq '.[] | .filename, (.previous_filename // empty)') || files=''
+          if printf '%s\n' "$files" | grep -qvE '^([^/]+\.md|docs/.*|\.github/ISSUE_TEMPLATE/.*|\.github/PULL_REQUEST_TEMPLATE\.md|\.github/FUNDING\.yml|LICENSE)$'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
-      - id: install
-        run: pnpm install --frozen-lockfile
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: pnpm lint
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: pnpm format:check
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: pnpm typecheck
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: pnpm test
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: pnpm build
+      - run: pnpm install --frozen-lockfile
+      - if: steps.changes.outputs.code != 'false' || !matrix.skipped_for_docs
+        run: pnpm ${{ matrix.gate }}
