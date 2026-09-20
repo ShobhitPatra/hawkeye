@@ -1,5 +1,5 @@
 import type { ReviewResult } from "@hawkeye/core";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
@@ -132,6 +132,34 @@ describe("heartbeatJob", () => {
       await heartbeatJob(db, { jobId: claimed?.id ?? "", runnerId: "runner-2", now }),
     ).toBeUndefined();
     expect(await heartbeatJob(db, { jobId: queued.id, runnerId: "runner-1", now })).toBeUndefined();
+  });
+});
+
+describe("the queue's indexes", () => {
+  async function plan(query: ReturnType<typeof sql>): Promise<string> {
+    await db.execute(sql`set enable_seqscan = off`);
+    try {
+      const result = (await db.execute(sql`explain ${query}`)) as {
+        rows: { "QUERY PLAN": string }[];
+      };
+      return result.rows.map((row) => row["QUERY PLAN"]).join("\n");
+    } finally {
+      await db.execute(sql`set enable_seqscan = on`);
+    }
+  }
+
+  it("serves the claim predicate from job_claimable", async () => {
+    expect(
+      await plan(
+        sql`select id from job where state = 'queued' and not_before <= now() order by not_before`,
+      ),
+    ).toContain("job_claimable");
+  });
+
+  it("serves the stale sweep predicate from job_stale", async () => {
+    expect(
+      await plan(sql`select id from job where state = 'claimed' and heartbeat_at < now()`),
+    ).toContain("job_stale");
   });
 });
 

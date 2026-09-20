@@ -2,6 +2,7 @@ import type { ReviewResult } from "@hawkeye/core";
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -129,6 +130,12 @@ export const job = pgTable(
     uniqueIndex("job_open_per_armed_pr")
       .on(t.armedPrId)
       .where(sql`${t.state} = 'queued'`),
+    index("job_claimable")
+      .on(t.notBefore)
+      .where(sql`${t.state} = 'queued'`),
+    index("job_stale")
+      .on(t.heartbeatAt)
+      .where(sql`${t.state} = 'claimed'`),
   ],
 );
 
