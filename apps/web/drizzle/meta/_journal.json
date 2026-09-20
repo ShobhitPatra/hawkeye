@@ -99,6 +99,13 @@
       "when": 1789887836339,
       "tag": "0013_salty_paper_doll",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789909378226,
+      "tag": "0014_jazzy_star_brand",
+      "breakpoints": true
     }
   ]
 }

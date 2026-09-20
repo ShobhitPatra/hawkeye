@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { runner } from "./db/schema";
 
@@ -72,9 +72,10 @@ export async function authenticateRunner(
   const token = parseRunnerToken(authorization);
   if (!token) return undefined;
 
+  const now = new Date();
   const [row] = await db
     .update(runner)
-    .set({ lastSeenAt: new Date() })
+    .set({ lastSeenAt: now, firstSeenAt: sql`coalesce(${runner.firstSeenAt}, ${now})` })
     .where(and(eq(runner.tokenHash, hashRunnerToken(token)), isNull(runner.revokedAt)))
     .returning();
   return row;
