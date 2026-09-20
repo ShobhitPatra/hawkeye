@@ -21,14 +21,15 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - if: ${{ !cancelled() }}
+      - id: install
+        run: pnpm install --frozen-lockfile
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: pnpm lint
-      - if: ${{ !cancelled() }}
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: pnpm format:check
-      - if: ${{ !cancelled() }}
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: pnpm typecheck
-      - if: ${{ !cancelled() }}
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: pnpm test
-      - if: ${{ !cancelled() }}
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: pnpm build
