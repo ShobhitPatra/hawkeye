@@ -10,7 +10,7 @@ Hawkeye is a code reviewer that belongs to you, not to a repository. Open a pull
 
 - **What it costs:** nothing beyond that plan. No seat, no token bill.
 - **Why it is different:** every other AI reviewer is bought per seat and wired into a repository by an admin. This one runs on your subscription, on your hardware. Your plan credential and your repository never reach a server of ours; only the findings do.
-- **What it needs today:** a Claude Code login. Codex is next; see [what works today](#what-works-today).
+- **What it needs today:** a Claude Code login. Codex is next ([#170](https://github.com/ShobhitPatra/hawkeye/issues/170)).
 
 [Sign in with GitHub](https://hawkeye-review.vercel.app) to review every push, or try one review with no account:
 
@@ -68,19 +68,6 @@ You need a machine with Node 22 or newer, git 2.31 or newer, and [Claude Code](h
 To stop: Pause on the Pull requests page stops one pull request; Settings turns automatic review off for all of them; closing the terminal stops the runner.
 
 If nothing happens, the Runners page says whether your runner is online, and each pull request's page on the dashboard lists its runs with the reason when one failed.
-
-## What works today
-
-| | |
-|---|---|
-| Reviews with Claude Code, on open and on every push | works |
-| One living comment per pull request, updated each round, with addressed findings resolved | works |
-| Your own pull requests, in repositories where the GitHub App is installed | works |
-| Model, turn and time limits, and up to three reviews at once, from Settings | works |
-| The hosted instance at hawkeye-review.vercel.app | works, as a preview: free, no promises about uptime |
-| Codex as the reviewing agent | planned, [#170](https://github.com/ShobhitPatra/hawkeye/issues/170) |
-| Repositories where nobody will install the App | planned, [#162](https://github.com/ShobhitPatra/hawkeye/issues/162) |
-| Reviewing pull requests you did not open | planned, behind a sandbox, [#159](https://github.com/ShobhitPatra/hawkeye/issues/159) |
 
 ## Try one review with no account
 
