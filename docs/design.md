@@ -230,7 +230,7 @@ The control plane runs two workloads with opposite shapes, and they must not sha
 
 Serverless is close to ideal for the first column and close to worst-case for the second: a held connection bills for its whole life while doing nothing, and a per-connection poll loop makes database load a function of *user count × time* rather than of work.
 
-**Today.** The claim endpoint long-polls inside a serverless function: up to 25 s per call, a queue check every 5 s, and the stale-claim sweep once per claim call. That is the shape this section replaces. Everything below is the target. Three of its rules are unmet today: the sweep runs inside a request, the sweep's predicate (`state = 'claimed'` and an old heartbeat) has no index behind it, and an idle runner claims again after a fixed second with no back-off.
+**Today.** The claim endpoint long-polls inside a serverless function: up to 25 s per call with a queue check every 5 s. The stale-claim sweep runs on a schedule, not in a request: `/api/internal/sweep`, guarded by `CRON_SECRET`, called every five minutes by a GitHub Actions workflow for the hosted instance (Vercel's Hobby cron fires once a day and stays as a backstop). The long-poll is the shape this section replaces. Everything below is the target. Two of its rules are unmet today: the sweep's predicate (`state = 'claimed'` and an old heartbeat) has no index behind it, and an idle runner claims again after a fixed second with no back-off.
 
 **Target shape.** Next.js stays on serverless for the dashboard, auth and webhook ingest. The runner channel moves to one always-on process that holds the idle connections in memory, with **a single `LISTEN` connection for the whole fleet** and in-memory fanout by user. The webhook that enqueues a job issues `NOTIFY`; the waiting runner is woken. Database work becomes proportional to pushes rather than to connected runners.
 
@@ -412,10 +412,12 @@ With a runner token:
 
 | Endpoint | Behaviour |
 |---|---|
-| `GET /api/runner/jobs` | Long-polls for up to 25 s, checking the queue every 5 s, and sweeps stale claims once per call. Returns the claimed job with a fresh installation token, the pull request coordinates, the user's review settings and — from the second round of an arm on — the previous round (the last posted round's findings with stable ids, plus the arm's still-open findings), or 204 when nothing is queued |
+| `GET /api/runner/jobs` | Long-polls for up to 25 s, checking the queue every 5 s. Returns the claimed job with a fresh installation token, the pull request coordinates, the user's review settings and — from the second round of an arm on — the previous round (the last posted round's findings with stable ids, plus the arm's still-open findings), or 204 when nothing is queued |
 | `POST /api/runner/jobs/<id>/heartbeat` | Keeps the claim alive (a claim without a heartbeat for 5 minutes goes back to the queue) and answers `{ ok, superseded }`, true once a newer job exists for the same arm |
 | `POST /api/runner/runs/<id>/events` | Accepts `{ type, at, data }` entries and counts the `turn` ones |
 | `POST /api/runner/runs/<id>/result` | Posts `{ status, turns, result?, error?, commentable? }`, storing the review result and closing the run and the job |
+
+With `CRON_SECRET` as a bearer token, `GET` or `POST /api/internal/sweep` requeues the jobs whose runner went silent for five minutes (failing one that a newer job for the same pull request has overtaken) and answers `{ ok, swept }`; without the secret it answers 401.
 
 ### Posting a review
 

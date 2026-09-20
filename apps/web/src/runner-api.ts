@@ -39,7 +39,6 @@ import {
   heartbeatJob,
   holdsJobClaim,
   releaseJob,
-  requeueStaleJobs,
   jobSuperseded,
   newerRunIsLive,
 } from "./job-queue";
@@ -156,7 +155,6 @@ export async function claimJob(request: Request, deps: ClaimDeps): Promise<Respo
     totalMs: DEFAULT_CLAIM_POLL_TOTAL_MS,
   };
   const deadline = now().getTime() + totalMs;
-  await requeueStaleJobs(deps.db, { now: now() });
 
   for (;;) {
     const claimed = await claimNextJob(deps.db, {

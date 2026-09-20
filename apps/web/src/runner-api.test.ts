@@ -3,9 +3,11 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
+import { requeueStaleJobs } from "./job-queue";
 import { enqueueJob } from "./jobs";
 import { claimJob, heartbeat, recordEvents, recordResult } from "./runner-api";
 import { createRunnerToken } from "./runner-tokens";
+import { sweep } from "./sweep";
 import { createTestDb, seedArmedPullRequest } from "./test/pglite";
 
 const now = new Date("2026-01-01T12:00:00.000Z");
@@ -490,7 +492,7 @@ describe("claimJob", () => {
     ]);
   });
 
-  it("requeues a stale job and claims it on the first attempt", async () => {
+  it("leaves a stale claim alone until the scheduled sweep requeues it, then claims it", async () => {
     const queued = await enqueue();
     await db
       .update(schema.job)
@@ -502,15 +504,21 @@ describe("claimJob", () => {
       })
       .where(eq(schema.job.id, queued.id));
 
-    const sleep = vi.fn(async () => {});
-    const response = await claimJob(
-      request("/api/runner/jobs"),
-      claimDeps({ poll: { intervalMs: 1, totalMs: 10 }, sleep }),
-    );
+    const before = await claimJob(request("/api/runner/jobs"), claimDeps());
+    expect(before.status).toBe(204);
 
-    expect(response.status).toBe(200);
-    expect(sleep).not.toHaveBeenCalled();
-    expect((await response.json()).job.id).toBe(queued.id);
+    const swept = await sweep(
+      new Request("https://hawkeye.test/api/internal/sweep", {
+        method: "POST",
+        headers: { authorization: "Bearer s3cret" },
+      }),
+      { db, secret: "s3cret", now: () => now },
+    );
+    expect(await swept.json()).toEqual({ ok: true, swept: 1 });
+
+    const after = await claimJob(request("/api/runner/jobs"), claimDeps());
+    expect(after.status).toBe(200);
+    expect((await after.json()).job.id).toBe(queued.id);
   });
 });
 
@@ -1345,10 +1353,11 @@ describe("recordResult", () => {
       .set({ heartbeatAt: new Date(now.getTime() - 3_600_000) })
       .where(eq(schema.job.id, queued.id));
 
+    await requeueStaleJobs(db, { now });
     const other = await createRunnerToken(db, { userId: "user-1", name: "desktop" });
     const second = await claimJob(
       request("/api/runner/jobs", { bearer: other.token }),
-      claimDeps({ poll: { intervalMs: 1, totalMs: 10 }, sleep: vi.fn(async () => {}) }),
+      claimDeps(),
     );
     expect(second.status).toBe(200);
     const freshRunId = (await second.json()).job.runId as string;

@@ -13,4 +13,5 @@ export const env = {
   githubWebhookSecret: () => required("GITHUB_WEBHOOK_SECRET"),
   githubAppId: () => required("GITHUB_APP_ID"),
   githubAppPrivateKey: () => required("GITHUB_APP_PRIVATE_KEY"),
+  cronSecret: () => process.env.CRON_SECRET,
 };
