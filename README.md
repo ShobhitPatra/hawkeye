@@ -29,6 +29,16 @@ The first round on this repository's own [pull request #87](https://github.com/S
 
 Nothing beyond the plan you already pay for. Your plan's limits are the budget, and the dashboard shows what each review cost in turns and minutes.
 
+## What the runner can reach
+
+A review runs a coding agent on your machine, as you, over code you did not write. Know what that means before you connect a runner.
+
+- **What it can reach.** The agent runs shell commands to read and test the checkout, with your environment and your files in reach, not only the pull request. Anything your own terminal can read, a command it runs could read.
+- **What it is denied.** Its file-editing, web-fetch and web-search tools are removed; the shell stays, which is why the first point holds. The checkout's own agent instructions (`CLAUDE.md`, `.claude/`) are removed before it starts and the repository's settings are never loaded, so a pull request cannot reconfigure the reviewer. The token that cloned the branch is never written into the checkout.
+- **What bounds the risk today.** Hawkeye reviews pull requests you open, in repositories you chose. The exposure is code from the people who can push to your branches. Reviewing strangers' pull requests waits for a sandbox around the shell ([#160](https://github.com/ShobhitPatra/hawkeye/issues/160)).
+
+Run the runner on a machine, or under a user, whose files you are willing to have read by a program reviewing that code.
+
 ## Start with one pull request
 
 1. Sign in with GitHub at [hawkeye-review.vercel.app](https://hawkeye-review.vercel.app) and install the GitHub App on a repository you admin.
