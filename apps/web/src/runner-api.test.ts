@@ -1136,6 +1136,35 @@ describe("recordResult", () => {
     expect(row?.status).toBe("superseded");
   });
 
+  it("leaves the reviewing block to a newer run of the same pull request that is live", async () => {
+    const olderRunId = await claimedRunId();
+    await enqueueJob(db, {
+      armedPrId: "armed-1",
+      headSha: "c".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: now,
+    });
+    await claimJob(request("/api/runner/jobs"), claimDeps());
+    (github.updateReview as ReturnType<typeof vi.fn>).mockClear();
+    (github.review as ReturnType<typeof vi.fn>).mockClear();
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${olderRunId}/result`, { status: "superseded", turns: 2 }),
+      { db, github },
+      olderRunId,
+    );
+
+    expect(response.status).toBe(200);
+    expect(github.updateReview).not.toHaveBeenCalled();
+    expect(github.review).not.toHaveBeenCalled();
+    expect(github.createCommitStatus).toHaveBeenCalledWith(
+      { owner: "octo", repo: "a", number: 1 },
+      "a".repeat(40),
+      { state: "success", description: "Superseded by a newer push", context: "hawkeye" },
+      "ghs_token",
+    );
+  });
+
   it("does not post for a non-ok status", async () => {
     const runId = await claimedRunId();
     (github.postReview as ReturnType<typeof vi.fn>).mockClear();

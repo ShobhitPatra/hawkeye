@@ -208,6 +208,25 @@ export async function completeRun(
   });
 }
 
+export async function newerRunIsLive(
+  db: Db,
+  current: { jobId: string; armedPrId: string },
+): Promise<boolean> {
+  const [live] = await db
+    .select({ id: run.id })
+    .from(run)
+    .innerJoin(job, eq(job.id, run.jobId))
+    .where(
+      and(
+        eq(job.armedPrId, current.armedPrId),
+        ne(job.id, current.jobId),
+        eq(run.status, "running"),
+      ),
+    )
+    .limit(1);
+  return live !== undefined;
+}
+
 export async function jobSuperseded(
   db: Db,
   current: Pick<Job, "id" | "armedPrId">,

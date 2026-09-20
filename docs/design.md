@@ -389,7 +389,7 @@ At every sign-in, and each time the pull request listing is fetched (held a minu
 
 ### Webhook deliveries
 
-A push to an armed PR (`synchronize` and `ready_for_review`) queues a job for the new head after the quiet window (armed override, else the user setting, else 0 s), replacing any job still waiting. A job already claimed keeps running until its next heartbeat, whose response says it is superseded; the daemon then stops the review, reports it as `superseded`, and claims the newer job. A daemon with a free slot may claim the newer job first; it then stops the older review of that pull request at once rather than waiting for the heartbeat. Drafts are skipped unless the user opted into reviewing drafts. Closing or merging the PR disarms it for everyone and cancels any job still waiting. `reopened` does not trigger.
+A push to an armed PR (`synchronize` and `ready_for_review`) queues a job for the new head after the quiet window (armed override, else the user setting, else 0 s), replacing any job still waiting. A job already claimed keeps running until its next heartbeat, whose response says it is superseded; the daemon then stops the review, reports it as `superseded`, and claims the newer job. A daemon with a free slot may claim the newer job first; it then stops the older review of that pull request at once rather than waiting for the heartbeat, and the control plane leaves the reviewing block alone when the older result arrives, because the newer run owns it by then. Drafts are skipped unless the user opted into reviewing drafts. Closing or merging the PR disarms it for everyone and cancels any job still waiting. `reopened` does not trigger.
 
 ### Connecting a runner
 
