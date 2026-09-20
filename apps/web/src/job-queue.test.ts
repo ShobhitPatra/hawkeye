@@ -1,15 +1,17 @@
 import type { ReviewResult } from "@hawkeye/core";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, type SQLWrapper } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
 import {
   claimNextJob,
+  claimNextJobStatement,
   completeRun,
   createRun,
   heartbeatJob,
   holdsJobClaim,
   requeueStaleJobs,
+  sweepStaleJobsStatement,
 } from "./job-queue";
 import { enqueueJob } from "./jobs";
 import { createTestDb, seedArmedPullRequest } from "./test/pglite";
@@ -136,30 +138,57 @@ describe("heartbeatJob", () => {
 });
 
 describe("the queue's indexes", () => {
-  async function plan(query: ReturnType<typeof sql>): Promise<string> {
-    await db.execute(sql`set enable_seqscan = off`);
-    try {
-      const result = (await db.execute(sql`explain ${query}`)) as {
-        rows: { "QUERY PLAN": string }[];
-      };
-      return result.rows.map((row) => row["QUERY PLAN"]).join("\n");
-    } finally {
-      await db.execute(sql`set enable_seqscan = on`);
-    }
+  async function seedQueue() {
+    await db.execute(
+      sql`insert into "user" (id, name, email)
+          select 'seed-u' || g, 'n', 'seed' || g || '@example.com' from generate_series(1, 200) g`,
+    );
+    await db.execute(
+      sql`insert into armed_pr (id, user_id, installation_id, owner, repo, number)
+          select 'seed-a' || g, 'seed-u' || (1 + g % 200), '10', 'seed', 'r' || g, g
+          from generate_series(1, 800) g`,
+    );
+    await db.execute(
+      sql`insert into job (armed_pr_id, head_sha, base_sha, not_before, state)
+          select 'seed-a' || (1 + g % 800), 'h' || g, 'b', now() - interval '1 hour',
+                 (case when g % 10 = 0 then 'failed' else 'done' end)::job_state
+          from generate_series(1, 20000) g`,
+    );
+    await db.execute(
+      sql`insert into job (armed_pr_id, head_sha, base_sha, not_before, state)
+          select 'seed-a' || g, 'q' || g, 'b', now() - interval '1 minute', 'queued'
+          from generate_series(1, 40) g`,
+    );
+    await db.execute(
+      sql`insert into job (armed_pr_id, head_sha, base_sha, not_before, state, heartbeat_at)
+          select 'seed-a' || (100 + g), 'c' || g, 'b', now() - interval '1 hour', 'claimed',
+                 now() - (g || ' minutes')::interval
+          from generate_series(1, 30) g`,
+    );
+    await db.execute(sql`analyze`);
   }
 
-  it("serves the claim predicate from job_claimable", async () => {
-    expect(
-      await plan(
-        sql`select id from job where state = 'queued' and not_before <= now() order by not_before`,
-      ),
-    ).toContain("job_claimable");
+  async function plan(statement: SQLWrapper): Promise<string> {
+    const result = (await db.execute(sql`explain `.append(statement.getSQL()))) as {
+      rows: { "QUERY PLAN": string }[];
+    };
+    return result.rows.map((row) => row["QUERY PLAN"]).join("\n");
+  }
+
+  it("serves the claim statement from job_claimable over a seeded queue", async () => {
+    await seedQueue();
+    const claim = claimNextJobStatement(db, {
+      runnerId: "runner-1",
+      userId: "seed-u5",
+      now: new Date(),
+    });
+    expect(await plan(claim)).toContain("Index Scan using job_claimable");
   });
 
-  it("serves the stale sweep predicate from job_stale", async () => {
-    expect(
-      await plan(sql`select id from job where state = 'claimed' and heartbeat_at < now()`),
-    ).toContain("job_stale");
+  it("serves the stale sweep statement from job_stale over a seeded queue", async () => {
+    await seedQueue();
+    const sweep = sweepStaleJobsStatement(db, new Date(Date.now() - 5 * 60_000));
+    expect(await plan(sweep)).toContain("Index Scan using job_stale");
   });
 });
 
