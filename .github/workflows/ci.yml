@@ -13,7 +13,7 @@ concurrency:
 jobs:
   checks:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -22,8 +22,13 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm format:check
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
+      - if: ${{ !cancelled() }}
+        run: pnpm lint
+      - if: ${{ !cancelled() }}
+        run: pnpm format:check
+      - if: ${{ !cancelled() }}
+        run: pnpm typecheck
+      - if: ${{ !cancelled() }}
+        run: pnpm test
+      - if: ${{ !cancelled() }}
+        run: pnpm build
