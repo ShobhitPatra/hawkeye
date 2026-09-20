@@ -1,14 +1,17 @@
 {
   "name": "hawkeye-review",
   "version": "0.7.0",
-  "description": "Personal AI code reviewer on the Claude Code or Codex plan you already pay for: review pull requests locally, or run the Hawkeye daemon.",
+  "description": "Code review on the AI subscription you already pay for.",
   "keywords": [
-    "ai",
-    "claude",
+    "ai-agents",
+    "ai-code-review",
     "claude-code",
+    "cli",
     "code-review",
     "codex",
-    "pull-request"
+    "developer-tools",
+    "llm",
+    "pull-requests"
   ],
   "homepage": "https://github.com/ShobhitPatra/hawkeye#readme",
   "bugs": "https://github.com/ShobhitPatra/hawkeye/issues",
