@@ -183,6 +183,57 @@ describe("renderLivingReview", () => {
     expect(rendered.body).not.toContain("Review lenses");
   });
 
+  it("walks each later rung alone: the current round, the lens table, then every detail", () => {
+    const base = input(new Set());
+    const many: RoundSummary[] = Array.from({ length: 12 }, (_, index) => ({
+      round: index + 1,
+      headSha: index === 11 ? head : index.toString(16).padStart(40, "0"),
+      verdict: "ship",
+      startedAt: "2026-01-01 00:00 UTC",
+    }));
+    const must = { path: "src/m.ts", severity: "must_fix" as const, claim: "Must claim" };
+    const sized = (detail: string, maxBodyLength: number) =>
+      renderLivingReview({
+        ...base,
+        commentable: new Map(),
+        rounds: many,
+        result: { ...base.result, findings: [{ ...must, detail }], priorFindings: [] },
+        maxBodyLength,
+      });
+    const full = sized("short", 100_000).body.length;
+    const rowLength = 56;
+
+    const currentOnly = sized("short", full - 3 * rowLength);
+    expect(currentOnly.trimmed.at(-1)).toBe("all but the current round");
+    expect(currentOnly.body).toContain("| 11 earlier rounds | | | |");
+    expect(currentOnly.body).toContain("Review lenses");
+
+    const noLenses = sized("short", currentOnly.body.length - 1);
+    expect(noLenses.trimmed.at(-1)).toBe("the lens table");
+    expect(noLenses.body).not.toContain("Review lenses");
+    expect(noLenses.body).toContain("  short");
+
+    const long = "y".repeat(4_000);
+    const claimsOnly = sized(long, 3_000);
+    expect(claimsOnly.trimmed.at(-1)).toBe("every finding's detail");
+    expect(claimsOnly.body).not.toContain(long);
+    expect(claimsOnly.body).toContain(
+      `- **Must claim** \`src/m.ts\` \`${findingId("src/m.ts", "Must claim")}\``,
+    );
+    expect(claimsOnly.body).toContain("### Changes needed");
+  });
+
+  it("caps the summary in the short form so it cannot be refused for length", () => {
+    const base = input(new Set());
+    const body = renderMinimalLivingReview({
+      ...base,
+      result: { ...base.result, summary: "z".repeat(90_000) },
+    });
+    expect(body.length).toBeLessThan(4_000);
+    expect(body).toContain(`${"z".repeat(2_000)}…`);
+    expect(body).toContain("### Changes needed");
+  });
+
   it("falls back to the short form when even the claims do not fit", () => {
     const base = input(new Set());
     const rendered = renderLivingReview({ ...base, maxBodyLength: 400 });

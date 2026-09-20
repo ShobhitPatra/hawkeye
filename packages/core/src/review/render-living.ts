@@ -11,8 +11,8 @@ import {
   type RenderInput,
 } from "./render.js";
 
-export const GITHUB_REVIEW_BODY_LIMIT = 65_536;
 export const LIVING_REVIEW_BODY_BUDGET = 64_000;
+const SHORT_FORM_SUMMARY_LIMIT = 2_000;
 
 export type RenderLivingReviewInput = Pick<
   RenderInput,
@@ -142,8 +142,12 @@ function renderWith(input: RenderLivingReviewInput, trim: Trim) {
 export function renderMinimalLivingReview(
   input: Pick<RenderLivingReviewInput, "result" | "headSha" | "repositoryUrl" | "rounds">,
 ): string {
+  const summary =
+    input.result.summary.length > SHORT_FORM_SUMMARY_LIMIT
+      ? `${input.result.summary.slice(0, SHORT_FORM_SUMMARY_LIMIT)}…`
+      : input.result.summary;
   const { lines } = renderReviewSections({
-    result: { ...input.result, findings: [] },
+    result: { ...input.result, summary, findings: [] },
     headSha: input.headSha,
     commentable: new Map(),
   });

@@ -29,7 +29,6 @@ export type { RenderedReview, ReviewComment } from "./review/render.js";
 export { renderReview, type FooterMeta, type RenderInput } from "./review/render.js";
 export { LENS_LABELS, SEVERITY_LABELS, VERDICT_LABELS } from "./review/format.js";
 export {
-  GITHUB_REVIEW_BODY_LIMIT,
   LIVING_REVIEW_BODY_BUDGET,
   renderLivingReview,
   renderMinimalLivingReview,
