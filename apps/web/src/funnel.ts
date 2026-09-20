@@ -14,19 +14,24 @@ type Row = { week_start: string } & Record<
 
 export async function loadFunnel(db: Db): Promise<Funnel> {
   const result = (await db.execute(sql`
-    select to_char(date_trunc('week', u.created_at), 'YYYY-MM-DD') as week_start,
+    with reached as (
+      select u.created_at,
+             exists (select 1 from installation_user iu where iu.user_id = u.id) as installed,
+             exists (select 1 from runner r where r.user_id = u.id) as connected,
+             exists (select 1 from runner r
+                     where r.user_id = u.id and r.first_seen_at is not null) as online,
+             exists (select 1 from review_posted p
+                     join armed_pr a on a.id = p.armed_pr_id
+                     where a.user_id = u.id and p.github_review_id is not null) as reviewed
+      from "user" u
+    )
+    select to_char(date_trunc('week', created_at at time zone 'utc'), 'YYYY-MM-DD') as week_start,
            count(*)::int as signed_in,
-           count(*) filter (where exists (
-             select 1 from installation_user iu where iu.user_id = u.id))::int as installed,
-           count(*) filter (where exists (
-             select 1 from runner r where r.user_id = u.id))::int as connected,
-           count(*) filter (where exists (
-             select 1 from runner r where r.user_id = u.id and r.first_seen_at is not null))::int as online,
-           count(*) filter (where exists (
-             select 1 from review_posted p
-             join armed_pr a on a.id = p.armed_pr_id
-             where a.user_id = u.id and p.github_review_id is not null))::int as reviewed
-    from "user" u
+           count(*) filter (where installed)::int as installed,
+           count(*) filter (where installed and connected)::int as connected,
+           count(*) filter (where installed and connected and online)::int as online,
+           count(*) filter (where installed and connected and online and reviewed)::int as reviewed
+    from reached
     group by 1
     order by 1 desc
   `)) as { rows: Row[] };

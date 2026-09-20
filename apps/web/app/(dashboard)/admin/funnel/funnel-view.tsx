@@ -35,7 +35,8 @@ export function FunnelView({ funnel }: { funnel: Funnel }) {
         <h1 className="hk-title">Funnel</h1>
         <p className="hk-compact hk-muted hk-prose">
           How far people get from signing in to a first review, counted from this instance's own
-          database. Nothing on this page is sent anywhere.
+          database. Each step counts only the people who also reached the ones before it. Nothing on
+          this page is sent anywhere.
         </p>
       </div>
 

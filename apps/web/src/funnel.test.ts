@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
@@ -73,6 +74,30 @@ describe("loadFunnel", () => {
       online: 2,
       reviewed: 1,
     });
+  });
+
+  it("nests the steps, so nobody counts at a step without the ones before it", async () => {
+    await person("no-app", "2026-09-16T10:00:00Z");
+    await person("with-app", "2026-09-16T11:00:00Z");
+    await db.insert(schema.installationUser).values({ installationId: "10", userId: "with-app" });
+    await db.insert(schema.runner).values([
+      { id: "r1", userId: "no-app", name: "a", tokenHash: "h1", firstSeenAt: new Date() },
+      { id: "r2", userId: "no-app", name: "b", tokenHash: "h2", firstSeenAt: new Date() },
+    ]);
+
+    const { total } = await loadFunnel(db);
+
+    expect(total).toEqual({ signedIn: 2, installed: 1, connected: 0, online: 0, reviewed: 0 });
+  });
+
+  it("buckets weeks in UTC whatever the session's time zone", async () => {
+    await person("sunday-night-utc", "2026-09-13T23:30:00Z");
+    await db.execute(sql`set time zone 'Asia/Kolkata'`);
+    try {
+      expect((await loadFunnel(db)).weeks.map((week) => week.weekStart)).toEqual(["2026-09-07"]);
+    } finally {
+      await db.execute(sql`set time zone 'UTC'`);
+    }
   });
 
   it("does not count a review still in flight", async () => {

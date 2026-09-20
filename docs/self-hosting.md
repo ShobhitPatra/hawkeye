@@ -41,7 +41,7 @@ Import the repository into a Vercel project with Root Directory `apps/web`, Inst
 | `GITHUB_APP_ID` | from the App page |
 | `GITHUB_APP_PRIVATE_KEY` | the contents of the `.pem`, newlines kept or written as `\n` |
 | `CRON_SECRET` | 32 random bytes as hex (`openssl rand -hex 32`); guards the sweep route below |
-| `ADMIN_LOGINS` | optional; GitHub logins, comma separated, that may open `/admin/funnel`. Empty means the page does not exist |
+| `ADMIN_LOGINS` | optional; GitHub logins, comma separated, that may open `/admin/funnel`. Empty means the page does not exist. A login can be renamed and the old name claimed by someone else, so take a login off the list if you rename the account |
 
 Before the first deployment finishes, run the migrations against Neon from your machine:
 
