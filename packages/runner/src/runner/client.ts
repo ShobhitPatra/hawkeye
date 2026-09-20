@@ -1,4 +1,5 @@
 import {
+  HONORS_RETRY_AFTER_HEADER,
   SEVERITIES,
   type ClaimedJob,
   type PriorFinding,
@@ -156,6 +157,7 @@ export function createControlPlaneClient(input: {
     path: string,
     body?: unknown,
     signal?: AbortSignal,
+    extraHeaders: Record<string, string> = {},
   ): Promise<Response> {
     const response = await input.fetch(`${baseUrl}${path}`, {
       method,
@@ -163,6 +165,7 @@ export function createControlPlaneClient(input: {
         Authorization: `Bearer ${input.token}`,
         Accept: "application/json",
         ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        ...extraHeaders,
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       ...(signal === undefined ? {} : { signal }),
@@ -179,7 +182,9 @@ export function createControlPlaneClient(input: {
 
   return {
     async claimJob(options = {}) {
-      const response = await send("GET", "/api/runner/jobs", undefined, options.signal);
+      const response = await send("GET", "/api/runner/jobs", undefined, options.signal, {
+        [HONORS_RETRY_AFTER_HEADER]: "1",
+      });
       if (response.status === 204) return claimWait(response.headers.get("retry-after"));
       return claimedJob(await response.json());
     },

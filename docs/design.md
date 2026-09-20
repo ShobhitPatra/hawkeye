@@ -412,7 +412,7 @@ With a runner token:
 
 | Endpoint | Behaviour |
 |---|---|
-| `GET /api/runner/jobs` | When the user has no pull request with reviews on, answers 204 at once with `Retry-After: 60`. Otherwise long-polls for up to 25 s, checking the queue every 5 s, and sweeps stale claims once per call. Returns the claimed job with a fresh installation token, the pull request coordinates, the user's review settings and — from the second round of an arm on — the previous round (the last posted round's findings with stable ids, plus the arm's still-open findings), or 204 when nothing is queued |
+| `GET /api/runner/jobs` | When the user has no pull request with reviews on and the daemon sent `X-Hawkeye-Honors-Retry-After: 1` (0.7.0 and later), answers 204 at once with `Retry-After: 60`; a daemon that does not send it is held as before, since it would ask again a second later. Otherwise long-polls for up to 25 s, checking the queue every 5 s, and sweeps stale claims once per call. Returns the claimed job with a fresh installation token, the pull request coordinates, the user's review settings and — from the second round of an arm on — the previous round (the last posted round's findings with stable ids, plus the arm's still-open findings), or 204 when nothing is queued |
 | `POST /api/runner/jobs/<id>/heartbeat` | Keeps the claim alive (a claim without a heartbeat for 5 minutes goes back to the queue) and answers `{ ok, superseded }`, true once a newer job exists for the same arm |
 | `POST /api/runner/runs/<id>/events` | Accepts `{ type, at, data }` entries and counts the `turn` ones |
 | `POST /api/runner/runs/<id>/result` | Posts `{ status, turns, result?, error?, commentable? }`, storing the review result and closing the run and the job |

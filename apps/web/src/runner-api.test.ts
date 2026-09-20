@@ -121,13 +121,30 @@ describe("claimJob", () => {
     const sleep = vi.fn(async () => {});
 
     const response = await claimJob(
-      request("/api/runner/jobs"),
+      request("/api/runner/jobs", { headers: { "X-Hawkeye-Honors-Retry-After": "1" } }),
       claimDeps({ poll: { intervalMs: 1, totalMs: 10 }, sleep }),
     );
 
     expect(response.status).toBe(204);
     expect(response.headers.get("retry-after")).toBe("60");
     expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it("holds an idle user's claim as before for a daemon that does not read the wait", async () => {
+    await db.update(schema.armedPr).set({ disarmedAt: now });
+    let clock = now.getTime();
+    const sleep = vi.fn(async (milliseconds: number) => {
+      clock += milliseconds;
+    });
+
+    const response = await claimJob(
+      request("/api/runner/jobs"),
+      claimDeps({ poll: { intervalMs: 1, totalMs: 3 }, sleep, now: () => new Date(clock) }),
+    );
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("retry-after")).toBeNull();
+    expect(sleep).toHaveBeenCalled();
   });
 
   it("holds the claim as before once the user has reviews on, and claims a queued job", async () => {

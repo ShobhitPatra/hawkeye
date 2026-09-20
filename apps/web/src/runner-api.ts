@@ -2,6 +2,7 @@ import {
   type ClaimedJob,
   findingId,
   type GitHubClient,
+  HONORS_RETRY_AFTER_HEADER,
   type PriorFinding,
   RUN_RESULT_STATUSES,
   parseReviewResult,
@@ -151,7 +152,10 @@ export async function claimJob(request: Request, deps: ClaimDeps): Promise<Respo
   const runner = await requireRunner(request, deps.db);
   if (runner instanceof Response) return runner;
 
-  if (!(await userHasReviewsOn(deps.db, runner.userId))) {
+  if (
+    request.headers.get(HONORS_RETRY_AFTER_HEADER) === "1" &&
+    !(await userHasReviewsOn(deps.db, runner.userId))
+  ) {
     return new Response(null, {
       status: 204,
       headers: { "Retry-After": String(IDLE_RETRY_AFTER_SECONDS) },

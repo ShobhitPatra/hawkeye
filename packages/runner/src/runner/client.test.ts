@@ -76,6 +76,15 @@ describe("createControlPlaneClient", () => {
     for (const header of ["0", "301", "1.5", "soon", "-5"])
       expect(await answer(header).claimJob()).toBeUndefined();
   });
+  it("tells the control plane on a claim that it reads Retry-After", async () => {
+    const { fetch, client: c } = client(() => new Response(null, { status: 204 }));
+    await c.claimJob();
+    const sent = (call: number) =>
+      new Headers(fetch.mock.calls[call]![1].headers).get("X-Hawkeye-Honors-Retry-After");
+    expect(sent(0)).toBe("1");
+    await c.heartbeat("j1").catch(() => {});
+    expect(sent(1)).toBeNull();
+  });
   it("passes the abort signal through to the claim request", async () => {
     const controller = new AbortController();
     const { fetch, client: c } = client(() => new Response(null, { status: 204 }));

@@ -310,6 +310,7 @@ export async function runRunnerLoop(
       if (delivery === "undelivered") throw new Error("the result was not delivered");
       return;
     }
+    lastWaitMs = undefined;
     concurrency = claimed.settings.concurrency ?? DEFAULT_CONCURRENCY;
     const { owner, repo, number } = claimed.pullRequest;
     const subject = `${owner}/${repo}#${number}`;
