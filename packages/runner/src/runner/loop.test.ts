@@ -215,8 +215,8 @@ describe("runRunnerLoop", () => {
     expect(
       d.reported
         .filter((event) => event.state === "posted")
-        .map((event) => event.slot)
-        .toSorted(),
+        .map((event) => event.slot ?? 0)
+        .toSorted((a, b) => a - b),
     ).toEqual([1, 2]);
     expect(plane.received.filter((r) => r.url.endsWith("/result"))).toHaveLength(2);
   });
