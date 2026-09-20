@@ -161,8 +161,8 @@ function EmptySentence() {
     <div className="hk-state">
       <p>Nothing reviewed yet.</p>
       <p>
-        <Link href="/connect">Connect a runner</Link> and{" "}
-        <Link href="/prs">arm a pull request</Link>. The first review shows up here.
+        <Link href="/connect">Connect a runner</Link> and open a pull request, or{" "}
+        <Link href="/prs">turn on reviews for one</Link>. The first review shows up here.
       </p>
     </div>
   );
