@@ -559,6 +559,37 @@ describe("postReviewForRun", () => {
     expect(row?.error).toBe("post: GitHub PUT failed: 500");
   });
 
+  it("posts the short form and notes it on the run when GitHub refuses the living body", async () => {
+    github.updateReview = vi
+      .fn()
+      .mockRejectedValueOnce(new GitHubRequestError(422, "GitHub PUT failed: 422 body is too long"))
+      .mockResolvedValueOnce(undefined);
+    await seedLivingReview(result);
+
+    await expect(post()).resolves.toBe("posted");
+    const calls = (github.updateReview as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[1]![2]).toContain("too long for GitHub to accept in full");
+    expect(calls[1]![2]).toContain("### ");
+    const [row] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
+    expect(row?.error).toBe(
+      "post: GitHub refused the full review (GitHub PUT failed: 422 body is too long); the short form was posted",
+    );
+    const rows = await db.select().from(schema.reviewPosted);
+    expect(rows.find((posted) => posted.headSha === headSha)?.githubReviewId).toBe("5");
+  });
+
+  it("fails the round with GitHub's message when the short form is refused too", async () => {
+    github.updateReview = vi.fn(async () => {
+      throw new GitHubRequestError(422, "GitHub PUT failed: 422");
+    });
+    await seedLivingReview(result);
+
+    await expect(post()).resolves.toBe("failed");
+    const [row] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
+    expect(row?.error).toBe("post: GitHub PUT failed: 422");
+  });
+
   it("falls back to body only on a 422", async () => {
     const log = vi.fn();
     github.postReview = vi

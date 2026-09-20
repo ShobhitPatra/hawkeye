@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { LENSES, type ReviewResult } from "../contract/schema.js";
 import { findingId } from "./finding-id.js";
-import { renderLivingReview } from "./render-living.js";
+import {
+  LIVING_REVIEW_BODY_BUDGET,
+  renderLivingReview,
+  renderMinimalLivingReview,
+} from "./render-living.js";
 import type { RoundSummary } from "./render-text.js";
 
 const head = "b".repeat(40);
@@ -116,5 +120,181 @@ describe("renderLivingReview", () => {
     const { body } = renderLivingReview(input());
     expect(body).toContain("<summary>Review lenses</summary>");
     expect(body.indexOf("Review lenses")).toBeLessThan(body.indexOf("Reviewed by"));
+  });
+
+  it("reports nothing trimmed for a body within the budget", () => {
+    const rendered = renderLivingReview(input());
+    expect(rendered.trimmed).toEqual([]);
+    expect(rendered.body.length).toBeLessThan(LIVING_REVIEW_BODY_BUDGET);
+  });
+
+  it("drops the oldest rounds and the closed prior findings first, keeping the open ones", () => {
+    const many: RoundSummary[] = Array.from({ length: 400 }, (_, index) => ({
+      round: index + 1,
+      headSha: index === 399 ? head : index.toString(16).padStart(40, "0"),
+      verdict: "changes_needed",
+      startedAt: "2026-01-01 00:00 UTC",
+    }));
+    const base = input();
+    const closed = Array.from({ length: 300 }, (_, index) => ({
+      id: `closed-${index}`,
+      status: "addressed" as const,
+      note: "fixed ".repeat(30),
+    }));
+    const rendered = renderLivingReview({
+      ...base,
+      rounds: many,
+      result: { ...base.result, priorFindings: [...base.result.priorFindings!, ...closed] },
+      maxBodyLength: 6_000,
+    });
+    expect(rendered.body.length).toBeLessThanOrEqual(6_000);
+    expect(rendered.trimmed).toEqual(["older rounds", "closed prior findings"]);
+    expect(rendered.body).toContain("| 390 earlier rounds | | | |");
+    expect(rendered.body).toContain("| 400 |");
+    expect(rendered.body).not.toContain("| 390 |");
+    expect(rendered.body).toContain("301 closed prior findings not shown.");
+    expect(rendered.body).toContain("still unaddressed");
+    expect(rendered.body).toContain("### Changes needed");
+    expect(rendered.body).toContain("Review lenses");
+    expect(rendered.body).toContain("round 400");
+  });
+
+  it("shrinks findings to their claims, least severe first, and never loses a claim", () => {
+    const base = input(new Set());
+    const long = "x".repeat(3_000);
+    const findings = [
+      { path: "src/m.ts", severity: "must_fix" as const, claim: "Must claim", detail: long },
+      { path: "src/s.ts", severity: "should_fix" as const, claim: "Should claim", detail: long },
+      { path: "src/o.ts", severity: "optional" as const, claim: "Optional claim", detail: long },
+    ];
+    const rendered = renderLivingReview({
+      ...base,
+      commentable: new Map(),
+      result: { ...base.result, findings, priorFindings: [] },
+      maxBodyLength: 5_500,
+    });
+    expect(rendered.trimmed.at(-1)).toBe("should fix finding detail");
+    expect(rendered.body).toContain(
+      `- **Optional claim** \`src/o.ts\` \`${findingId("src/o.ts", "Optional claim")}\``,
+    );
+    expect(rendered.body).toContain("**Should claim**");
+    expect(rendered.body).toContain(long);
+    expect(rendered.body.match(/x{3000}/g)).toHaveLength(1);
+    expect(rendered.body).not.toContain("Review lenses");
+  });
+
+  it("walks each later rung alone: the current round, the lens table, then every detail", () => {
+    const base = input(new Set());
+    const many: RoundSummary[] = Array.from({ length: 12 }, (_, index) => ({
+      round: index + 1,
+      headSha: index === 11 ? head : index.toString(16).padStart(40, "0"),
+      verdict: "ship",
+      startedAt: "2026-01-01 00:00 UTC",
+    }));
+    const must = { path: "src/m.ts", severity: "must_fix" as const, claim: "Must claim" };
+    const sized = (detail: string, maxBodyLength: number) =>
+      renderLivingReview({
+        ...base,
+        commentable: new Map(),
+        rounds: many,
+        result: { ...base.result, findings: [{ ...must, detail }], priorFindings: [] },
+        maxBodyLength,
+      });
+    const full = sized("short", 100_000).body.length;
+    const rowLength = 56;
+
+    const currentOnly = sized("short", full - 3 * rowLength);
+    expect(currentOnly.trimmed.at(-1)).toBe("all but the current round");
+    expect(currentOnly.body).toContain("| 11 earlier rounds | | | |");
+    expect(currentOnly.body).toContain("Review lenses");
+
+    const noLenses = sized("short", currentOnly.body.length - 1);
+    expect(noLenses.trimmed.at(-1)).toBe("the lens table");
+    expect(noLenses.body).not.toContain("Review lenses");
+    expect(noLenses.body).toContain("  short");
+
+    const long = "y".repeat(4_000);
+    const claimsOnly = sized(long, 3_000);
+    expect(claimsOnly.trimmed.at(-1)).toBe("every finding's detail");
+    expect(claimsOnly.body).not.toContain(long);
+    expect(claimsOnly.body).toContain(
+      `- **Must claim** \`src/m.ts\` \`${findingId("src/m.ts", "Must claim")}\``,
+    );
+    expect(claimsOnly.body).toContain("### Changes needed");
+  });
+
+  it("caps the summary in the short form so it cannot be refused for length", () => {
+    const base = input(new Set());
+    const body = renderMinimalLivingReview({
+      ...base,
+      result: { ...base.result, summary: "z".repeat(90_000) },
+    });
+    expect(body.length).toBeLessThan(4_000);
+    expect(body).toContain(`${"z".repeat(2_000)}…`);
+    expect(body).toContain("### Changes needed");
+  });
+
+  it("names only the rungs that removed something", () => {
+    const base = input(new Set());
+    const long = "w".repeat(4_000);
+    const rendered = renderLivingReview({
+      ...base,
+      commentable: new Map(),
+      result: {
+        ...base.result,
+        findings: [
+          { path: "src/o.ts", severity: "optional", claim: "Optional claim", detail: long },
+        ],
+        priorFindings: [],
+      },
+      maxBodyLength: 3_000,
+    });
+    expect(rendered.trimmed).toEqual([
+      "all but the current round",
+      "the lens table",
+      "optional finding detail",
+    ]);
+  });
+
+  it("uses the singular for one earlier round and one closed prior finding", () => {
+    const base = input(new Set());
+    const eleven: RoundSummary[] = Array.from({ length: 11 }, (_, index) => ({
+      round: index + 1,
+      headSha: index === 10 ? head : index.toString(16).padStart(40, "0"),
+      verdict: "changes_needed",
+      startedAt: "2026-01-01 00:00 UTC",
+    }));
+    const justOver = (over: Parameters<typeof renderLivingReview>[0]) =>
+      renderLivingReview({ ...over, maxBodyLength: renderLivingReview(over).body.length - 1 });
+
+    const oneRound = justOver({ ...base, rounds: eleven });
+    expect(oneRound.trimmed).toEqual(["older rounds"]);
+    expect(oneRound.body).toContain("| 1 earlier round | | | |");
+
+    const onePrior = justOver(base);
+    expect(onePrior.trimmed).toEqual(["closed prior findings"]);
+    expect(onePrior.body).toContain("- 1 closed prior finding not shown.");
+  });
+
+  it("says there are no findings in the short form of a clean review", () => {
+    const base = input(new Set());
+    const body = renderMinimalLivingReview({
+      ...base,
+      result: { ...base.result, verdict: "ship", findings: [] },
+    });
+    expect(body).toContain("### Ship");
+    expect(body).toContain("No findings.");
+    expect(body).not.toContain("Findings:");
+  });
+
+  it("falls back to the short form when even the claims do not fit", () => {
+    const base = input(new Set());
+    const rendered = renderLivingReview({ ...base, maxBodyLength: 400 });
+    expect(rendered.trimmed.at(-1)).toBe("the findings list");
+    expect(rendered.body).toBe(renderMinimalLivingReview(base));
+    expect(rendered.body).toContain("### Changes needed");
+    expect(rendered.body).toContain("Findings: 1 must fix, 1 should fix.");
+    expect(rendered.body).toContain("too long for GitHub to accept in full");
+    expect(rendered.body).toContain("round 2");
   });
 });
