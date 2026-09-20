@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { LENSES, type ReviewResult } from "../contract/schema.js";
 import { findingId } from "./finding-id.js";
-import { renderLivingReview } from "./render-living.js";
+import {
+  LIVING_REVIEW_BODY_BUDGET,
+  renderLivingReview,
+  renderMinimalLivingReview,
+} from "./render-living.js";
 import type { RoundSummary } from "./render-text.js";
 
 const head = "b".repeat(40);
@@ -116,5 +120,77 @@ describe("renderLivingReview", () => {
     const { body } = renderLivingReview(input());
     expect(body).toContain("<summary>Review lenses</summary>");
     expect(body.indexOf("Review lenses")).toBeLessThan(body.indexOf("Reviewed by"));
+  });
+
+  it("reports nothing trimmed for a body within the budget", () => {
+    const rendered = renderLivingReview(input());
+    expect(rendered.trimmed).toEqual([]);
+    expect(rendered.body.length).toBeLessThan(LIVING_REVIEW_BODY_BUDGET);
+  });
+
+  it("drops the oldest rounds and the closed prior findings first, keeping the open ones", () => {
+    const many: RoundSummary[] = Array.from({ length: 400 }, (_, index) => ({
+      round: index + 1,
+      headSha: index === 399 ? head : index.toString(16).padStart(40, "0"),
+      verdict: "changes_needed",
+      startedAt: "2026-01-01 00:00 UTC",
+    }));
+    const base = input();
+    const closed = Array.from({ length: 300 }, (_, index) => ({
+      id: `closed-${index}`,
+      status: "addressed" as const,
+      note: "fixed ".repeat(30),
+    }));
+    const rendered = renderLivingReview({
+      ...base,
+      rounds: many,
+      result: { ...base.result, priorFindings: [...base.result.priorFindings!, ...closed] },
+      maxBodyLength: 6_000,
+    });
+    expect(rendered.body.length).toBeLessThanOrEqual(6_000);
+    expect(rendered.trimmed).toEqual(["older rounds", "closed prior findings"]);
+    expect(rendered.body).toContain("| 390 earlier rounds | | | |");
+    expect(rendered.body).toContain("| 400 |");
+    expect(rendered.body).not.toContain("| 390 |");
+    expect(rendered.body).toContain("301 closed prior findings not shown.");
+    expect(rendered.body).toContain("still unaddressed");
+    expect(rendered.body).toContain("### Changes needed");
+    expect(rendered.body).toContain("Review lenses");
+    expect(rendered.body).toContain("round 400");
+  });
+
+  it("shrinks findings to their claims, least severe first, and never loses a claim", () => {
+    const base = input(new Set());
+    const long = "x".repeat(3_000);
+    const findings = [
+      { path: "src/m.ts", severity: "must_fix" as const, claim: "Must claim", detail: long },
+      { path: "src/s.ts", severity: "should_fix" as const, claim: "Should claim", detail: long },
+      { path: "src/o.ts", severity: "optional" as const, claim: "Optional claim", detail: long },
+    ];
+    const rendered = renderLivingReview({
+      ...base,
+      commentable: new Map(),
+      result: { ...base.result, findings, priorFindings: [] },
+      maxBodyLength: 5_500,
+    });
+    expect(rendered.trimmed.at(-1)).toBe("should fix finding detail");
+    expect(rendered.body).toContain(
+      `- **Optional claim** \`src/o.ts\` \`${findingId("src/o.ts", "Optional claim")}\``,
+    );
+    expect(rendered.body).toContain("**Should claim**");
+    expect(rendered.body).toContain(long);
+    expect(rendered.body.match(/x{3000}/g)).toHaveLength(1);
+    expect(rendered.body).not.toContain("Review lenses");
+  });
+
+  it("falls back to the short form when even the claims do not fit", () => {
+    const base = input(new Set());
+    const rendered = renderLivingReview({ ...base, maxBodyLength: 400 });
+    expect(rendered.trimmed.at(-1)).toBe("the findings list");
+    expect(rendered.body).toBe(renderMinimalLivingReview(base));
+    expect(rendered.body).toContain("### Changes needed");
+    expect(rendered.body).toContain("Findings: 1 must fix, 1 should fix.");
+    expect(rendered.body).toContain("too long for GitHub to accept in full");
+    expect(rendered.body).toContain("round 2");
   });
 });

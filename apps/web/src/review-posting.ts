@@ -7,6 +7,7 @@ import {
   type RoundSummary,
   postRenderedReview,
   renderLivingReview,
+  renderMinimalLivingReview,
   renderReview,
   type ReviewResult,
 } from "@hawkeye/core";
@@ -313,6 +314,8 @@ export async function postReviewForRun(
         rounds,
       });
     const inline = render(toCommentableMap(input.commentable));
+    if (inline.trimmed.length > 0)
+      log(`living body over budget for run ${input.runId}; left out ${inline.trimmed.join(", ")}`);
     let finalBody = inline.body;
     let supplementalPosted = false;
     if (inline.comments.length > 0) {
@@ -345,7 +348,29 @@ export async function postReviewForRun(
       if (placeholder) await clear(token, SUPERSEDED_BODY);
       return "superseded";
     }
-    await github.updateReview(reference, living.githubReviewId, finalBody, token);
+    try {
+      await github.updateReview(reference, living.githubReviewId, finalBody, token);
+    } catch (error) {
+      if (!(error instanceof GitHubRequestError && error.status === 422)) throw error;
+      log(`living body refused for run ${input.runId} (${error.message}); posting the short form`);
+      await github.updateReview(
+        reference,
+        living.githubReviewId,
+        renderMinimalLivingReview({
+          result: input.result,
+          headSha,
+          repositoryUrl: HAWKEYE_REPOSITORY_URL,
+          rounds,
+        }),
+        token,
+      );
+      await db
+        .update(run)
+        .set({
+          error: `post: GitHub refused the full review (${error.message}); the short form was posted`,
+        })
+        .where(eq(run.id, input.runId));
+    }
     githubWrote = true;
     if (!supplementalPosted || placeholder) await record(living.githubReviewId);
     return "posted";
