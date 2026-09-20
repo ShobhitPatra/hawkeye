@@ -21,7 +21,7 @@ export function PageError({ reset, onward }: { reset: () => void; onward: ReactN
       </div>
       <div className="hk-actions">
         <button type="button" className="hk-button" onClick={tryAgain} disabled={pending}>
-          {pending ? "Trying again" : "Try again"}
+          Try again
         </button>
         {onward}
       </div>
