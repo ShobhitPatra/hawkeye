@@ -1,6 +1,6 @@
 # hawkeye-review
 
-Code review on the AI subscription you already pay for. The personal AI code reviewer: it runs on your own Claude Code login today, with Codex next, and needs no API key. `prepare` and `show` are read-only; the runner daemon only reports to the control plane you connect.
+Code review on the AI subscription you already pay for. It runs on your own Claude Code login today, with Codex next, and needs no API key. `prepare` and `show` are read-only; the runner daemon only reports to the control plane you connect.
 
 Design, docs and source: https://github.com/ShobhitPatra/hawkeye
 
