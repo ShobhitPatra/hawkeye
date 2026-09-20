@@ -1,7 +1,5 @@
 import Link from "next/link";
 
-export const metadata = { title: "Not found, Hawkeye" };
-
 export default function DashboardNotFound() {
   return (
     <main className="hk-page">
