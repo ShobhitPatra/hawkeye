@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
-import { requeueStaleJobs } from "./job-queue";
 import { enqueueJob } from "./jobs";
 import { claimJob, heartbeat, recordEvents, recordResult } from "./runner-api";
 import { createRunnerToken } from "./runner-tokens";
@@ -1353,7 +1352,13 @@ describe("recordResult", () => {
       .set({ heartbeatAt: new Date(now.getTime() - 3_600_000) })
       .where(eq(schema.job.id, queued.id));
 
-    await requeueStaleJobs(db, { now });
+    await sweep(
+      new Request("https://hawkeye.test/api/internal/sweep", {
+        method: "POST",
+        headers: { authorization: "Bearer s3cret" },
+      }),
+      { db, secret: "s3cret", now: () => now },
+    );
     const other = await createRunnerToken(db, { userId: "user-1", name: "desktop" });
     const second = await claimJob(
       request("/api/runner/jobs", { bearer: other.token }),

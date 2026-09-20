@@ -2,7 +2,12 @@ import { timingSafeEqual } from "node:crypto";
 import type { Db } from "./db/client";
 import { requeueStaleJobs } from "./job-queue";
 
-export type SweepDeps = { db: Db; secret: string | undefined; now?: () => Date };
+export type SweepDeps = {
+  db: Db;
+  secret: string | undefined;
+  now?: () => Date;
+  log?: (line: string) => void;
+};
 
 function authorized(request: Request, secret: string | undefined): boolean {
   if (!secret) return false;
@@ -13,6 +18,7 @@ function authorized(request: Request, secret: string | undefined): boolean {
 
 export async function sweep(request: Request, deps: SweepDeps): Promise<Response> {
   if (!authorized(request, deps.secret)) {
+    if (!deps.secret) deps.log?.("sweep refused: CRON_SECRET is not set, so no caller can sweep");
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
   const swept = await requeueStaleJobs(deps.db, { now: (deps.now ?? (() => new Date()))() });

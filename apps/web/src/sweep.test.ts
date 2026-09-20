@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
 import { claimNextJob } from "./job-queue";
@@ -60,6 +60,17 @@ describe("sweep", () => {
     }
     const [row] = await db.select().from(schema.job).where(eq(schema.job.id, jobId));
     expect(row?.state).toBe("claimed");
+  });
+
+  it("logs that the secret is missing, and only then", async () => {
+    const log = vi.fn();
+    await sweep(request(`Bearer ${secret}`), { db, secret: undefined, log });
+    expect(log).toHaveBeenCalledWith(
+      "sweep refused: CRON_SECRET is not set, so no caller can sweep",
+    );
+    log.mockClear();
+    await sweep(request("Bearer wrong!"), { db, secret, log });
+    expect(log).not.toHaveBeenCalled();
   });
 
   it("requeues stale claims for a caller with the secret, on GET and POST", async () => {
