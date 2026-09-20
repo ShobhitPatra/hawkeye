@@ -21,8 +21,11 @@ export class ControlPlaneRequestError extends Error {
 
 export type HeartbeatAcknowledgement = { superseded: boolean };
 
+export type ClaimWait = { retryAfterMs: number };
+export const MAX_RETRY_AFTER_SECONDS = 300;
+
 export type ControlPlaneClient = {
-  claimJob(options?: { signal?: AbortSignal }): Promise<ClaimedJob | undefined>;
+  claimJob(options?: { signal?: AbortSignal }): Promise<ClaimedJob | ClaimWait | undefined>;
   heartbeat(jobId: string): Promise<HeartbeatAcknowledgement>;
   sendEvents(runId: string, events: RunEvent[]): Promise<void>;
   sendResult(runId: string, report: RunResultReport): Promise<ResultAcknowledgement>;
@@ -134,6 +137,13 @@ function claimedJob(payload: unknown): ClaimedJob {
   };
 }
 
+function claimWait(header: string | null): ClaimWait | undefined {
+  if (header === null || !/^\d+$/.test(header)) return undefined;
+  const seconds = Number(header);
+  if (seconds < 1 || seconds > MAX_RETRY_AFTER_SECONDS) return undefined;
+  return { retryAfterMs: seconds * 1000 };
+}
+
 export function createControlPlaneClient(input: {
   baseUrl: string;
   token: string;
@@ -170,7 +180,7 @@ export function createControlPlaneClient(input: {
   return {
     async claimJob(options = {}) {
       const response = await send("GET", "/api/runner/jobs", undefined, options.signal);
-      if (response.status === 204) return undefined;
+      if (response.status === 204) return claimWait(response.headers.get("retry-after"));
       return claimedJob(await response.json());
     },
     async heartbeat(jobId) {

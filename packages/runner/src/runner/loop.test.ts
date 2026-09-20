@@ -543,6 +543,31 @@ describe("runRunnerLoop", () => {
     await runRunnerLoop(d);
     expect(Date.now() - started).toBeLessThan(1_000);
   });
+  it("waits as long as the control plane says and reports idle once", async () => {
+    const controller = new AbortController();
+    const sleeps: number[] = [];
+    const d = await deps("http://127.0.0.1:1", {
+      signal: controller.signal,
+      emptyPollDelayMs: 5,
+      sleep: async (milliseconds) => {
+        sleeps.push(milliseconds);
+        if (sleeps.length === 3) controller.abort();
+      },
+    });
+    const answers = [{ retryAfterMs: 60_000 }, { retryAfterMs: 60_000 }, undefined];
+    d.client = {
+      claimJob: async () => answers.shift(),
+      heartbeat: async () => ({ superseded: false }),
+      sendEvents: async () => {},
+      sendResult: async () => ({ ok: true }),
+    };
+    await runRunnerLoop(d);
+    expect(sleeps).toEqual([60_000, 60_000, 5]);
+    expect(d.reported.filter((event) => event.state === "idle")).toEqual([
+      { state: "idle", detail: "no pull request has reviews on; asking again every 60s" },
+    ]);
+  });
+
   it("returns after one empty poll with once", async () => {
     const plane = await fakeControlPlane(scripted([]));
     servers.push(plane.server);

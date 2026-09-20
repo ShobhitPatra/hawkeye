@@ -230,7 +230,7 @@ The control plane runs two workloads with opposite shapes, and they must not sha
 
 Serverless is close to ideal for the first column and close to worst-case for the second: a held connection bills for its whole life while doing nothing, and a per-connection poll loop makes database load a function of *user count × time* rather than of work.
 
-**Today.** The claim endpoint long-polls inside a serverless function: up to 25 s per call, a queue check every 5 s, and the stale-claim sweep once per claim call. That is the shape this section replaces. Everything below is the target. Three of its rules are unmet today: the sweep runs inside a request, the sweep's predicate (`state = 'claimed'` and an old heartbeat) has no index behind it, and an idle runner claims again after a fixed second with no back-off.
+**Today.** The claim endpoint long-polls inside a serverless function: up to 25 s per call, a queue check every 5 s, and the stale-claim sweep once per claim call. That is the shape this section replaces. Everything below is the target. Two of its rules are unmet today: the sweep runs inside a request, and the sweep's predicate (`state = 'claimed'` and an old heartbeat) has no index behind it. The idle rule is met: a runner whose user has no pull request with reviews on is answered at once, with no hold and no queue check, and told to ask again in 60 seconds.
 
 **Target shape.** Next.js stays on serverless for the dashboard, auth and webhook ingest. The runner channel moves to one always-on process that holds the idle connections in memory, with **a single `LISTEN` connection for the whole fleet** and in-memory fanout by user. The webhook that enqueues a job issues `NOTIFY`; the waiting runner is woken. Database work becomes proportional to pushes rather than to connected runners.
 
@@ -354,7 +354,7 @@ The daemon then loops: claim a job, clone the PR with the one-hour token the job
 
 **Output.** One line per state change on stderr, time first, then a state word (`polling`, `contract`, `claimed`, `reviewing`, `posted`, `skipped`, `failed`, `waiting`, `delivered`, `idle`, `stopping`) and the subject. The posted line carries the verdict, counts, turns and duration; the run's detail lines (one per turn) go to `log.txt` in the run directory.
 
-**Retries.** `--once` handles a single job and exits non-zero when three claims in a row fail or the result cannot be delivered. The daemon waits a second after an empty poll, retries a failed claim after five seconds, and retries a failed result report three times (2 s, 4 s, 8 s) before logging it and moving on. The control plane requeues a claim that stops heartbeating.
+**Retries.** `--once` handles a single job and exits non-zero when three claims in a row fail or the result cannot be delivered. The daemon waits a second after an empty poll, or as long as the answer's `Retry-After` says (1 to 300 seconds; it logs `idle` once when that starts), retries a failed claim after five seconds, and retries a failed result report three times (2 s, 4 s, 8 s) before logging it and moving on. The control plane requeues a claim that stops heartbeating.
 
 **Flags.** `--contract <path>` overrides the built-in contract (else the job's per-user override, else the default); `--model <name>` picks the claude CLI model for every job this runner claims.
 
@@ -412,7 +412,7 @@ With a runner token:
 
 | Endpoint | Behaviour |
 |---|---|
-| `GET /api/runner/jobs` | Long-polls for up to 25 s, checking the queue every 5 s, and sweeps stale claims once per call. Returns the claimed job with a fresh installation token, the pull request coordinates, the user's review settings and — from the second round of an arm on — the previous round (the last posted round's findings with stable ids, plus the arm's still-open findings), or 204 when nothing is queued |
+| `GET /api/runner/jobs` | When the user has no pull request with reviews on, answers 204 at once with `Retry-After: 60`. Otherwise long-polls for up to 25 s, checking the queue every 5 s, and sweeps stale claims once per call. Returns the claimed job with a fresh installation token, the pull request coordinates, the user's review settings and — from the second round of an arm on — the previous round (the last posted round's findings with stable ids, plus the arm's still-open findings), or 204 when nothing is queued |
 | `POST /api/runner/jobs/<id>/heartbeat` | Keeps the claim alive (a claim without a heartbeat for 5 minutes goes back to the queue) and answers `{ ok, superseded }`, true once a newer job exists for the same arm |
 | `POST /api/runner/runs/<id>/events` | Accepts `{ type, at, data }` entries and counts the `turn` ones |
 | `POST /api/runner/runs/<id>/result` | Posts `{ status, turns, result?, error?, commentable? }`, storing the review result and closing the run and the job |

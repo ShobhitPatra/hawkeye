@@ -69,6 +69,13 @@ describe("createControlPlaneClient", () => {
     const { client: c } = client(() => new Response(null, { status: 204 }));
     expect(await c.claimJob()).toBeUndefined();
   });
+  it("reads how long to wait from a 204's Retry-After, and ignores one it cannot trust", async () => {
+    const answer = (header: string) =>
+      client(() => new Response(null, { status: 204, headers: { "Retry-After": header } })).client;
+    expect(await answer("60").claimJob()).toEqual({ retryAfterMs: 60_000 });
+    for (const header of ["0", "301", "1.5", "soon", "-5"])
+      expect(await answer(header).claimJob()).toBeUndefined();
+  });
   it("passes the abort signal through to the claim request", async () => {
     const controller = new AbortController();
     const { fetch, client: c } = client(() => new Response(null, { status: 204 }));
