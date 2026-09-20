@@ -391,15 +391,6 @@ export async function recordResult(
     );
     try {
       const living = await livingReviewFor(deps.db, target.armedPr);
-      const ownPlaceholder =
-        existing.placeholderReviewId !== null &&
-        existing.placeholderReviewId !== living?.githubReviewId;
-      if (
-        !ownPlaceholder &&
-        (await newerRunIsLive(deps.db, { jobId: completed.jobId, armedPrId: target.armedPr.id }))
-      ) {
-        return Response.json({ ok: true }, { status: 200 });
-      }
       await clearReviewing(deps, {
         reference: statusTarget.reference,
         headSha: target.headSha,
@@ -408,6 +399,8 @@ export async function recordResult(
         livingReviewId: living?.githubReviewId,
         placeholderReviewId: existing.placeholderReviewId,
         closing: superseded ? SUPERSEDED_BODY : NOT_COMPLETED_BODY,
+        livingBlockBelongsToNewerRun: () =>
+          newerRunIsLive(deps.db, { jobId: completed.jobId, armedPrId: target.armedPr.id }),
       });
     } catch (error) {
       deps.log?.(

@@ -126,6 +126,7 @@ export async function clearReviewing(
     livingReviewId: string | undefined;
     placeholderReviewId: string | null;
     closing: string;
+    livingBlockBelongsToNewerRun?: () => Promise<boolean>;
   },
 ): Promise<void> {
   const { github } = deps;
@@ -140,6 +141,7 @@ export async function clearReviewing(
       return;
     }
     if (!input.livingReviewId) return;
+    if (await input.livingBlockBelongsToNewerRun?.()) return;
     const { body } = await github.review(input.reference, input.livingReviewId, input.token);
     if (!hasReviewingBlock(body)) return;
     await github.updateReview(
