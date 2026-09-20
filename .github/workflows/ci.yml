@@ -20,11 +20,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        gate: [lint, format:check, typecheck, test, build]
+        gate: [lint, format:check, typecheck]
+        include:
+          - gate: test
+            skipped_for_docs: true
+          - gate: build
+            skipped_for_docs: true
     steps:
       - uses: actions/checkout@v7
       - id: changes
-        if: github.event_name == 'pull_request' && (matrix.gate == 'test' || matrix.gate == 'build')
+        if: github.event_name == 'pull_request' && matrix.skipped_for_docs
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -40,5 +45,5 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - if: steps.changes.outputs.code != 'false' || (matrix.gate != 'test' && matrix.gate != 'build')
+      - if: steps.changes.outputs.code != 'false' || !matrix.skipped_for_docs
         run: pnpm ${{ matrix.gate }}
