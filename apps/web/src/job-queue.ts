@@ -72,7 +72,21 @@ export async function heartbeatJob(
   return beat;
 }
 
-export function requeueStaleJobsStatement(db: Db, cutoff: Date): Statement<{ id: string }> {
+type ArmedPr = typeof armedPr.$inferSelect;
+
+export type FailedStaleJob = {
+  jobId: string;
+  runId: string;
+  headSha: string;
+  placeholderReviewId: string | null;
+  armedPr: Pick<ArmedPr, "id" | "owner" | "repo" | "number" | "installationId">;
+};
+export type StaleSweep = { swept: number; failed: FailedStaleJob[] };
+
+export function requeueStaleJobsStatement(
+  db: Db,
+  cutoff: Date,
+): Statement<{ id: string; state: Job["state"] }> {
   return db
     .update(job)
     .set({
@@ -92,20 +106,20 @@ export function requeueStaleJobsStatement(db: Db, cutoff: Date): Statement<{ id:
       heartbeatAt: null,
     })
     .where(and(eq(job.state, "claimed"), sql`${job.heartbeatAt} < ${cutoff}`))
-    .returning({ id: job.id });
+    .returning({ id: job.id, state: job.state });
 }
 
 export async function requeueStaleJobs(
   db: Db,
   input: { now: Date; staleAfterSeconds?: number },
-): Promise<number> {
+): Promise<StaleSweep> {
   const cutoff = new Date(
     input.now.getTime() - (input.staleAfterSeconds ?? DEFAULT_STALE_AFTER_SECONDS) * 1000,
   );
   const swept = await requeueStaleJobsStatement(db, cutoff);
-  if (swept.length === 0) return 0;
+  if (swept.length === 0) return { swept: 0, failed: [] };
 
-  await db
+  const ended = await db
     .update(run)
     .set({ status: "error", error: "heartbeat lost", endedAt: input.now })
     .where(
@@ -116,8 +130,38 @@ export async function requeueStaleJobs(
         ),
         eq(run.status, "running"),
       ),
+    )
+    .returning({ id: run.id, jobId: run.jobId, placeholderReviewId: run.placeholderReviewId });
+
+  const failedIds = new Set(swept.filter((row) => row.state === "failed").map((row) => row.id));
+  const endedFailed = ended.filter((row) => failedIds.has(row.jobId));
+  if (endedFailed.length === 0) return { swept: swept.length, failed: [] };
+  const jobs = await db
+    .select({
+      jobId: job.id,
+      headSha: job.headSha,
+      armedPr: {
+        id: armedPr.id,
+        owner: armedPr.owner,
+        repo: armedPr.repo,
+        number: armedPr.number,
+        installationId: armedPr.installationId,
+      },
+    })
+    .from(job)
+    .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
+    .where(
+      inArray(
+        job.id,
+        endedFailed.map((row) => row.jobId),
+      ),
     );
-  return swept.length;
+  const byJob = new Map(jobs.map((row) => [row.jobId, row]));
+  const failed = endedFailed.flatMap((row) => {
+    const found = byJob.get(row.jobId);
+    return found ? [{ ...found, runId: row.id, placeholderReviewId: row.placeholderReviewId }] : [];
+  });
+  return { swept: swept.length, failed };
 }
 
 export async function releaseJob(
