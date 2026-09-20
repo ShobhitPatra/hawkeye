@@ -429,6 +429,8 @@ For an `ok` result the control plane renders the review — inline comments on t
 
 **One round per head**, reserved in `review_posted` under a per-pull-request lock: the first round posts under that lock, later rounds post outside it and are recorded right after each GitHub write. So a second run for the same head posts nothing, and a round that finds a newer head under review yields to it.
 
+**GitHub is asked before a first post.** If the database fails just after a review was written, the record of it rolls back, and the database alone would post a second review on the next run. So when it knows of no review for a pull request, the control plane lists the pull request's reviews and looks for one by its own bot (`GET /app` gives the login, asked once per process) that carries a head marker and a verdict; the inline-comment reviews carry the marker alone and are skipped. One for the same head is adopted as that head's record and nothing is written. One for an older head is adopted as the living review and edited like any later round. If GitHub cannot be asked, nothing is posted and the run fails with GitHub's message.
+
 Each finding is also stored in `finding` under its stable id with the head it was first seen on and the head it disappeared on — unless a newer job for the pull request has already completed, in which case the older result is reported as `superseded` and leaves the rows alone. A repeat run of the same arm for a head it already posted is reported as `already-posted` and leaves them alone too. A recording error is logged and reported as `failed` without affecting the posted review; a failed post keeps the result and records the error on the run.
 
 The response says `posted`, `already-posted`, `superseded` or `failed`.

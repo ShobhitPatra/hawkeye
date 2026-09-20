@@ -70,6 +70,7 @@ export interface GitHubClient {
     token: string,
   ): Promise<LinkedIssue | undefined>;
   reviews(reference: PullRequestReference, token: string): Promise<ExistingReview[]>;
+  botLogin(): Promise<string>;
   postReview(
     reference: PullRequestReference,
     review: RenderedReview,
@@ -304,6 +305,8 @@ export function createGitHubClient(input: {
       }));
   }
 
+  let botLoginRequest: Promise<string> | undefined;
+
   async function installationAccessToken(installationId: string): Promise<string> {
     if (!/^\d+$/.test(installationId))
       throw new Error(`Invalid installation id: "${installationId}"`);
@@ -341,12 +344,31 @@ export function createGitHubClient(input: {
     linkedIssue(reference, body, token) {
       return fetchLinkedIssue({ fetch: input.fetch, apiBase }, reference, body, token);
     },
+    botLogin() {
+      botLoginRequest ??= request<{ slug?: unknown }>(
+        "GET",
+        "/app",
+        bearer(createAppJwt({ appId: input.appId, privateKeyPem: input.privateKeyPem })),
+      )
+        .then((app) => {
+          if (typeof app.slug !== "string") throw new Error("GitHub GET /app returned no slug");
+          return `${app.slug}[bot]`;
+        })
+        .catch((error: unknown) => {
+          botLoginRequest = undefined;
+          throw error;
+        });
+      return botLoginRequest;
+    },
     async reviews(reference, token) {
       return paginate(`${pulls(reference)}/reviews`, token, (payload) =>
-        (payload as { user: { login: string } | null; body: string }[]).map((review) => ({
-          authorLogin: review.user?.login ?? "",
-          body: review.body ?? "",
-        })),
+        (payload as { id?: number; user: { login: string } | null; body: string }[]).map(
+          (review) => ({
+            authorLogin: review.user?.login ?? "",
+            body: review.body ?? "",
+            ...(typeof review.id === "number" ? { id: String(review.id) } : {}),
+          }),
+        ),
       );
     },
     async postReview(reference, review, token) {

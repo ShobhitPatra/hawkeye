@@ -169,7 +169,9 @@ describe("createGitHubClient", () => {
   it("lists reviews with author login and body, and posts a review", async () => {
     const { fetchImpl, calls } = fakeFetch({
       "GET /repos/o/r/pulls/5/reviews": () => ({
-        json: [{ user: { login: "hawkeye-review[bot]" }, body: "<!-- hawkeye: head=aa -->" }],
+        json: [
+          { id: 77, user: { login: "hawkeye-review[bot]" }, body: "<!-- hawkeye: head=aa -->" },
+        ],
       }),
       "POST /repos/o/r/pulls/5/reviews": () => ({
         json: { html_url: "https://github.com/o/r/pull/5#pullrequestreview-1", id: 1 },
@@ -177,7 +179,7 @@ describe("createGitHubClient", () => {
     });
     const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
     await expect(client.reviews(ref, "t")).resolves.toEqual([
-      { authorLogin: "hawkeye-review[bot]", body: "<!-- hawkeye: head=aa -->" },
+      { authorLogin: "hawkeye-review[bot]", body: "<!-- hawkeye: head=aa -->", id: "77" },
     ]);
     const posted = await client.postReview(
       ref,
@@ -192,6 +194,24 @@ describe("createGitHubClient", () => {
       body: "b",
       comments: [],
     });
+  });
+  it("asks GitHub once who the App is and answers its bot login", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      "GET /app": () => ({ json: { slug: "hawkeye-review" } }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(client.botLogin()).resolves.toBe("hawkeye-review[bot]");
+    await expect(client.botLogin()).resolves.toBe("hawkeye-review[bot]");
+    expect(calls).toHaveLength(1);
+  });
+  it("asks again after a failed lookup, and refuses an answer without a slug", async () => {
+    let answers = 0;
+    const { fetchImpl } = fakeFetch({
+      "GET /app": () => ({ json: (answers += 1) === 1 ? {} : { slug: "hawkeye-review" } }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(client.botLogin()).rejects.toThrow("returned no slug");
+    await expect(client.botLogin()).resolves.toBe("hawkeye-review[bot]");
   });
   it("tolerates reviews whose author account was deleted", async () => {
     const { fetchImpl } = fakeFetch({

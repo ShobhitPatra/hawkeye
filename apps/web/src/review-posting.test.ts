@@ -45,7 +45,7 @@ function createGitHub(): GitHubClient {
     pullRequest: unsupported(),
     mergeBase: unsupported(),
     linkedIssue: unsupported(),
-    reviews: unsupported(),
+    reviews: vi.fn(async () => []),
     postReview: vi.fn(async () => ({
       url: "https://github.com/octo/repo/pull/7#pullrequestreview-9",
       id: "9",
@@ -55,6 +55,7 @@ function createGitHub(): GitHubClient {
     createCommitStatus: vi.fn(async () => {}),
     listInstallationRepositories: unsupported(),
     listUserInstallations: unsupported(),
+    botLogin: vi.fn(async () => "hawkeye-review[bot]"),
     listOpenPullRequestsByAuthor: unsupported(),
   };
 }
@@ -157,6 +158,77 @@ describe("postReviewForRun", () => {
     const rows = await db.select().from(schema.reviewPosted);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ runId, armedPrId: "armed-1", headSha, githubReviewId: "9" });
+  });
+
+  it("adopts a review already on GitHub for this head instead of posting a second one", async () => {
+    github.reviews = vi.fn(async () => [
+      { authorLogin: "alice", body: `<!-- hawkeye: head=${headSha} -->\n\n### Ship\n`, id: "1" },
+      { authorLogin: "hawkeye-review[bot]", body: `<!-- hawkeye: head=${headSha} -->`, id: "2" },
+      {
+        authorLogin: "hawkeye-review[bot]",
+        body: `<!-- hawkeye: head=${headSha} -->\n\n### Ship\n\nfine`,
+        id: "3",
+      },
+    ]);
+
+    await expect(post()).resolves.toBe("posted");
+
+    expect(github.postReview).not.toHaveBeenCalled();
+    const rows = await db.select().from(schema.reviewPosted);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ runId, headSha, githubReviewId: "3" });
+  });
+
+  it("adopts an older head's review on GitHub as the living review and patches it", async () => {
+    github.reviews = vi.fn(async () => [
+      {
+        authorLogin: "hawkeye-review[bot]",
+        body: `<!-- hawkeye: head=${previousHead} -->\n\n### Ship\n\nfine`,
+        id: "41",
+      },
+    ]);
+    github.updateReview = vi.fn(async () => {});
+
+    await expect(post()).resolves.toBe("posted");
+
+    const [, reviewId, body] = (github.updateReview as ReturnType<typeof vi.fn>).mock.calls.at(-1)!;
+    expect(reviewId).toBe("41");
+    expect(body).toContain(`<!-- hawkeye: head=${headSha} -->`);
+    const firstPosts = (github.postReview as ReturnType<typeof vi.fn>).mock.calls.filter(
+      ([, review]) => review.body.includes("### "),
+    );
+    expect(firstPosts).toEqual([]);
+    const rows = await db.select().from(schema.reviewPosted);
+    expect(rows.some((row) => row.headSha === headSha && row.githubReviewId !== null)).toBe(true);
+  });
+
+  it("writes nothing when GitHub cannot say what is already there", async () => {
+    github.reviews = vi.fn(async () => {
+      throw new GitHubRequestError(502, "GitHub GET failed: 502");
+    });
+
+    await expect(post()).resolves.toBe("failed");
+
+    expect(github.postReview).not.toHaveBeenCalled();
+    expect(await db.select().from(schema.reviewPosted)).toHaveLength(0);
+    const [row] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
+    expect(row?.error).toBe("post: GitHub GET failed: 502");
+  });
+
+  it("does not post again after the database lost the record of a posted review", async () => {
+    await expect(post()).resolves.toBe("posted");
+    const posted = (github.postReview as ReturnType<typeof vi.fn>).mock.calls[0]![1];
+    await db.delete(schema.reviewPosted);
+    github.reviews = vi.fn(async () => [
+      { authorLogin: "hawkeye-review[bot]", body: posted.body, id: "9" },
+    ]);
+    (github.postReview as ReturnType<typeof vi.fn>).mockClear();
+
+    await expect(post()).resolves.toBe("posted");
+
+    expect(github.postReview).not.toHaveBeenCalled();
+    const rows = await db.select().from(schema.reviewPosted);
+    expect(rows.map((row) => row.githubReviewId)).toEqual(["9"]);
   });
 
   it("posts body only when no commentable lines are known", async () => {

@@ -35,7 +35,7 @@ export {
   type RenderLivingReviewInput,
   type RenderedLivingReview,
 } from "./review/render-living.js";
-export { encodeMarker } from "./review/marker.js";
+export { decodeMarker, encodeMarker } from "./review/marker.js";
 export {
   postRenderedReview,
   type PostRenderedReviewInput,

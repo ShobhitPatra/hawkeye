@@ -22,6 +22,7 @@ function fakeGitHub(pullRequest: GitHubClient["pullRequest"]): GitHubClient {
     createCommitStatus: unsupported(),
     listInstallationRepositories: unsupported(),
     listUserInstallations: unsupported(),
+    botLogin: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
   };
 }

@@ -29,6 +29,7 @@ function deps(
     installationTokenById: vi.fn(async () => "ghs_t"),
     listInstallationRepositories: vi.fn(async () => []),
     listUserInstallations: vi.fn(async () => []),
+    botLogin: vi.fn(),
     listOpenPullRequestsByAuthor: vi.fn(async () => []),
     pullRequest: vi.fn(async () => ({
       number: 1,

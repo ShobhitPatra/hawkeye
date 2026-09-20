@@ -1,4 +1,5 @@
 import {
+  decodeMarker,
   encodeMarker,
   findingId,
   type GitHubClient,
@@ -73,6 +74,21 @@ async function placeholderFor(
     .where(eq(run.id, runId));
   if (!row?.placeholderReviewId) return undefined;
   return { githubReviewId: row.placeholderReviewId, placeholder: true };
+}
+
+async function livingReviewOnGitHub(
+  github: Pick<GitHubClient, "botLogin" | "reviews">,
+  reference: { owner: string; repo: string; number: number },
+  token: string,
+): Promise<{ githubReviewId: string; headSha: string } | undefined> {
+  const [login, reviews] = await Promise.all([github.botLogin(), github.reviews(reference, token)]);
+  for (const review of reviews) {
+    if (review.authorLogin !== login || review.id === undefined) continue;
+    const headSha = decodeMarker(review.body);
+    if (headSha === undefined || !/^### /m.test(review.body)) continue;
+    return { githubReviewId: review.id, headSha };
+  }
+  return undefined;
 }
 
 export async function closedPlaceholderFor(
@@ -232,7 +248,33 @@ export async function postReviewForRun(
       .limit(1);
     if (postedForHead) return "already-posted" as const;
     if (await newerHeadStarted(tx, armedPr, input.jobId)) return "superseded" as const;
-    const living = (await livingReviewFor(tx, armedPr)) ?? (await placeholderFor(tx, input.runId));
+    let living: Awaited<ReturnType<typeof livingReviewFor | typeof placeholderFor>> =
+      (await livingReviewFor(tx, armedPr)) ?? (await placeholderFor(tx, input.runId));
+    let firstPostToken: string | undefined;
+    if (!living) {
+      try {
+        firstPostToken = await github.installationTokenById(armedPr.installationId);
+        const onGitHub = await livingReviewOnGitHub(github, reference, firstPostToken);
+        if (onGitHub?.headSha === headSha) {
+          log(`adopted review ${onGitHub.githubReviewId} already on GitHub for run ${input.runId}`);
+          await tx.insert(reviewPosted).values({
+            runId: input.runId,
+            armedPrId: armedPr.id,
+            headSha,
+            githubReviewId: onGitHub.githubReviewId,
+          });
+          return "posted" as const;
+        }
+        if (onGitHub) {
+          log(
+            `adopted review ${onGitHub.githubReviewId} as the living review for run ${input.runId}`,
+          );
+          living = { githubReviewId: onGitHub.githubReviewId, placeholder: true };
+        }
+      } catch (error) {
+        return { failed: error instanceof Error ? error.message : String(error) };
+      }
+    }
     if (living) {
       const [inserted] = await tx
         .insert(reviewPosted)
@@ -242,7 +284,7 @@ export async function postReviewForRun(
       return { id: inserted.id, living };
     }
     try {
-      const token = await github.installationTokenById(armedPr.installationId);
+      const token = firstPostToken ?? (await github.installationTokenById(armedPr.installationId));
       const render = (commentable: Map<string, Set<number>>) =>
         renderReview({
           result: input.result,

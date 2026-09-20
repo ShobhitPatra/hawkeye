@@ -22,6 +22,7 @@ function fakeGitHub(mergeBase = vi.fn(async () => "m".repeat(40))): GitHubClient
     createCommitStatus: unsupported(),
     listInstallationRepositories: unsupported(),
     listUserInstallations: unsupported(),
+    botLogin: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
   };
 }

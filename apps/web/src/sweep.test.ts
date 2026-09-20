@@ -38,6 +38,7 @@ function createGitHub(overrides: Partial<GitHubClient> = {}): GitHubClient {
     postReview: unsupported(),
     listInstallationRepositories: unsupported(),
     listUserInstallations: unsupported(),
+    botLogin: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
     ...overrides,
   };

@@ -1,6 +1,6 @@
 import { decodeMarker } from "./marker.js";
 
-export type ExistingReview = { authorLogin: string; body: string };
+export type ExistingReview = { authorLogin: string; body: string; id?: string };
 
 export function alreadyReviewed(
   reviews: ExistingReview[],
