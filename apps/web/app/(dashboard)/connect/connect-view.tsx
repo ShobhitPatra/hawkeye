@@ -61,7 +61,7 @@ export function ConnectView({
         <li>
           <div className="hk-step-body">
             <p>
-              Start the runner. Leave it running; it polls for jobs and reviews armed pull requests
+              Start the runner. Leave it running; it polls for jobs and reviews your pull requests
               as they change.
             </p>
             <div className="hk-code-row">
