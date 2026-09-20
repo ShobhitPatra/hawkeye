@@ -390,10 +390,16 @@ export async function recordResult(
       deps.log,
     );
     try {
-      if (await newerRunIsLive(deps.db, { jobId: completed.jobId, armedPrId: target.armedPr.id })) {
+      const living = await livingReviewFor(deps.db, target.armedPr);
+      const ownPlaceholder =
+        existing.placeholderReviewId !== null &&
+        existing.placeholderReviewId !== living?.githubReviewId;
+      if (
+        !ownPlaceholder &&
+        (await newerRunIsLive(deps.db, { jobId: completed.jobId, armedPrId: target.armedPr.id }))
+      ) {
         return Response.json({ ok: true }, { status: 200 });
       }
-      const living = await livingReviewFor(deps.db, target.armedPr);
       await clearReviewing(deps, {
         reference: statusTarget.reference,
         headSha: target.headSha,
