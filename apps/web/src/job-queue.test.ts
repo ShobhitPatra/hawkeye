@@ -11,7 +11,7 @@ import {
   heartbeatJob,
   holdsJobClaim,
   requeueStaleJobs,
-  sweepStaleJobsStatement,
+  requeueStaleJobsStatement,
 } from "./job-queue";
 import { enqueueJob } from "./jobs";
 import { createTestDb, seedArmedPullRequest } from "./test/pglite";
@@ -175,7 +175,7 @@ describe("the queue's indexes", () => {
     return result.rows.map((row) => row["QUERY PLAN"]).join("\n");
   }
 
-  it("serves the claim statement from job_claimable over a seeded queue", async () => {
+  it("serves the claim from job_claimable and the stale sweep from job_stale over a seeded queue", async () => {
     await seedQueue();
     const claim = claimNextJobStatement(db, {
       runnerId: "runner-1",
@@ -183,11 +183,7 @@ describe("the queue's indexes", () => {
       now: new Date(),
     });
     expect(await plan(claim)).toContain("Index Scan using job_claimable");
-  });
-
-  it("serves the stale sweep statement from job_stale over a seeded queue", async () => {
-    await seedQueue();
-    const sweep = sweepStaleJobsStatement(db, new Date(Date.now() - 5 * 60_000));
+    const sweep = requeueStaleJobsStatement(db, new Date(Date.now() - 5 * 60_000));
     expect(await plan(sweep)).toContain("Index Scan using job_stale");
   });
 });
