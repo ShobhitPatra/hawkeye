@@ -103,7 +103,7 @@ export async function requeueStaleJobs(
     .returning({ id: job.id, state: job.state });
   if (swept.length === 0) return { swept: 0, failed: [] };
 
-  await db
+  const ended = await db
     .update(run)
     .set({ status: "error", error: "heartbeat lost", endedAt: input.now })
     .where(
@@ -114,16 +114,16 @@ export async function requeueStaleJobs(
         ),
         eq(run.status, "running"),
       ),
-    );
+    )
+    .returning({ id: run.id, jobId: run.jobId, placeholderReviewId: run.placeholderReviewId });
 
-  const failedIds = swept.filter((row) => row.state === "failed").map((row) => row.id);
-  if (failedIds.length === 0) return { swept: swept.length, failed: [] };
-  const rows = await db
+  const failedIds = new Set(swept.filter((row) => row.state === "failed").map((row) => row.id));
+  const endedFailed = ended.filter((row) => failedIds.has(row.jobId));
+  if (endedFailed.length === 0) return { swept: swept.length, failed: [] };
+  const jobs = await db
     .select({
       jobId: job.id,
-      runId: run.id,
       headSha: job.headSha,
-      placeholderReviewId: run.placeholderReviewId,
       armedPr: {
         id: armedPr.id,
         owner: armedPr.owner,
@@ -134,9 +134,18 @@ export async function requeueStaleJobs(
     })
     .from(job)
     .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
-    .innerJoin(run, and(eq(run.jobId, job.id), eq(run.endedAt, input.now)))
-    .where(inArray(job.id, failedIds));
-  return { swept: swept.length, failed: rows };
+    .where(
+      inArray(
+        job.id,
+        endedFailed.map((row) => row.jobId),
+      ),
+    );
+  const byJob = new Map(jobs.map((row) => [row.jobId, row]));
+  const failed = endedFailed.flatMap((row) => {
+    const found = byJob.get(row.jobId);
+    return found ? [{ ...found, runId: row.id, placeholderReviewId: row.placeholderReviewId }] : [];
+  });
+  return { swept: swept.length, failed };
 }
 
 export async function releaseJob(

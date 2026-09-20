@@ -1,8 +1,8 @@
+import type { GitHubClient } from "@hawkeye/core";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
-import type { GitHubClient } from "@hawkeye/core";
 import { claimNextJob, createRun } from "./job-queue";
 import { enqueueJob } from "./jobs";
 import { claimJob } from "./runner-api";
@@ -18,14 +18,29 @@ let runnerId: string;
 let token: string;
 let github: GitHubClient;
 
+function unsupported() {
+  return vi.fn(() => {
+    throw new Error("unexpected call");
+  });
+}
+
 function createGitHub(overrides: Partial<GitHubClient> = {}): GitHubClient {
   return {
     installationTokenById: vi.fn(async () => "ghs_token"),
     createCommitStatus: vi.fn(async () => {}),
     updateReview: vi.fn(async () => {}),
     review: vi.fn(async () => ({ body: "" })),
+    installationToken: unsupported(),
+    pullRequest: unsupported(),
+    mergeBase: unsupported(),
+    linkedIssue: unsupported(),
+    reviews: unsupported(),
+    postReview: unsupported(),
+    listInstallationRepositories: unsupported(),
+    listUserInstallations: unsupported(),
+    listOpenPullRequestsByAuthor: unsupported(),
     ...overrides,
-  } as unknown as GitHubClient;
+  };
 }
 
 function request(authorization?: string, method = "POST") {
@@ -206,7 +221,7 @@ describe("claimJob", () => {
       }),
       {
         db,
-        github: {} as never,
+        github,
         now: () => now,
         poll: { intervalMs: 0, totalMs: 0 },
         controlPlaneUrl: "https://hawkeye.test",
