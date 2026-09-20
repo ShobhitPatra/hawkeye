@@ -173,9 +173,11 @@ export function renderLivingReview(input: RenderLivingReviewInput): RenderedLivi
   if (full.body.length <= budget) return { ...full, trimmed: [] };
 
   const trimmed: string[] = [];
+  let previous = full.body;
   for (const step of TRIM_LADDER) {
-    trimmed.push(step.note);
     const attempt = renderWith(input, step.trim);
+    if (attempt.body !== previous) trimmed.push(step.note);
+    previous = attempt.body;
     if (attempt.body.length <= budget) return { ...attempt, trimmed };
   }
   return {

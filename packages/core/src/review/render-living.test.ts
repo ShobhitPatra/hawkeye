@@ -234,6 +234,59 @@ describe("renderLivingReview", () => {
     expect(body).toContain("### Changes needed");
   });
 
+  it("names only the rungs that removed something", () => {
+    const base = input(new Set());
+    const long = "w".repeat(4_000);
+    const rendered = renderLivingReview({
+      ...base,
+      commentable: new Map(),
+      result: {
+        ...base.result,
+        findings: [
+          { path: "src/o.ts", severity: "optional", claim: "Optional claim", detail: long },
+        ],
+        priorFindings: [],
+      },
+      maxBodyLength: 3_000,
+    });
+    expect(rendered.trimmed).toEqual([
+      "all but the current round",
+      "the lens table",
+      "optional finding detail",
+    ]);
+  });
+
+  it("uses the singular for one earlier round and one closed prior finding", () => {
+    const base = input(new Set());
+    const eleven: RoundSummary[] = Array.from({ length: 11 }, (_, index) => ({
+      round: index + 1,
+      headSha: index === 10 ? head : index.toString(16).padStart(40, "0"),
+      verdict: "changes_needed",
+      startedAt: "2026-01-01 00:00 UTC",
+    }));
+    const justOver = (over: Parameters<typeof renderLivingReview>[0]) =>
+      renderLivingReview({ ...over, maxBodyLength: renderLivingReview(over).body.length - 1 });
+
+    const oneRound = justOver({ ...base, rounds: eleven });
+    expect(oneRound.trimmed).toEqual(["older rounds"]);
+    expect(oneRound.body).toContain("| 1 earlier round | | | |");
+
+    const onePrior = justOver(base);
+    expect(onePrior.trimmed).toEqual(["closed prior findings"]);
+    expect(onePrior.body).toContain("- 1 closed prior finding not shown.");
+  });
+
+  it("says there are no findings in the short form of a clean review", () => {
+    const base = input(new Set());
+    const body = renderMinimalLivingReview({
+      ...base,
+      result: { ...base.result, verdict: "ship", findings: [] },
+    });
+    expect(body).toContain("### Ship");
+    expect(body).toContain("No findings.");
+    expect(body).not.toContain("Findings:");
+  });
+
   it("falls back to the short form when even the claims do not fit", () => {
     const base = input(new Set());
     const rendered = renderLivingReview({ ...base, maxBodyLength: 400 });
