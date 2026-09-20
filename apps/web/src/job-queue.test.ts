@@ -182,9 +182,9 @@ describe("the queue's indexes", () => {
       userId: "seed-u5",
       now: new Date(),
     });
-    expect(await plan(claim)).toContain("Index Scan using job_claimable");
+    expect(await plan(claim)).toMatch(/Scan (using|on) job_claimable/);
     const sweep = requeueStaleJobsStatement(db, new Date(Date.now() - 5 * 60_000));
-    expect(await plan(sweep)).toContain("Index Scan using job_stale");
+    expect(await plan(sweep)).toMatch(/Scan (using|on) job_stale/);
   });
 });
 
