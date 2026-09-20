@@ -2,8 +2,6 @@ name: ci
 
 on:
   pull_request:
-  push:
-    branches: [main]
 
 permissions:
   contents: read
@@ -14,18 +12,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  gate:
-    name: ${{ matrix.gate }}
+  checks:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        gate: [lint, format:check, typecheck, test, build]
     steps:
       - uses: actions/checkout@v7
       - id: changes
-        if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -41,5 +33,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - if: steps.changes.outputs.code != 'false' || (matrix.gate != 'test' && matrix.gate != 'build')
-        run: pnpm ${{ matrix.gate }}
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - if: steps.changes.outputs.code != 'false'
+        run: pnpm test
+      - if: steps.changes.outputs.code != 'false'
+        run: pnpm build

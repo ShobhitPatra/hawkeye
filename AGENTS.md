@@ -15,7 +15,7 @@ apps/web           Next.js control plane (Drizzle + Postgres)
 
 ## Commands
 
-pnpm install · pnpm lint (oxlint) · pnpm format (oxfmt; run before every commit) · pnpm typecheck · pnpm test (vitest) · pnpm build (tsup). CI (`.github/workflows/ci.yml`) runs install, lint, format:check, typecheck, test and build on every PR and push to main; on a PR that only touches Markdown, `docs/`, the templates, the funding file or the license, test and build report success without running. Scope to one package with pnpm --filter <name>. Control plane: `pnpm --filter web dev|build|db:generate|db:migrate|auth:generate`, `docker compose up -d --wait db` (local Postgres). The web build fetches IBM Plex from Google Fonts through next/font, so it needs network access.
+pnpm install · pnpm lint (oxlint) · pnpm format (oxfmt; run before every commit) · pnpm typecheck · pnpm test (vitest) · pnpm build (tsup). CI (`.github/workflows/ci.yml`) runs install, lint, format:check, typecheck, test and build as the steps of one job, `checks`, on every PR; on a PR that only touches Markdown, `docs/`, the templates, the funding file or the license, test and build are skipped. It does not run again on main: branch protection requires a PR to be up to date with main, so the squashed result is the tree that was checked. One job, because a private repository bills each job rounded up to a whole minute. Scope to one package with pnpm --filter <name>. Control plane: `pnpm --filter web dev|build|db:generate|db:migrate|auth:generate`, `docker compose up -d --wait db` (local Postgres). The web build fetches IBM Plex from Google Fonts through next/font, so it needs network access.
 
 ## Rules
 
