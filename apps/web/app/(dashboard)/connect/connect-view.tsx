@@ -1,3 +1,4 @@
+import { HAWKEYE_REPOSITORY_URL } from "@hawkeye/core";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { RunnerStatus } from "@/runner-status";
@@ -29,6 +30,15 @@ export function ConnectView({
         <p className="hk-compact hk-muted hk-prose">
           Three steps on the machine that holds your Claude Code login. Nothing here leaves that
           machine except the review.
+        </p>
+        <p className="hk-compact hk-muted hk-prose">
+          A review runs a coding agent on that machine, as you, over code you did not write. Its
+          editing and web tools are removed; the shell stays, so connect a machine whose files you
+          would let that code read.{" "}
+          <a href={`${HAWKEYE_REPOSITORY_URL}/blob/main/README.md#what-the-runner-can-reach`}>
+            What the runner can reach
+          </a>
+          .
         </p>
       </div>
 
