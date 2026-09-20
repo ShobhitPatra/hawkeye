@@ -1,5 +1,5 @@
 import type { ReviewResult, RunResultStatus } from "@hawkeye/core";
-import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, sql, type SQLWrapper } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import { armedPr, job, run } from "./db/schema";
@@ -14,11 +14,13 @@ const queuedSibling = sql`exists (select 1
                                   where waiting.armed_pr_id = ${job.armedPrId}
                                     and waiting.state = 'queued')`;
 
-export async function claimNextJob(
+type Statement<Row> = SQLWrapper & PromiseLike<Row[]>;
+
+export function claimNextJobStatement(
   db: Db,
   input: { runnerId: string; userId: string; now: Date },
-): Promise<Job | undefined> {
-  const [claimed] = await db
+): Statement<Job> {
+  return db
     .update(job)
     .set({
       state: "claimed",
@@ -42,6 +44,13 @@ export async function claimNextJob(
       ),
     )
     .returning();
+}
+
+export async function claimNextJob(
+  db: Db,
+  input: { runnerId: string; userId: string; now: Date },
+): Promise<Job | undefined> {
+  const [claimed] = await claimNextJobStatement(db, input);
   return claimed;
 }
 
@@ -63,14 +72,8 @@ export async function heartbeatJob(
   return beat;
 }
 
-export async function requeueStaleJobs(
-  db: Db,
-  input: { now: Date; staleAfterSeconds?: number },
-): Promise<number> {
-  const cutoff = new Date(
-    input.now.getTime() - (input.staleAfterSeconds ?? DEFAULT_STALE_AFTER_SECONDS) * 1000,
-  );
-  const swept = await db
+export function requeueStaleJobsStatement(db: Db, cutoff: Date): Statement<{ id: string }> {
+  return db
     .update(job)
     .set({
       state: sql`(case
@@ -90,6 +93,16 @@ export async function requeueStaleJobs(
     })
     .where(and(eq(job.state, "claimed"), sql`${job.heartbeatAt} < ${cutoff}`))
     .returning({ id: job.id });
+}
+
+export async function requeueStaleJobs(
+  db: Db,
+  input: { now: Date; staleAfterSeconds?: number },
+): Promise<number> {
+  const cutoff = new Date(
+    input.now.getTime() - (input.staleAfterSeconds ?? DEFAULT_STALE_AFTER_SECONDS) * 1000,
+  );
+  const swept = await requeueStaleJobsStatement(db, cutoff);
   if (swept.length === 0) return 0;
 
   await db
