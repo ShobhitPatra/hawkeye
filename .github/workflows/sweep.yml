@@ -1,0 +1,28 @@
+name: sweep
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  sweep:
+    if: github.repository == 'ShobhitPatra/hawkeye'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Requeue stale review jobs
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          CONTROL_PLANE_URL: ${{ vars.CONTROL_PLANE_URL || 'https://hawkeye-review.vercel.app' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::notice::CRON_SECRET is not set; nothing swept."
+            exit 0
+          fi
+          curl --fail --silent --show-error --max-time 60 \
+            --request POST \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            "$CONTROL_PLANE_URL/api/internal/sweep"

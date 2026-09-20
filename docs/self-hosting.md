@@ -40,6 +40,7 @@ Import the repository into a Vercel project with Root Directory `apps/web`, Inst
 | `GITHUB_WEBHOOK_SECRET` | the webhook secret you generated |
 | `GITHUB_APP_ID` | from the App page |
 | `GITHUB_APP_PRIVATE_KEY` | the contents of the `.pem`, newlines kept or written as `\n` |
+| `CRON_SECRET` | 32 random bytes as hex (`openssl rand -hex 32`); guards the sweep route below |
 
 Before the first deployment finishes, run the migrations against Neon from your machine:
 
@@ -51,6 +52,17 @@ DATABASE_URL='<the Neon connection string>' pnpm --filter web db:migrate
 Run the same command after pulling a version that adds a migration; migrations are additive and safe to run before the matching deployment goes live.
 
 Then set the App's callback and webhook URLs to the deployment's URL, if you left them for later, and redeploy once so `BETTER_AUTH_URL` is baked in.
+
+## Schedule the sweep
+
+A runner that dies mid-review leaves its job claimed. `POST /api/internal/sweep` (GET works too) puts every job whose runner has been silent for five minutes back in the queue, and answers 401 to any caller that does not send `Authorization: Bearer <CRON_SECRET>`. Nothing calls it on its own, so give it a clock; every one to five minutes is plenty. A claim counts as stale after five silent minutes, so the time to recover a dead runner's job is that plus your clock's interval.
+
+- **Vercel Cron.** `apps/web/vercel.json` schedules the route once a day, which is all the Hobby plan allows; Vercel sends the secret itself once `CRON_SECRET` is set. On Pro, change the schedule to `* * * * *` and nothing else is needed.
+- **Anything else with a timer.** The repository's `.github/workflows/sweep.yml` calls the route every five minutes for the hosted instance; in a fork, set the repository secret `CRON_SECRET` and the variable `CONTROL_PLANE_URL` and drop the repository check at the top of the job. GitHub's schedule is best effort: runs are often late, sometimes skipped, and the schedule is switched off after 60 days without activity in the repository. If recovery time matters to you, use a clock you control. A cron line on any machine does the same:
+
+  ```sh
+  */5 * * * * curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://<your control plane>/api/internal/sweep
+  ```
 
 ## 4. Sign in and install the App
 
