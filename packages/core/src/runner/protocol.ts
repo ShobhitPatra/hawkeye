@@ -20,6 +20,7 @@ export type ClaimedJob = {
     promptOverride?: string;
     model?: string;
     harness?: string;
+    concurrency?: number;
   };
   previousRound?: { headSha: string; findings: PriorFinding[] };
 };

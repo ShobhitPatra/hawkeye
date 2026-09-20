@@ -350,6 +350,8 @@ npx hawkeye-review runner
 
 The daemon then loops: claim a job, clone the PR with the one-hour token the job carries, run Claude Code with the review contract, heartbeat, report the result.
 
+**Reviews at once.** The daemon remembers the concurrency the last claimed job carried and keeps that many reviews running, with one claim call open at a time, claiming again whenever a slot frees. The first job after a start runs alone, a change in Settings reaches the daemon with its next job, stopping waits for every running review, and `--once` runs one job regardless. With more than one slot every line of a job carries its slot number in brackets before the subject, and each job's detail lines go to its own run directory.
+
 **Output.** One line per state change on stderr, time first, then a state word (`polling`, `contract`, `claimed`, `reviewing`, `posted`, `skipped`, `failed`, `waiting`, `delivered`, `idle`, `stopping`) and the subject. The posted line carries the verdict, counts, turns and duration; the run's detail lines (one per turn) go to `log.txt` in the run directory.
 
 **Retries.** `--once` handles a single job and exits non-zero when three claims in a row fail or the result cannot be delivered. The daemon waits a second after an empty poll, retries a failed claim after five seconds, and retries a failed result report three times (2 s, 4 s, 8 s) before logging it and moving on. The control plane requeues a claim that stops heartbeating.
@@ -387,7 +389,7 @@ At every sign-in, and each time the pull request listing is fetched (held a minu
 
 ### Webhook deliveries
 
-A push to an armed PR (`synchronize` and `ready_for_review`) queues a job for the new head after the quiet window (armed override, else the user setting, else 0 s), replacing any job still waiting. A job already claimed keeps running until its next heartbeat, whose response says it is superseded; the daemon then stops the review, reports it as `superseded`, and claims the newer job. Drafts are skipped unless the user opted into reviewing drafts. Closing or merging the PR disarms it for everyone and cancels any job still waiting. `reopened` does not trigger.
+A push to an armed PR (`synchronize` and `ready_for_review`) queues a job for the new head after the quiet window (armed override, else the user setting, else 0 s), replacing any job still waiting. A job already claimed keeps running until its next heartbeat, whose response says it is superseded; the daemon then stops the review, reports it as `superseded`, and claims the newer job. A daemon with a free slot may claim the newer job first; it then stops the older review of that pull request at once rather than waiting for the heartbeat, and when the older result arrives the control plane leaves the living review's reviewing block alone, because the newer run owns it by then; the older run's own placeholder comment, when it has one, is still closed with the superseded sentence. Drafts are skipped unless the user opted into reviewing drafts. Closing or merging the PR disarms it for everyone and cancels any job still waiting. `reopened` does not trigger.
 
 ### Connecting a runner
 
@@ -466,7 +468,7 @@ A Vercel project with a Neon Postgres and the same env, configured with Root Dir
 - **Trigger:** automatic from open for the author's own pull requests (per-user switch, default on), or from the dashboard; then every push. Quiet window default 0.
 - **Hosting:** Next.js + Postgres, deployable to Vercel + Neon and as a single Docker Compose. No Workers/D1 (locks self-hosters to one vendor).
 - **Runner channel:** today the runner long-polls with a runner token and posts results back; clone with a 1h App installation token shipped in the job. The target is a ready signal from a long-lived process rather than a poll held by a serverless function — see [The runner channel](#the-runner-channel).
-- **The job carries the user's settings:** turn and wall-clock limits, the prompt override, the model (one of a fixed list of pinned versions the web keeps and the claude CLI accepts, else the CLI default; a daemon started with `--model` keeps its own; a new model is added to the list and shipped) and the harness name (`claude-code` until a second harness exists).
+- **The job carries the user's settings:** turn and wall-clock limits, the prompt override, the model (one of a fixed list of pinned versions the web keeps and the claude CLI accepts, else the CLI default; a daemon started with `--model` keeps its own; a new model is added to the list and shipped) the harness name (`claude-code` until a second harness exists) and the concurrency (1 to 3, default 1).
 - **Review contract:** all six lenses by default; overrides per user and per repo.
 - **Subscription terms:** the user is responsible for staying within their plan's terms; Hawkeye only drives the CLI they already run. Stated in the README and on the runner-setup page.
 

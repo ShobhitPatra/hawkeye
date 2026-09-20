@@ -171,6 +171,133 @@ describe("runRunnerLoop", () => {
     const harnessInput = (d.harness.run as ReturnType<typeof vi.fn>).mock.calls[0]![0];
     expect(harnessInput).toMatchObject({ maxTurns: 3, wallClockMs: 60_000, model: "sonnet" });
   });
+  it("runs up to the job's concurrency at once and numbers the slots", async () => {
+    const second: ClaimedJob = {
+      ...claimedJob,
+      job: { ...claimedJob.job, id: "job-2", runId: "run-2" },
+      pullRequest: { owner: "o", repo: "r", number: 8 },
+    };
+    const withPool = (job: ClaimedJob) => ({
+      ...job,
+      settings: { ...job.settings, concurrency: 2 },
+    });
+    const plane = await fakeControlPlane(scripted([withPool(claimedJob), withPool(second)]));
+    servers.push(plane.server);
+    const stop = new AbortController();
+    const d = await deps(plane.baseUrl, { signal: stop.signal });
+    let started = 0;
+    let release: () => void = () => {};
+    const bothStarted = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    d.harness = {
+      name: "gate",
+      run: async (i) => {
+        started += 1;
+        if (started === 2) release();
+        await bothStarted;
+        await writeFile(i.resultPath, JSON.stringify(review));
+        return { status: "ok", turns: 1 };
+      },
+    };
+    const loop = runRunnerLoop(d);
+    await bothStarted;
+    stop.abort();
+    await loop;
+    const claimedEvents = d.reported.filter((event) => event.state === "claimed");
+    expect(claimedEvents.map((event) => event.slot)).toEqual([1, 2]);
+    expect(
+      d.reported.filter((event) => event.state === "posted").map((event) => event.slot),
+    ).toEqual([1, 2]);
+    expect(plane.received.filter((r) => r.url.endsWith("/result"))).toHaveLength(2);
+  });
+
+  it("stops a running review as soon as it claims a newer job for the same pull request", async () => {
+    const pool = (job: ClaimedJob) => ({ ...job, settings: { ...job.settings, concurrency: 2 } });
+    const newer: ClaimedJob = {
+      ...claimedJob,
+      job: { ...claimedJob.job, id: "job-2", runId: "run-2", headSha: "c".repeat(40) },
+    };
+    let reviewing = false;
+    let served = 0;
+    const plane = await fakeControlPlane((received, response) => {
+      if (received.url === "/api/runner/jobs") {
+        if (served === 0 || (served === 1 && reviewing)) {
+          served += 1;
+          return json(response, 200, pool(served === 1 ? claimedJob : newer));
+        }
+        return json(response, 204);
+      }
+      return json(response, 200, { ok: true, posted: "posted" });
+    });
+    servers.push(plane.server);
+    const stop = new AbortController();
+    const d = await deps(plane.baseUrl, { signal: stop.signal, heartbeatIntervalMs: 60_000 });
+    d.harness = {
+      name: "until-stopped",
+      run: async (i) => {
+        if (!reviewing) {
+          reviewing = true;
+          await new Promise<void>((resolve) =>
+            i.signal?.addEventListener("abort", () => resolve(), { once: true }),
+          );
+          return { status: "superseded", turns: 0 };
+        }
+        await writeFile(i.resultPath, JSON.stringify(review));
+        return { status: "ok", turns: 1 };
+      },
+    };
+    const loop = runRunnerLoop(d);
+    await vi.waitFor(() =>
+      expect(plane.received.filter((r) => r.url.endsWith("/result"))).toHaveLength(2),
+    );
+    stop.abort();
+    await loop;
+    const results = plane.received.filter((r) => r.url.endsWith("/result"));
+    expect(results.map((r) => [r.url, (r.body as { status: string }).status])).toEqual(
+      expect.arrayContaining([
+        ["/api/runner/runs/run-1/result", "superseded"],
+        ["/api/runner/runs/run-2/result", "ok"],
+      ]),
+    );
+    expect(d.reported.some((event) => event.state === "superseded" && event.slot === 1)).toBe(true);
+  });
+
+  it("runs one job at a time and carries no slot when concurrency is one", async () => {
+    const second: ClaimedJob = {
+      ...claimedJob,
+      job: { ...claimedJob.job, id: "job-2", runId: "run-2" },
+      pullRequest: { owner: "o", repo: "r", number: 8 },
+    };
+    const plane = await fakeControlPlane(scripted([claimedJob, second]));
+    servers.push(plane.server);
+    const stop = new AbortController();
+    const d = await deps(plane.baseUrl, { signal: stop.signal });
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let runs = 0;
+    d.harness = {
+      name: "gate",
+      run: async (i) => {
+        runs += 1;
+        if (runs === 1) await gate;
+        await writeFile(i.resultPath, JSON.stringify(review));
+        return { status: "ok", turns: 1 };
+      },
+    };
+    const loop = runRunnerLoop(d);
+    await vi.waitFor(() => expect(runs).toBe(1));
+    expect(plane.received.filter((r) => r.url === "/api/runner/jobs")).toHaveLength(1);
+    release();
+    await vi.waitFor(() => expect(runs).toBe(2));
+    stop.abort();
+    await loop;
+    expect(d.reported.filter((event) => event.state === "claimed")).toHaveLength(2);
+    expect(d.reported.every((event) => event.slot === undefined)).toBe(true);
+  });
+
   it("heartbeats while the review runs", async () => {
     const plane = await fakeControlPlane(scripted([claimedJob]));
     servers.push(plane.server);

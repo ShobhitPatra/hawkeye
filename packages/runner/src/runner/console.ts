@@ -21,10 +21,9 @@ export function runnerConsole(input: {
   home: string;
   style?: Partial<TerminalStyle>;
   now?: () => Date;
-}): { report(event: ConsoleEvent): void; log(line: string): void } {
+}): { report(event: ConsoleEvent): void; log(line: string, runDirectory: string): void } {
   const style = { ...PLAIN, ...input.style };
   const now = input.now ?? (() => new Date());
-  let logPath: string | undefined;
   const word = (state: string) => {
     const padded = state.padEnd(STATE_WIDTH);
     if (state === "failed") return style.must(padded);
@@ -50,13 +49,10 @@ export function runnerConsole(input: {
   };
   return {
     report: (event) => {
-      if (event.state === "reviewing") logPath = join(event.runDirectory, "log.txt");
       const time = now().toTimeString().slice(0, 8);
-      input.stderr(`${style.dim(time)}  ${word(event.state)} ${detailOf(event)}`);
+      const slot = "slot" in event && event.slot !== undefined ? `[${event.slot}] ` : "";
+      input.stderr(`${style.dim(time)}  ${word(event.state)} ${slot}${detailOf(event)}`);
     },
-    log: (line) => {
-      if (logPath === undefined) input.stderr(line);
-      else input.appendFile(logPath, `${line}\n`);
-    },
+    log: (line, runDirectory) => input.appendFile(join(runDirectory, "log.txt"), `${line}\n`),
   };
 }

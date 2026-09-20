@@ -1,12 +1,14 @@
 import { eq } from "drizzle-orm";
 import type { Db } from "./db/client";
 import {
+  DEFAULT_CONCURRENCY,
   DEFAULT_MAX_TURNS,
   DEFAULT_QUIET_WINDOW_SECONDS,
   DEFAULT_WALL_CLOCK_MINUTES,
   userSettings,
 } from "./db/schema";
 import {
+  CONCURRENCY_RANGE,
   isModelChoice,
   MAX_QUIET_WINDOW_SECONDS,
   MAX_TURNS_RANGE,
@@ -64,6 +66,7 @@ export const DEFAULT_RUNNER_SETTINGS: RunnerSettings = {
   model: null,
   maxTurns: DEFAULT_MAX_TURNS,
   wallClockMinutes: DEFAULT_WALL_CLOCK_MINUTES,
+  concurrency: DEFAULT_CONCURRENCY,
 };
 
 export async function readRunnerSettings(db: Db, userId: string): Promise<RunnerSettings> {
@@ -72,6 +75,7 @@ export async function readRunnerSettings(db: Db, userId: string): Promise<Runner
       model: userSettings.model,
       maxTurns: userSettings.maxTurns,
       wallClockMinutes: userSettings.wallClockMinutes,
+      concurrency: userSettings.concurrency,
     })
     .from(userSettings)
     .where(eq(userSettings.userId, userId));
@@ -118,5 +122,6 @@ export function parseRunnerSettings(formData: FormData): RunnerSettings {
       "Minutes per review",
       WALL_CLOCK_MINUTES_RANGE,
     ),
+    concurrency: wholeNumber(formData, "concurrency", "Reviews at once", CONCURRENCY_RANGE),
   };
 }

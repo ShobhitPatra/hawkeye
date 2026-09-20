@@ -223,6 +223,27 @@ describe("clearReviewing", () => {
     expect(github.updateReview).toHaveBeenCalledWith(reference, "42", "done", "t");
   });
 
+  it("leaves the living review alone when a newer run owns its block, but still closes a placeholder", async () => {
+    const github = {
+      review: vi.fn(async () => ({ body: "<!-- hawkeye: reviewing -->\n### Ship\n" })),
+      updateReview: vi.fn(async () => {}),
+    } as unknown as GitHubClient;
+    const livingBlockBelongsToNewerRun = vi.fn(async () => true);
+    const target = { reference, headSha: "a".repeat(40), token: "t", runId, closing: "done" };
+    await clearReviewing(
+      { db, github },
+      { ...target, livingReviewId: "42", placeholderReviewId: null, livingBlockBelongsToNewerRun },
+    );
+    expect(github.review).not.toHaveBeenCalled();
+    expect(github.updateReview).not.toHaveBeenCalled();
+    await clearReviewing(
+      { db, github },
+      { ...target, livingReviewId: "42", placeholderReviewId: "7", livingBlockBelongsToNewerRun },
+    );
+    expect(github.updateReview).toHaveBeenCalledWith(reference, "7", "done", "t");
+    expect(livingBlockBelongsToNewerRun).toHaveBeenCalledTimes(1);
+  });
+
   it("strips the block from a living review and leaves an untouched body alone", async () => {
     const updateReview = vi.fn(async () => {});
     const github = {

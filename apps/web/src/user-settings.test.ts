@@ -95,6 +95,7 @@ describe("runner settings", () => {
       model: null,
       maxTurns: 40,
       wallClockMinutes: 15,
+      concurrency: 1,
     });
   });
 
@@ -108,17 +109,24 @@ describe("runner settings", () => {
       model: "claude-opus-5",
       maxTurns: 60,
       wallClockMinutes: 20,
+      concurrency: 2,
     });
     expect(await readRunnerSettings(db, "u1")).toEqual({
       model: "claude-opus-5",
       maxTurns: 60,
       wallClockMinutes: 20,
+      concurrency: 2,
     });
     expect(await readReviewSettings(db, "u1")).toMatchObject({
       autoReview: false,
       quietWindowSeconds: 30,
     });
-    await saveRunnerSettings(db, "u1", { model: null, maxTurns: 60, wallClockMinutes: 20 });
+    await saveRunnerSettings(db, "u1", {
+      model: null,
+      maxTurns: 60,
+      wallClockMinutes: 20,
+      concurrency: 2,
+    });
     expect((await readRunnerSettings(db, "u1")).model).toBeNull();
   });
 
@@ -130,34 +138,56 @@ describe("runner settings", () => {
   it("parses the radios and the limits", () => {
     expect(
       parseRunnerSettings(
-        form({ model: "claude-sonnet-5", maxTurns: "12", wallClockMinutes: "5" }),
+        form({ model: "claude-sonnet-5", maxTurns: "12", wallClockMinutes: "5", concurrency: "1" }),
       ),
-    ).toEqual({ model: "claude-sonnet-5", maxTurns: 12, wallClockMinutes: 5 });
+    ).toEqual({ model: "claude-sonnet-5", maxTurns: 12, wallClockMinutes: 5, concurrency: 1 });
     expect(
-      parseRunnerSettings(form({ model: "", maxTurns: "1", wallClockMinutes: "60" })).model,
+      parseRunnerSettings(
+        form({ model: "", maxTurns: "1", wallClockMinutes: "60", concurrency: "1" }),
+      ).model,
     ).toBeNull();
   });
 
   it("refuses an unknown model and limits outside the range", () => {
     expect(() =>
-      parseRunnerSettings(form({ model: "haiku", maxTurns: "12", wallClockMinutes: "5" })),
+      parseRunnerSettings(
+        form({ model: "haiku", maxTurns: "12", wallClockMinutes: "5", concurrency: "1" }),
+      ),
     ).toThrow("not in the list");
     expect(
       parseRunnerSettings(
-        form({ model: "claude-fable-5-1", maxTurns: "12", wallClockMinutes: "5" }),
+        form({
+          model: "claude-fable-5-1",
+          maxTurns: "12",
+          wallClockMinutes: "5",
+          concurrency: "1",
+        }),
       ).model,
     ).toBe("claude-fable-5-1");
     expect(() =>
-      parseRunnerSettings(form({ model: "", maxTurns: "0", wallClockMinutes: "5" })),
+      parseRunnerSettings(
+        form({ model: "", maxTurns: "0", wallClockMinutes: "5", concurrency: "1" }),
+      ),
     ).toThrow("Turns per review must be between 1 and 200.");
     expect(() =>
-      parseRunnerSettings(form({ model: "", maxTurns: "201", wallClockMinutes: "5" })),
+      parseRunnerSettings(
+        form({ model: "", maxTurns: "201", wallClockMinutes: "5", concurrency: "1" }),
+      ),
     ).toThrow("between 1 and 200");
     expect(() =>
-      parseRunnerSettings(form({ model: "", maxTurns: "12", wallClockMinutes: "61" })),
+      parseRunnerSettings(
+        form({ model: "", maxTurns: "12", wallClockMinutes: "61", concurrency: "1" }),
+      ),
     ).toThrow("Minutes per review must be between 1 and 60.");
     expect(() =>
-      parseRunnerSettings(form({ model: "", maxTurns: "1.5", wallClockMinutes: "5" })),
+      parseRunnerSettings(
+        form({ model: "", maxTurns: "1.5", wallClockMinutes: "5", concurrency: "1" }),
+      ),
     ).toThrow("whole number");
+    expect(() =>
+      parseRunnerSettings(
+        form({ model: "", maxTurns: "12", wallClockMinutes: "5", concurrency: "4" }),
+      ),
+    ).toThrow("Reviews at once must be between 1 and 3.");
   });
 });

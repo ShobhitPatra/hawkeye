@@ -54,6 +54,11 @@ function integer(value: unknown, field: string): number {
   return Number.isInteger(value) ? (value as number) : invalid(field);
 }
 
+function positiveInteger(value: unknown, field: string): number {
+  const parsed = integer(value, field);
+  return parsed >= 1 ? parsed : invalid(field);
+}
+
 function priorFinding(value: unknown, field: string): PriorFinding {
   const entry = record(value, field);
   const severity = text(entry.severity, `${field}.severity`);
@@ -97,6 +102,7 @@ function claimedJob(payload: unknown): ClaimedJob {
   const promptOverride = settings.promptOverride;
   const model = settings.model;
   const harness = settings.harness;
+  const concurrency = settings.concurrency;
   return {
     job: {
       id: text(job.id, "job.id"),
@@ -118,6 +124,9 @@ function claimedJob(payload: unknown): ClaimedJob {
         : { promptOverride: text(promptOverride, "settings.promptOverride") }),
       ...(model === undefined ? {} : { model: text(model, "settings.model") }),
       ...(harness === undefined ? {} : { harness: text(harness, "settings.harness") }),
+      ...(concurrency === undefined
+        ? {}
+        : { concurrency: positiveInteger(concurrency, "settings.concurrency") }),
     },
     ...(root.previousRound === undefined
       ? {}

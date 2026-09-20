@@ -20,9 +20,11 @@ export function isModelChoice(value: string): value is ModelChoice {
 }
 export const MAX_TURNS_RANGE = { min: 1, max: 200 } as const;
 export const WALL_CLOCK_MINUTES_RANGE = { min: 1, max: 60 } as const;
+export const CONCURRENCY_RANGE = { min: 1, max: 3 } as const;
 
 export type RunnerSettings = {
   model: string | null;
   maxTurns: number;
   wallClockMinutes: number;
+  concurrency: number;
 };

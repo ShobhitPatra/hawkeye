@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import {
+  CONCURRENCY_RANGE,
   isModelChoice,
   MAX_TURNS_RANGE,
   MODELS,
@@ -79,6 +80,25 @@ export function RunnerForm({ settings }: { settings: RunnerSettings }) {
           defaultValue={settings.wallClockMinutes}
         />
         <p className="hk-help">A review that runs longer stops and reports a timeout.</p>
+      </div>
+      <div className="hk-field">
+        <label htmlFor="concurrency">Reviews at once</label>
+        <input
+          className="hk-input"
+          id="concurrency"
+          name="concurrency"
+          type="number"
+          inputMode="numeric"
+          required
+          min={CONCURRENCY_RANGE.min}
+          max={CONCURRENCY_RANGE.max}
+          step={1}
+          defaultValue={settings.concurrency}
+        />
+        <p className="hk-help">
+          How many reviews the runner runs at the same time, up to three. Each one spends your plan,
+          so more at once reaches its limits sooner.
+        </p>
       </div>
       <div className="hk-action-row">
         <button type="submit" className="hk-button" data-variant="primary" disabled={pending}>

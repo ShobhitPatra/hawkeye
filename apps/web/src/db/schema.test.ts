@@ -248,6 +248,7 @@ describe("schema migrations", () => {
       autoReview: true,
       model: null,
       harness: "claude-code",
+      concurrency: 1,
     });
 
     await db.insert(schema.installationUser).values({ installationId: "3", userId: "u3" });
