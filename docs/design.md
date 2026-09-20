@@ -419,7 +419,7 @@ With a runner token:
 | `POST /api/runner/runs/<id>/events` | Accepts `{ type, at, data }` entries and counts the `turn` ones |
 | `POST /api/runner/runs/<id>/result` | Posts `{ status, turns, result?, error?, commentable? }`, storing the review result and closing the run and the job |
 
-With `CRON_SECRET` as a bearer token, `GET` or `POST /api/internal/sweep` requeues the jobs whose runner went silent for five minutes (failing one that a newer job for the same pull request has overtaken) and answers `{ ok, swept }`; without the secret it answers 401.
+With `CRON_SECRET` as a bearer token, `GET` or `POST /api/internal/sweep` requeues the jobs whose runner went silent for five minutes (failing one that a newer job for the same pull request has overtaken) and answers `{ ok, swept }`; without the secret it answers 401. A job it fails will never send a result, so the sweep closes it on the pull request the way a failed result would: the commit status becomes success "Review did not complete" and the reviewing line is replaced by the sentence that says so (left alone when a newer run owns the living review's block). A requeued job is left as it is, since the next claim marks both again. These writes are best effort: a GitHub failure is logged and the sweep still completes.
 
 ### Posting a review
 
