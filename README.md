@@ -6,7 +6,11 @@
 
 <br>
 
-Open a pull request. A runner on your machine reads every push with the coding agent you already pay for, under your own login, and posts one verdict as `hawkeye-review[bot]`. No token bill, no credentials in the cloud, and silence where the code is fine.
+Hawkeye is a code reviewer that belongs to you, not to a repository. Open a pull request, and a runner on your machine reads every push with the coding agent you already pay for, under your own login, then posts one verdict as `hawkeye-review[bot]`.
+
+- **What it costs:** nothing beyond that plan. No seat, no token bill.
+- **Why it is different:** every other AI reviewer is bought per seat and wired into a repository by an admin. This one runs on your subscription, on your hardware. Your plan credential and your repository never reach a server of ours; only the findings do.
+- **What it needs today:** a Claude Code login. Codex is next ([#170](https://github.com/ShobhitPatra/hawkeye/issues/170)).
 
 [Sign in with GitHub](https://hawkeye-review.vercel.app) to review every push, or try one review with no account:
 
@@ -41,17 +45,29 @@ Run the runner on a machine, or under a user, whose files you are willing to hav
 
 ## Start with one pull request
 
-1. Sign in with GitHub at [hawkeye-review.vercel.app](https://hawkeye-review.vercel.app) and install the GitHub App on a repository you admin.
-2. On the machine where your coding agent is logged in, connect a runner and leave it running:
+You need a machine with Node 22 or newer, git 2.31 or newer, and [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) installed and signed in (run `claude` once and check it answers). Nothing else is installed; `npx` fetches the runner each time.
+
+1. **Sign in** with GitHub at [hawkeye-review.vercel.app](https://hawkeye-review.vercel.app).
+2. **Install the GitHub App** on a repository you admin: open [github.com/apps/hawkeye-review](https://github.com/apps/hawkeye-review), choose Install, and pick the repositories. The App is how the review gets posted: it reads the repository, its issues and its pull requests, and writes review comments and commit statuses. Signing in also shares the email address on your GitHub account.
+3. **Connect a runner** on that machine:
 
    ```sh
    npx hawkeye-review runner login --url https://hawkeye-review.vercel.app
+   ```
+
+   It prints a code and a link. Open the link, type the code, approve it. The terminal then says it is connected and where it saved its token.
+4. **Start it and leave it running:**
+
+   ```sh
    npx hawkeye-review runner
    ```
 
-3. Open a pull request; it is reviewed on open and on every push.
+   The Runners page shows it online within a minute. If the machine sleeps or the terminal closes, reviews wait in the queue and run when it is back.
+5. **Open a pull request of your own**, not a draft, in a repository you installed the App on. A draft is reviewed once you mark it ready, unless you turn on "Review drafts too" in Settings. Within a minute its checks show `hawkeye` as "Reviewing on <your machine>", and a few minutes later the review is posted as a comment. Every later push is reviewed again, and the same comment is updated in place.
 
-The hosted instance shows every repository where the App is installed and your GitHub account has access. Claude Code works today; Codex support is the next release.
+To stop: Pause on the Pull requests page stops one pull request. Settings turns automatic review off for the pull requests you open from then on; ones already being reviewed keep going until you pause them. Closing the terminal stops the runner, and queued reviews wait for it.
+
+If nothing happens, the Runners page says whether your runner is online, and each pull request's page on the dashboard lists its runs with the reason when one failed.
 
 ## Try one review with no account
 
@@ -60,5 +76,5 @@ The hosted instance shows every repository where the App is installed and your G
 ## Open source, yours to run
 
 - MIT licensed, and every pull request to this repository is reviewed by Hawkeye itself before a maintainer reads it.
-- Run your own instance: the [self-hosting guide](docs/self-hosting.md) covers a Vercel deployment on Neon Postgres, or a single machine with Docker Compose.
+- Run your own instance: the [self-hosting guide](docs/self-hosting.md) covers a Vercel deployment on Neon Postgres, the way the hosted instance runs. Docker Compose is there for development.
 - Read [how it works and why](docs/design.md), the [contributing guide](CONTRIBUTING.md), and the [security policy](SECURITY.md).

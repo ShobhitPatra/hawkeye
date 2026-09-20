@@ -2,6 +2,8 @@
 
 Hawkeye handles GitHub App installation tokens, runner tokens and the review results of private repositories, so reports are taken seriously and handled privately.
 
+Before connecting a runner, read [what the runner can reach](README.md#what-the-runner-can-reach): a review runs a coding agent on your machine, as you.
+
 ## Reporting a vulnerability
 
 Report through GitHub's private vulnerability reporting: https://github.com/ShobhitPatra/hawkeye/security/advisories/new. Do not open a public issue for anything that could be a vulnerability.
