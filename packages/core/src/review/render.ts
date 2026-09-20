@@ -71,8 +71,10 @@ export function renderReviewSections({
   headSha,
   commentable,
   commentWorthy,
+  claimOnly,
 }: Pick<RenderInput, "result" | "headSha" | "commentable"> & {
   commentWorthy?: (finding: Finding) => boolean;
+  claimOnly?: ReadonlySet<Finding["severity"]>;
 }): ReviewSections {
   const comments: ReviewComment[] = [];
   const anchored = new Set<Finding>();
@@ -105,6 +107,10 @@ export function renderReviewSections({
       lines.push(`- **${oneLine(f.claim)}**${location(f)}`);
       if (anchored.has(f)) {
         lines.push(`  Posted inline at the line. ${id}`);
+        continue;
+      }
+      if (claimOnly?.has(f.severity)) {
+        lines[lines.length - 1] = `${lines[lines.length - 1]} ${id}`;
         continue;
       }
       const detail = indentLines(f.detail.trimEnd(), "  ");

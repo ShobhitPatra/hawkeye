@@ -29,7 +29,9 @@ export type { RenderedReview, ReviewComment } from "./review/render.js";
 export { renderReview, type FooterMeta, type RenderInput } from "./review/render.js";
 export { LENS_LABELS, SEVERITY_LABELS, VERDICT_LABELS } from "./review/format.js";
 export {
+  LIVING_REVIEW_BODY_BUDGET,
   renderLivingReview,
+  renderMinimalLivingReview,
   type RenderLivingReviewInput,
   type RenderedLivingReview,
 } from "./review/render-living.js";
