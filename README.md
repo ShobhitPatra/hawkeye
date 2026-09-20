@@ -33,9 +33,9 @@ Nothing beyond the plan you already pay for. Your plan's limits are the budget, 
 
 A review runs a coding agent on your machine, as you, over code you did not write. Know what that means before you connect a runner.
 
-- **What it can reach.** The agent runs shell commands to read and test the checkout, with your environment and your files in reach, not only the pull request. Anything your own terminal can read, a command it runs could read.
-- **What it is denied.** Its file-editing, web-fetch and web-search tools are removed; the shell stays, which is why the first point holds. The checkout's own agent instructions (`CLAUDE.md`, `.claude/`) are removed before it starts and the repository's settings are never loaded, so a pull request cannot reconfigure the reviewer. The token that cloned the branch is never written into the checkout.
-- **What bounds the risk today.** Hawkeye reviews pull requests you open, in repositories you chose. The exposure is code from the people who can push to your branches. Reviewing strangers' pull requests waits for a sandbox around the shell ([#160](https://github.com/ShobhitPatra/hawkeye/issues/160)).
+- **What it can reach.** The agent runs shell commands to read and test the checkout, with your environment and your files in reach, not only the pull request. Anything your own terminal can read, change or run, a command it runs could too.
+- **What it is denied.** Its file-editing, web-fetch and web-search tools are removed. The shell stays, so the first point holds in full: a command can still write a file or start a program. The checkout's own agent configuration (`CLAUDE.md`, `.claude/`) is removed before it starts and the repository's settings are never loaded, so a pull request cannot change the reviewer's tools or settings. The branch's `AGENTS.md`, `CLAUDE.md` and `CONTRIBUTING.md` are still read into the prompt as repository rules, fenced as untrusted text. The token that cloned the branch is never written into the checkout.
+- **What bounds the risk today.** The runner reviews pull requests you open, in repositories you chose, so the exposure is code from the people who can push to your branches. `prepare` reviews whatever pull request URL you hand it; hand it code you would be willing to run. Reviewing strangers' pull requests waits for a sandbox around the shell ([#160](https://github.com/ShobhitPatra/hawkeye/issues/160)).
 
 Run the runner on a machine, or under a user, whose files you are willing to have read by a program reviewing that code.
 
