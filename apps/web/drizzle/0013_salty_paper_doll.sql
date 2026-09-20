@@ -1,0 +1,2 @@
+CREATE INDEX "job_claimable" ON "job" USING btree ("not_before") WHERE "job"."state" = 'queued';--> statement-breakpoint
+CREATE INDEX "job_stale" ON "job" USING btree ("heartbeat_at") WHERE "job"."state" = 'claimed';
