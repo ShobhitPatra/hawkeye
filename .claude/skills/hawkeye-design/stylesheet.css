@@ -297,6 +297,9 @@ html {
 .hk-topbar-end a:focus-visible {
   color: var(--hk-fg);
 }
+.hk-topbar-end a.hk-button {
+  color: var(--hk-fg);
+}
 .hk-topbar-end {
   margin-left: auto;
   display: flex;

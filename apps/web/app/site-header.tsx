@@ -5,7 +5,15 @@ import { SignInButton } from "./sign-in-button";
 import { ThemeChoice } from "./theme-choice";
 import { ThemeIcon } from "./theme-icon";
 
-export function SiteHeader({ theme, callbackURL }: { theme: Theme; callbackURL?: string }) {
+export function SiteHeader({
+  theme,
+  callbackURL,
+  signedIn = false,
+}: {
+  theme: Theme;
+  callbackURL?: string;
+  signedIn?: boolean;
+}) {
   return (
     <header className="hk-topbar">
       <a className="hk-wordmark hk-lockup" href="/">
@@ -22,7 +30,13 @@ export function SiteHeader({ theme, callbackURL }: { theme: Theme; callbackURL?:
             <ThemeChoice theme={theme} />
           </div>
         </details>
-        <SignInButton {...(callbackURL ? { callbackURL } : {})} />
+        {signedIn ? (
+          <a className="hk-button" href="/overview">
+            Dashboard
+          </a>
+        ) : (
+          <SignInButton {...(callbackURL ? { callbackURL } : {})} />
+        )}
       </div>
     </header>
   );
