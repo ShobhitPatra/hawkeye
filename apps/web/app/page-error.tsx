@@ -1,10 +1,17 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { type ReactNode, startTransition } from "react";
 
 export type PageErrorProps = { error: Error & { digest?: string }; reset: () => void };
 
 export function PageError({ reset, onward }: { reset: () => void; onward: ReactNode }) {
+  const router = useRouter();
+  const tryAgain = () =>
+    startTransition(() => {
+      router.refresh();
+      reset();
+    });
   return (
     <div className="hk-section">
       <div className="hk-state">
@@ -12,7 +19,7 @@ export function PageError({ reset, onward }: { reset: () => void; onward: ReactN
         <p>Something failed on our side while building it. Nothing of yours was lost.</p>
       </div>
       <div className="hk-actions">
-        <button type="button" className="hk-button" onClick={reset}>
+        <button type="button" className="hk-button" onClick={tryAgain}>
           Try again
         </button>
         {onward}
