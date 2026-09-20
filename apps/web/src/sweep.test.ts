@@ -2,7 +2,8 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
-import { claimNextJob } from "./job-queue";
+import type { GitHubClient } from "@hawkeye/core";
+import { claimNextJob, createRun } from "./job-queue";
 import { enqueueJob } from "./jobs";
 import { claimJob } from "./runner-api";
 import { createRunnerToken } from "./runner-tokens";
@@ -15,6 +16,17 @@ const secret = "s3cret";
 let db: Db;
 let runnerId: string;
 let token: string;
+let github: GitHubClient;
+
+function createGitHub(overrides: Partial<GitHubClient> = {}): GitHubClient {
+  return {
+    installationTokenById: vi.fn(async () => "ghs_token"),
+    createCommitStatus: vi.fn(async () => {}),
+    updateReview: vi.fn(async () => {}),
+    review: vi.fn(async () => ({ body: "" })),
+    ...overrides,
+  } as unknown as GitHubClient;
+}
 
 function request(authorization?: string, method = "POST") {
   return new Request("https://hawkeye.test/api/internal/sweep", {
@@ -40,6 +52,7 @@ beforeEach(async () => {
   const created = await createRunnerToken(db, { userId: "user-1", name: "laptop" });
   runnerId = created.runner.id;
   token = created.token;
+  github = createGitHub();
 });
 
 describe("sweep", () => {
@@ -53,6 +66,7 @@ describe("sweep", () => {
     ] as const) {
       const response = await sweep(request(authorization), {
         db,
+        github,
         secret: configured,
         now: () => now,
       });
@@ -64,24 +78,107 @@ describe("sweep", () => {
 
   it("logs that the secret is missing, and only then", async () => {
     const log = vi.fn();
-    await sweep(request(`Bearer ${secret}`), { db, secret: undefined, log });
+    await sweep(request(`Bearer ${secret}`), { db, github, secret: undefined, log });
     expect(log).toHaveBeenCalledWith(
       "sweep refused: CRON_SECRET is not set, so no caller can sweep",
     );
     log.mockClear();
-    await sweep(request("Bearer wrong!"), { db, secret, log });
+    await sweep(request("Bearer wrong!"), { db, github, secret, log });
     expect(log).not.toHaveBeenCalled();
   });
 
   it("requeues stale claims for a caller with the secret, on GET and POST", async () => {
     const jobId = await staleClaim();
-    const first = await sweep(request(`Bearer ${secret}`, "GET"), { db, secret, now: () => now });
+    const first = await sweep(request(`Bearer ${secret}`, "GET"), {
+      db,
+      github,
+      secret,
+      now: () => now,
+    });
     expect(first.status).toBe(200);
     expect(await first.json()).toEqual({ ok: true, swept: 1 });
     const [row] = await db.select().from(schema.job).where(eq(schema.job.id, jobId));
     expect(row?.state).toBe("queued");
-    const again = await sweep(request(`Bearer ${secret}`), { db, secret, now: () => now });
+    const again = await sweep(request(`Bearer ${secret}`), { db, github, secret, now: () => now });
     expect(await again.json()).toEqual({ ok: true, swept: 0 });
+  });
+});
+
+describe("sweep on GitHub", () => {
+  async function staleClaimWithRun(placeholderReviewId: string | null): Promise<string> {
+    const jobId = await staleClaim();
+    const created = await createRun(db, { jobId, runnerId });
+    await db.update(schema.run).set({ placeholderReviewId }).where(eq(schema.run.id, created.id));
+    return jobId;
+  }
+  const queueNewerHead = () =>
+    enqueueJob(db, {
+      armedPrId: "armed-1",
+      headSha: "c".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: minutesBefore(1),
+    });
+
+  it("closes the status and the placeholder of a job it fails", async () => {
+    const jobId = await staleClaimWithRun("77");
+    await queueNewerHead();
+
+    const response = await sweep(request(`Bearer ${secret}`), {
+      db,
+      github,
+      secret,
+      now: () => now,
+    });
+
+    expect(await response.json()).toEqual({ ok: true, swept: 1 });
+    const [row] = await db.select().from(schema.job).where(eq(schema.job.id, jobId));
+    expect(row?.state).toBe("failed");
+    expect(github.createCommitStatus).toHaveBeenCalledWith(
+      { owner: "octo", repo: "repo", number: 7 },
+      "a".repeat(40),
+      { state: "success", description: "Review did not complete", context: "hawkeye" },
+      "ghs_token",
+    );
+    expect(github.updateReview).toHaveBeenCalledWith(
+      { owner: "octo", repo: "repo", number: 7 },
+      "77",
+      "The review did not complete. The next push queues a new one.",
+      "ghs_token",
+    );
+  });
+
+  it("writes nothing to GitHub for a job it requeues", async () => {
+    await staleClaimWithRun("77");
+
+    await sweep(request(`Bearer ${secret}`), { db, github, secret, now: () => now });
+
+    expect(github.installationTokenById).not.toHaveBeenCalled();
+    expect(github.createCommitStatus).not.toHaveBeenCalled();
+    expect(github.updateReview).not.toHaveBeenCalled();
+  });
+
+  it("still sweeps, and logs, when GitHub cannot be reached", async () => {
+    const jobId = await staleClaimWithRun(null);
+    await queueNewerHead();
+    const log = vi.fn();
+    github = createGitHub({
+      installationTokenById: vi.fn(async () => {
+        throw new Error("github down");
+      }),
+    });
+
+    const response = await sweep(request(`Bearer ${secret}`), {
+      db,
+      github,
+      secret,
+      now: () => now,
+      log,
+    });
+
+    expect(response.status).toBe(200);
+    expect(log).toHaveBeenCalledWith(`swept job ${jobId} not closed on GitHub: github down`);
+    const [row] = await db.select().from(schema.job).where(eq(schema.job.id, jobId));
+    expect(row?.state).toBe("failed");
   });
 });
 

@@ -63,10 +63,21 @@ export async function heartbeatJob(
   return beat;
 }
 
+type ArmedPr = typeof armedPr.$inferSelect;
+
+export type FailedStaleJob = {
+  jobId: string;
+  runId: string;
+  headSha: string;
+  placeholderReviewId: string | null;
+  armedPr: Pick<ArmedPr, "id" | "owner" | "repo" | "number" | "installationId">;
+};
+export type StaleSweep = { swept: number; failed: FailedStaleJob[] };
+
 export async function requeueStaleJobs(
   db: Db,
   input: { now: Date; staleAfterSeconds?: number },
-): Promise<number> {
+): Promise<StaleSweep> {
   const cutoff = new Date(
     input.now.getTime() - (input.staleAfterSeconds ?? DEFAULT_STALE_AFTER_SECONDS) * 1000,
   );
@@ -89,8 +100,8 @@ export async function requeueStaleJobs(
       heartbeatAt: null,
     })
     .where(and(eq(job.state, "claimed"), sql`${job.heartbeatAt} < ${cutoff}`))
-    .returning({ id: job.id });
-  if (swept.length === 0) return 0;
+    .returning({ id: job.id, state: job.state });
+  if (swept.length === 0) return { swept: 0, failed: [] };
 
   await db
     .update(run)
@@ -104,7 +115,28 @@ export async function requeueStaleJobs(
         eq(run.status, "running"),
       ),
     );
-  return swept.length;
+
+  const failedIds = swept.filter((row) => row.state === "failed").map((row) => row.id);
+  if (failedIds.length === 0) return { swept: swept.length, failed: [] };
+  const rows = await db
+    .select({
+      jobId: job.id,
+      runId: run.id,
+      headSha: job.headSha,
+      placeholderReviewId: run.placeholderReviewId,
+      armedPr: {
+        id: armedPr.id,
+        owner: armedPr.owner,
+        repo: armedPr.repo,
+        number: armedPr.number,
+        installationId: armedPr.installationId,
+      },
+    })
+    .from(job)
+    .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
+    .innerJoin(run, and(eq(run.jobId, job.id), eq(run.endedAt, input.now)))
+    .where(inArray(job.id, failedIds));
+  return { swept: swept.length, failed: rows };
 }
 
 export async function releaseJob(

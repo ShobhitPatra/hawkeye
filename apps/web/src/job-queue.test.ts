@@ -141,7 +141,7 @@ describe("requeueStaleJobs", () => {
     await claim();
     await heartbeatJob(db, { jobId: stale.id, runnerId: "runner-1", now: minutesBefore(6) });
 
-    expect(await requeueStaleJobs(db, { now })).toBe(1);
+    expect((await requeueStaleJobs(db, { now })).swept).toBe(1);
 
     const [row] = await db.select().from(schema.job).where(eq(schema.job.id, stale.id));
     expect(row).toMatchObject({
@@ -158,7 +158,7 @@ describe("requeueStaleJobs", () => {
     const abandoned = await createRun(db, { jobId: stale.id, runnerId: "runner-1" });
     await heartbeatJob(db, { jobId: stale.id, runnerId: "runner-1", now: minutesBefore(6) });
 
-    expect(await requeueStaleJobs(db, { now })).toBe(1);
+    expect((await requeueStaleJobs(db, { now })).swept).toBe(1);
 
     const [row] = await db.select().from(schema.run).where(eq(schema.run.id, abandoned.id));
     expect(row).toMatchObject({ status: "error", error: "heartbeat lost" });
@@ -181,7 +181,7 @@ describe("requeueStaleJobs", () => {
       .set({ state: "claimed", claimedByRunnerId: "runner-1", heartbeatAt: minutesBefore(6) })
       .where(eq(schema.job.id, stale.id));
 
-    expect(await requeueStaleJobs(db, { now })).toBe(1);
+    expect((await requeueStaleJobs(db, { now })).swept).toBe(1);
 
     const [row] = await db.select().from(schema.run).where(eq(schema.run.id, finished.id));
     expect(row).toMatchObject({ status: "ok", error: null });
@@ -192,7 +192,7 @@ describe("requeueStaleJobs", () => {
     await claim();
     await heartbeatJob(db, { jobId: live.id, runnerId: "runner-1", now: minutesBefore(1) });
 
-    expect(await requeueStaleJobs(db, { now })).toBe(0);
+    expect((await requeueStaleJobs(db, { now })).swept).toBe(0);
 
     const [row] = await db.select().from(schema.job).where(eq(schema.job.id, live.id));
     expect(row?.state).toBe("claimed");
@@ -204,7 +204,7 @@ describe("requeueStaleJobs", () => {
     await heartbeatJob(db, { jobId: stale.id, runnerId: "runner-1", now: minutesBefore(6) });
     const fresh = await enqueue("armed-1", minutesBefore(1));
 
-    expect(await requeueStaleJobs(db, { now })).toBe(1);
+    expect((await requeueStaleJobs(db, { now })).swept).toBe(1);
 
     const rows = await db.select().from(schema.job).where(eq(schema.job.armedPrId, "armed-1"));
     expect(rows.find((row) => row.id === stale.id)?.state).toBe("failed");
@@ -225,7 +225,7 @@ describe("requeueStaleJobs", () => {
       .set({ heartbeatAt: minutesBefore(6), createdAt: minutesBefore(10) })
       .where(eq(schema.job.id, newer.id));
 
-    expect(await requeueStaleJobs(db, { now })).toBe(2);
+    expect((await requeueStaleJobs(db, { now })).swept).toBe(2);
 
     const rows = await db.select().from(schema.job).where(eq(schema.job.armedPrId, "armed-1"));
     expect(rows.find((row) => row.id === newer.id)?.state).toBe("queued");
@@ -244,7 +244,7 @@ describe("requeueStaleJobs", () => {
     await claim("runner-2");
     await db.update(schema.job).set({ heartbeatAt: minutesBefore(6) });
 
-    expect(await requeueStaleJobs(db, { now })).toBe(2);
+    expect((await requeueStaleJobs(db, { now })).swept).toBe(2);
 
     const rows = await db.select().from(schema.job);
     expect(rows.find((row) => row.id === one.id)?.state).toBe("queued");
@@ -256,7 +256,7 @@ describe("requeueStaleJobs", () => {
     await claim();
     await heartbeatJob(db, { jobId: stale.id, runnerId: "runner-1", now: minutesBefore(2) });
 
-    expect(await requeueStaleJobs(db, { now, staleAfterSeconds: 60 })).toBe(1);
+    expect((await requeueStaleJobs(db, { now, staleAfterSeconds: 60 })).swept).toBe(1);
   });
 });
 

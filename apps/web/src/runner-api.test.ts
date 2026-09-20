@@ -561,7 +561,7 @@ describe("claimJob", () => {
         method: "POST",
         headers: { authorization: "Bearer s3cret" },
       }),
-      { db, secret: "s3cret", now: () => now },
+      { db, github, secret: "s3cret", now: () => now },
     );
     expect(await swept.json()).toEqual({ ok: true, swept: 1 });
 
@@ -1407,7 +1407,7 @@ describe("recordResult", () => {
         method: "POST",
         headers: { authorization: "Bearer s3cret" },
       }),
-      { db, secret: "s3cret", now: () => now },
+      { db, github, secret: "s3cret", now: () => now },
     );
     const other = await createRunnerToken(db, { userId: "user-1", name: "desktop" });
     const second = await claimJob(
