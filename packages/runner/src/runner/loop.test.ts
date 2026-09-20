@@ -22,6 +22,19 @@ const claimedJob: ClaimedJob = {
   settings: { maxTurns: 3, wallClockMinutes: 1, promptOverride: "ignored", model: "sonnet" },
 };
 
+const pool = (job: ClaimedJob): ClaimedJob => ({
+  ...job,
+  settings: { ...job.settings, concurrency: 2 },
+});
+
+function gate(): { promise: Promise<void>; open: () => void } {
+  let open!: () => void;
+  const promise = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  return { promise, open };
+}
+
 type Received = { method: string; url: string; authorization?: string; body: unknown };
 
 async function readBody(request: IncomingMessage): Promise<unknown> {
@@ -177,19 +190,12 @@ describe("runRunnerLoop", () => {
       job: { ...claimedJob.job, id: "job-2", runId: "run-2" },
       pullRequest: { owner: "o", repo: "r", number: 8 },
     };
-    const withPool = (job: ClaimedJob) => ({
-      ...job,
-      settings: { ...job.settings, concurrency: 2 },
-    });
-    const plane = await fakeControlPlane(scripted([withPool(claimedJob), withPool(second)]));
+    const plane = await fakeControlPlane(scripted([pool(claimedJob), pool(second)]));
     servers.push(plane.server);
     const stop = new AbortController();
     const d = await deps(plane.baseUrl, { signal: stop.signal });
     let started = 0;
-    let release: () => void = () => {};
-    const bothStarted = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const { promise: bothStarted, open: release } = gate();
     d.harness = {
       name: "gate",
       run: async (i) => {
@@ -207,13 +213,15 @@ describe("runRunnerLoop", () => {
     const claimedEvents = d.reported.filter((event) => event.state === "claimed");
     expect(claimedEvents.map((event) => event.slot)).toEqual([1, 2]);
     expect(
-      d.reported.filter((event) => event.state === "posted").map((event) => event.slot),
+      d.reported
+        .filter((event) => event.state === "posted")
+        .map((event) => event.slot ?? 0)
+        .toSorted((a, b) => a - b),
     ).toEqual([1, 2]);
     expect(plane.received.filter((r) => r.url.endsWith("/result"))).toHaveLength(2);
   });
 
   it("stops a running review as soon as it claims a newer job for the same pull request", async () => {
-    const pool = (job: ClaimedJob) => ({ ...job, settings: { ...job.settings, concurrency: 2 } });
     const newer: ClaimedJob = {
       ...claimedJob,
       job: { ...claimedJob.job, id: "job-2", runId: "run-2", headSha: "c".repeat(40) },
@@ -273,16 +281,13 @@ describe("runRunnerLoop", () => {
     servers.push(plane.server);
     const stop = new AbortController();
     const d = await deps(plane.baseUrl, { signal: stop.signal });
-    let release: () => void = () => {};
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const { promise: held, open: release } = gate();
     let runs = 0;
     d.harness = {
       name: "gate",
       run: async (i) => {
         runs += 1;
-        if (runs === 1) await gate;
+        if (runs === 1) await held;
         await writeFile(i.resultPath, JSON.stringify(review));
         return { status: "ok", turns: 1 };
       },
