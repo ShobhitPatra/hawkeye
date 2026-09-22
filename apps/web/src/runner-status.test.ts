@@ -2,10 +2,9 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
-import { enqueueJob } from "./jobs";
 import { RUNNER_ONLINE_WINDOW_MS, reviewingByRunner, runnerStatus } from "./runner-status";
 import { createRunnerToken, revokeRunnerToken } from "./runner-tokens";
-import { createTestDb, seedArmedPullRequest } from "./test/pglite";
+import { createTestDb, seedArmedPullRequest, queueJob } from "./test/pglite";
 
 const now = new Date("2026-01-01T12:00:00.000Z");
 
@@ -69,7 +68,7 @@ describe("runnerStatus", () => {
     await seedArmedPullRequest(db, { armedPrId: "armed-3", userId: "user-1", number: 3 });
     await seedArmedPullRequest(db, { armedPrId: "armed-4", userId: "user-2", number: 4 });
     for (const armedPrId of ["armed-1", "armed-2", "armed-3", "armed-4"]) {
-      await enqueueJob(db, {
+      await queueJob(db, {
         headCurrentAt: new Date(),
         armedPrId,
         headSha: "h",
@@ -96,7 +95,7 @@ describe("reviewingByRunner", () => {
     const idle = await createRunnerToken(db, { userId: "user-1", name: "vps" });
     const theirs = await createRunnerToken(db, { userId: "user-2", name: "theirs" });
     const seed = async (armedPrId: string, runnerId: string, state: "claimed" | "done") => {
-      const job = await enqueueJob(db, {
+      const job = await queueJob(db, {
         headCurrentAt: new Date(),
         armedPrId,
         headSha: "a".repeat(40),

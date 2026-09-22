@@ -15,6 +15,7 @@ export type PullRequestDetails = {
   baseRef: string;
   cloneUrl: string;
   commits: number;
+  updatedAt: string;
 };
 export type LinkedIssue = { number: number; title: string; body: string };
 export type CommitStatus = { state: "pending" | "success"; description: string; context: string };
@@ -176,6 +177,7 @@ export async function fetchPullRequestDetails(
     head: { sha: string; ref: string };
     base: { sha: string; ref: string; repo: { clone_url: string } };
     commits: number;
+    updated_at: string;
   };
   if (!Number.isInteger(pr.commits))
     throw new Error(`GitHub GET ${pulls(reference)} returned no commits count`);
@@ -191,6 +193,7 @@ export async function fetchPullRequestDetails(
     baseRef: pr.base.ref,
     cloneUrl: pr.base.repo.clone_url,
     commits: pr.commits,
+    updatedAt: pr.updated_at,
   };
 }
 

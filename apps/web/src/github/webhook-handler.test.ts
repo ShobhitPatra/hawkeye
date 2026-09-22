@@ -31,6 +31,7 @@ const github: GitHubClient = {
     baseRef: "main",
     cloneUrl: "https://github.com/octo/repo.git",
     commits: 1,
+    updatedAt: "2026-01-01T00:00:00Z",
   })),
   linkedIssue: unsupported(),
   reviews: unsupported(),

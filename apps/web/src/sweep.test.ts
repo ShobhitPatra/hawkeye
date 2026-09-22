@@ -4,11 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
 import { claimNextJob, createRun } from "./job-queue";
-import { enqueueJob } from "./jobs";
 import { claimJob } from "./runner-api";
 import { createRunnerToken } from "./runner-tokens";
 import { sweep } from "./sweep";
-import { createTestDb, seedArmedPullRequest } from "./test/pglite";
+import { createTestDb, seedArmedPullRequest, queueJob } from "./test/pglite";
 
 const now = new Date("2026-01-01T12:00:00.000Z");
 const minutesBefore = (minutes: number) => new Date(now.getTime() - minutes * 60_000);
@@ -52,7 +51,7 @@ function request(authorization?: string, method = "POST") {
 }
 
 async function staleClaim(): Promise<string> {
-  const queued = await enqueueJob(db, {
+  const queued = await queueJob(db, {
     headCurrentAt: new Date(),
     armedPrId: "armed-1",
     headSha: "a".repeat(40),
@@ -129,7 +128,7 @@ describe("sweep on GitHub", () => {
     return jobId;
   }
   const queueNewerHead = () =>
-    enqueueJob(db, {
+    queueJob(db, {
       headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: "c".repeat(40),
@@ -210,7 +209,7 @@ describe("claimJob", () => {
       number: 2,
     });
     const other = await createRunnerToken(db, { userId: "user-2", name: "desk" });
-    const stale = await enqueueJob(db, {
+    const stale = await queueJob(db, {
       headCurrentAt: new Date(),
       armedPrId: "armed-2",
       headSha: "c".repeat(40),

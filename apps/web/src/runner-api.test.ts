@@ -3,11 +3,10 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
-import { enqueueJob } from "./jobs";
 import { claimJob, heartbeat, recordEvents, recordResult } from "./runner-api";
 import { createRunnerToken } from "./runner-tokens";
 import { sweep } from "./sweep";
-import { createTestDb, seedArmedPullRequest } from "./test/pglite";
+import { createTestDb, seedArmedPullRequest, queueJob } from "./test/pglite";
 
 const now = new Date("2026-01-01T12:00:00.000Z");
 
@@ -75,7 +74,7 @@ function request(path: string, init: RequestInit & { bearer?: string | null } = 
 }
 
 function enqueue(notBefore = new Date(now.getTime() - 60_000)) {
-  return enqueueJob(db, {
+  return queueJob(db, {
     headCurrentAt: new Date(),
     armedPrId: "armed-1",
     headSha: "a".repeat(40),
@@ -226,7 +225,7 @@ describe("claimJob", () => {
     github.review = vi.fn(async () => ({ body: "<!-- hawkeye: head=aaa -->\n\n### Ship\n" }));
     (github.updateReview as ReturnType<typeof vi.fn>).mockClear();
     (github.postReview as ReturnType<typeof vi.fn>).mockClear();
-    await enqueueJob(db, {
+    await queueJob(db, {
       headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: "b".repeat(40),
@@ -257,7 +256,7 @@ describe("claimJob", () => {
     );
     (github.updateReview as ReturnType<typeof vi.fn>).mockClear();
     (github.postReview as ReturnType<typeof vi.fn>).mockClear();
-    await enqueueJob(db, {
+    await queueJob(db, {
       headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: "b".repeat(40),
@@ -346,7 +345,7 @@ describe("claimJob", () => {
       repo: "b",
       number: 2,
     });
-    await enqueueJob(db, {
+    await queueJob(db, {
       headCurrentAt: new Date(),
       armedPrId: "armed-2",
       headSha: "c".repeat(40),
@@ -382,7 +381,7 @@ describe("claimJob", () => {
       { db, github },
       firstRunId,
     );
-    await enqueueJob(db, {
+    await queueJob(db, {
       headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: "c".repeat(40),
@@ -427,7 +426,7 @@ describe("claimJob", () => {
       .values({ userId: "user-2", installationId: "10", owner: "octo", repo: "a", number: 1 })
       .returning();
     const other = await createRunnerToken(db, { userId: "user-2", name: "desk" });
-    await enqueueJob(db, {
+    await queueJob(db, {
       headCurrentAt: new Date(),
       armedPrId: sibling!.id,
       headSha: "c".repeat(40),
@@ -604,7 +603,7 @@ describe("heartbeat", () => {
     );
     expect(await first.json()).toEqual({ ok: true, superseded: false });
 
-    await enqueueJob(db, {
+    await queueJob(db, {
       headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: "c".repeat(40),
@@ -622,7 +621,7 @@ describe("heartbeat", () => {
   it("does not count a newer job for the same head as superseding", async () => {
     const queued = await enqueue();
     await claimJob(request("/api/runner/jobs"), claimDeps());
-    await enqueueJob(db, {
+    await queueJob(db, {
       headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: queued.headSha,
@@ -902,7 +901,7 @@ describe("recordResult", () => {
       { db, github },
       firstRunId,
     );
-    await enqueueJob(db, {
+    await queueJob(db, {
       headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: "c".repeat(40),
@@ -1089,7 +1088,7 @@ describe("recordResult", () => {
       number: 1,
     });
     const other = await createRunnerToken(db, { userId: "user-2", name: "desk" });
-    await enqueueJob(db, {
+    await queueJob(db, {
       headCurrentAt: new Date(),
       armedPrId: "armed-2",
       headSha: "a".repeat(40),
@@ -1127,7 +1126,7 @@ describe("recordResult", () => {
 
   it("does not record findings from a result whose head a newer done job superseded", async () => {
     const runId = await claimedRunId();
-    const newer = await enqueueJob(db, {
+    const newer = await queueJob(db, {
       headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: "c".repeat(40),
@@ -1217,7 +1216,7 @@ describe("recordResult", () => {
       firstRunId,
     );
     const queue = (headSha: string) =>
-      enqueueJob(db, {
+      queueJob(db, {
         headCurrentAt: new Date(),
         armedPrId: "armed-1",
         headSha,
@@ -1250,7 +1249,7 @@ describe("recordResult", () => {
 
   it("still closes the older run's own placeholder when a newer run is live", async () => {
     const olderRunId = await claimedRunId();
-    await enqueueJob(db, {
+    await queueJob(db, {
       headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: "c".repeat(40),

@@ -5,6 +5,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import type { Db } from "../db/client";
 import * as schema from "../db/schema";
+import { enqueueJob, type EnqueueJobInput, type Job } from "../jobs";
 
 const migrationsFolder = join(import.meta.dirname, "..", "..", "drizzle");
 
@@ -65,4 +66,10 @@ export async function seedArmedPullRequest(db: Db, overrides: SeedArmedPullReque
   });
 
   return seed;
+}
+
+export async function queueJob(db: Db, input: EnqueueJobInput): Promise<Job> {
+  const queued = await enqueueJob(db, input);
+  if (!queued) throw new Error(`no job was queued for ${input.armedPrId}`);
+  return queued;
 }

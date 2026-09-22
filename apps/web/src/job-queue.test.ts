@@ -13,8 +13,7 @@ import {
   requeueStaleJobs,
   requeueStaleJobsStatement,
 } from "./job-queue";
-import { enqueueJob } from "./jobs";
-import { createTestDb, seedArmedPullRequest } from "./test/pglite";
+import { createTestDb, seedArmedPullRequest, queueJob } from "./test/pglite";
 
 const now = new Date("2026-01-01T12:00:00.000Z");
 
@@ -40,7 +39,7 @@ beforeEach(async () => {
 });
 
 function enqueue(armedPrId: string, notBefore: Date) {
-  return enqueueJob(db, {
+  return queueJob(db, {
     headCurrentAt: new Date(),
     armedPrId,
     headSha: "a".repeat(40),

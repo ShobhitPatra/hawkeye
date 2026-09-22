@@ -96,13 +96,13 @@ export async function handlePullRequestEvent(
 
     const target = await reviewTarget();
     const delaySeconds = quietWindowSeconds(settings, row);
-    await enqueueJob(db, {
+    const queued = await enqueueJob(db, {
       armedPrId: row.id,
       ...target,
       headCurrentAt: new Date(event.updatedAt),
       notBefore: new Date(Date.now() + delaySeconds * 1000),
     });
-    enqueued += 1;
+    if (queued) enqueued += 1;
   }
 
   return { armed: armedCount, enqueued, disarmed: 0, cancelled: 0 };

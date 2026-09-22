@@ -3,11 +3,10 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
-import { enqueueJob } from "./jobs";
 import { createRun } from "./job-queue";
 import { postReviewForRun } from "./review-posting";
 import { createRunnerToken } from "./runner-tokens";
-import { createTestDb, seedArmedPullRequest } from "./test/pglite";
+import { createTestDb, seedArmedPullRequest, queueJob } from "./test/pglite";
 
 const headSha = "a".repeat(40);
 const previousHead = "c".repeat(40);
@@ -69,7 +68,7 @@ let runnerId: string;
 beforeEach(async () => {
   db = await createTestDb();
   await seedArmedPullRequest(db);
-  const queued = await enqueueJob(db, {
+  const queued = await queueJob(db, {
     headCurrentAt: new Date(),
     armedPrId: armedPr.id,
     headSha,

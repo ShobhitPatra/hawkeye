@@ -39,7 +39,7 @@ export async function armAction(formData: FormData) {
     await enqueueJob(tx, {
       armedPrId: armed.id,
       ...target,
-      headCurrentAt: new Date(),
+      headCurrentAt: new Date(pullRequest.updatedAt),
       notBefore: new Date(),
     });
   });
