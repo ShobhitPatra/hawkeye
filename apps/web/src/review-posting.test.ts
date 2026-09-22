@@ -160,7 +160,9 @@ describe("postReviewForRun", () => {
     expect(rows[0]).toMatchObject({ runId, armedPrId: "armed-1", headSha, githubReviewId: "9" });
   });
 
-  it("adopts a review already on GitHub for this head instead of posting a second one", async () => {
+  it("adopts a review already on GitHub for this head instead of filling its own placeholder", async () => {
+    await db.update(schema.run).set({ placeholderReviewId: "42" }).where(eq(schema.run.id, runId));
+    github.updateReview = vi.fn(async () => {});
     github.reviews = vi.fn(async () => [
       { authorLogin: "alice", body: `<!-- hawkeye: head=${headSha} -->\n\n### Ship\n`, id: "1" },
       { authorLogin: "hawkeye-review[bot]", body: `<!-- hawkeye: head=${headSha} -->`, id: "2" },
@@ -169,17 +171,54 @@ describe("postReviewForRun", () => {
         body: `<!-- hawkeye: head=${headSha} -->\n\n### Ship\n\nfine`,
         id: "3",
       },
+      { authorLogin: "hawkeye-review[bot]", body: "<!-- hawkeye: reviewing -->", id: "42" },
     ]);
 
     await expect(post()).resolves.toBe("posted");
 
     expect(github.postReview).not.toHaveBeenCalled();
+    expect(github.updateReview).toHaveBeenCalledTimes(1);
+    expect(github.updateReview).toHaveBeenCalledWith(
+      { owner: "octo", repo: "repo", number: 7 },
+      "42",
+      "Another run reviewed this push; its review is on this pull request.",
+      "ghs_token",
+    );
     const rows = await db.select().from(schema.reviewPosted);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ runId, headSha, githubReviewId: "3" });
   });
 
-  it("adopts an older head's review on GitHub as the living review and patches it", async () => {
+  it("adopts an older head's review as the living review, patches it and closes its own placeholder", async () => {
+    await db.update(schema.run).set({ placeholderReviewId: "42" }).where(eq(schema.run.id, runId));
+    github.reviews = vi.fn(async () => [
+      {
+        authorLogin: "hawkeye-review[bot]",
+        body: `<!-- hawkeye: head=${previousHead} -->\n\n### Ship\n\nfine`,
+        id: "41",
+      },
+      { authorLogin: "hawkeye-review[bot]", body: "<!-- hawkeye: reviewing -->", id: "42" },
+    ]);
+    github.updateReview = vi.fn(async () => {});
+
+    await expect(post()).resolves.toBe("posted");
+
+    const updates = (github.updateReview as ReturnType<typeof vi.fn>).mock.calls.map(
+      ([, id, body]) => [id, body.slice(0, 40)],
+    );
+    expect(updates[0]![0]).toBe("41");
+    expect(updates[0]![1]).toContain(`<!-- hawkeye: head=${headSha.slice(0, 8)}`);
+    expect(updates[1]).toEqual(["42", "Another run reviewed this push; its revi"]);
+    const firstPosts = (github.postReview as ReturnType<typeof vi.fn>).mock.calls.filter(
+      ([, review]) => review.body.includes("### "),
+    );
+    expect(firstPosts).toEqual([]);
+    const rows = await db.select().from(schema.reviewPosted);
+    expect(rows.find((row) => row.headSha === headSha)?.githubReviewId).toBe("41");
+  });
+
+  it("never overwrites an adopted review when the round fails or is superseded", async () => {
+    await db.update(schema.run).set({ placeholderReviewId: "42" }).where(eq(schema.run.id, runId));
     github.reviews = vi.fn(async () => [
       {
         authorLogin: "hawkeye-review[bot]",
@@ -187,22 +226,25 @@ describe("postReviewForRun", () => {
         id: "41",
       },
     ]);
-    github.updateReview = vi.fn(async () => {});
+    github.review = vi.fn(async () => ({ body: "### Ship\n\nfine" }));
+    github.updateReview = vi.fn(async (_reference, id: string) => {
+      if (id === "41") throw new GitHubRequestError(500, "GitHub PUT failed: 500");
+    });
 
-    await expect(post()).resolves.toBe("posted");
+    await expect(post({})).resolves.toBe("failed");
 
-    const [, reviewId, body] = (github.updateReview as ReturnType<typeof vi.fn>).mock.calls.at(-1)!;
-    expect(reviewId).toBe("41");
-    expect(body).toContain(`<!-- hawkeye: head=${headSha} -->`);
-    const firstPosts = (github.postReview as ReturnType<typeof vi.fn>).mock.calls.filter(
-      ([, review]) => review.body.includes("### "),
-    );
-    expect(firstPosts).toEqual([]);
-    const rows = await db.select().from(schema.reviewPosted);
-    expect(rows.some((row) => row.headSha === headSha && row.githubReviewId !== null)).toBe(true);
+    const updates = (github.updateReview as ReturnType<typeof vi.fn>).mock.calls;
+    const closingOf41 = updates.filter(([, id, body]) => id === "41" && !body.includes("### "));
+    expect(closingOf41).toEqual([]);
+    expect(updates.at(-1)!.slice(1, 3)).toEqual([
+      "42",
+      "The review did not complete. The next push queues a new one.",
+    ]);
+    expect(await db.select().from(schema.reviewPosted)).toHaveLength(0);
   });
 
   it("writes nothing when GitHub cannot say what is already there", async () => {
+    await db.update(schema.run).set({ placeholderReviewId: "42" }).where(eq(schema.run.id, runId));
     github.reviews = vi.fn(async () => {
       throw new GitHubRequestError(502, "GitHub GET failed: 502");
     });
@@ -219,16 +261,31 @@ describe("postReviewForRun", () => {
     await expect(post()).resolves.toBe("posted");
     const posted = (github.postReview as ReturnType<typeof vi.fn>).mock.calls[0]![1];
     await db.delete(schema.reviewPosted);
+    const again = (await createRun(db, { jobId, runnerId })).id;
+    await db.update(schema.run).set({ placeholderReviewId: "42" }).where(eq(schema.run.id, again));
     github.reviews = vi.fn(async () => [
       { authorLogin: "hawkeye-review[bot]", body: posted.body, id: "9" },
+      { authorLogin: "hawkeye-review[bot]", body: "<!-- hawkeye: reviewing -->", id: "42" },
     ]);
+    github.updateReview = vi.fn(async () => {});
     (github.postReview as ReturnType<typeof vi.fn>).mockClear();
 
-    await expect(post()).resolves.toBe("posted");
+    await expect(
+      postReviewForRun(
+        { db, github },
+        { runId: again, jobId, armedPr, headSha, result, commentable: {} },
+      ),
+    ).resolves.toBe("posted");
 
     expect(github.postReview).not.toHaveBeenCalled();
     const rows = await db.select().from(schema.reviewPosted);
     expect(rows.map((row) => row.githubReviewId)).toEqual(["9"]);
+    expect(github.updateReview).toHaveBeenCalledWith(
+      { owner: "octo", repo: "repo", number: 7 },
+      "42",
+      "Another run reviewed this push; its review is on this pull request.",
+      "ghs_token",
+    );
   });
 
   it("posts body only when no commentable lines are known", async () => {

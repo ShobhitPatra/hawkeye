@@ -76,6 +76,8 @@ async function placeholderFor(
   return { githubReviewId: row.placeholderReviewId, placeholder: true };
 }
 
+type Living = { githubReviewId: string; kind: "living" | "adopted" | "placeholder" };
+
 async function livingReviewOnGitHub(
   github: Pick<GitHubClient, "botLogin" | "reviews">,
   reference: { owner: string; repo: string; number: number },
@@ -194,6 +196,20 @@ async function roundsFor(
   });
 }
 
+async function postedForHead(
+  db: Db,
+  armedPr: ReviewPostingInput["armedPr"],
+  headSha: string,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: reviewPosted.id })
+    .from(reviewPosted)
+    .innerJoin(armedPrTable, eq(armedPrTable.id, reviewPosted.armedPrId))
+    .where(and(samePullRequest(armedPr), eq(reviewPosted.headSha, headSha)))
+    .limit(1);
+  return row !== undefined;
+}
+
 async function newerHeadStarted(
   db: Db,
   armedPr: ReviewPostingInput["armedPr"],
@@ -227,6 +243,20 @@ export async function postReviewForRun(
   const log = deps.log ?? (() => {});
   const { armedPr, headSha } = input;
   const reference = { owner: armedPr.owner, repo: armedPr.repo, number: armedPr.number };
+  let onGitHub: Awaited<ReturnType<typeof livingReviewOnGitHub>>;
+  let firstPostToken: string | undefined;
+  if (
+    !(await livingReviewFor(db, armedPr)) &&
+    !(await postedForHead(db, armedPr, headSha)) &&
+    !(await newerHeadStarted(db, armedPr, input.jobId))
+  ) {
+    try {
+      firstPostToken = await github.installationTokenById(armedPr.installationId);
+      onGitHub = await livingReviewOnGitHub(github, reference, firstPostToken);
+    } catch (error) {
+      return failRun(deps, input.runId, error instanceof Error ? error.message : String(error));
+    }
+  }
   const reservation = await db.transaction(async (tx) => {
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtextextended(${`${armedPr.owner}/${armedPr.repo}#${armedPr.number}`}, 0))`,
@@ -240,40 +270,27 @@ export async function postReviewForRun(
           lt(reviewPosted.postedAt, new Date(Date.now() - STALE_RESERVATION_MS)),
         ),
       );
-    const [postedForHead] = await tx
-      .select({ id: reviewPosted.id })
-      .from(reviewPosted)
-      .innerJoin(armedPrTable, eq(armedPrTable.id, reviewPosted.armedPrId))
-      .where(and(samePullRequest(armedPr), eq(reviewPosted.headSha, headSha)))
-      .limit(1);
-    if (postedForHead) return "already-posted" as const;
+    if (await postedForHead(tx, armedPr, headSha)) return "already-posted" as const;
     if (await newerHeadStarted(tx, armedPr, input.jobId)) return "superseded" as const;
-    let living: Awaited<ReturnType<typeof livingReviewFor | typeof placeholderFor>> =
-      (await livingReviewFor(tx, armedPr)) ?? (await placeholderFor(tx, input.runId));
-    let firstPostToken: string | undefined;
+    const known = await livingReviewFor(tx, armedPr);
+    let living: Living | undefined = known ? { ...known, kind: "living" } : undefined;
+    if (!living && onGitHub?.headSha === headSha) {
+      log(`adopted review ${onGitHub.githubReviewId} already on GitHub for run ${input.runId}`);
+      await tx.insert(reviewPosted).values({
+        runId: input.runId,
+        armedPrId: armedPr.id,
+        headSha,
+        githubReviewId: onGitHub.githubReviewId,
+      });
+      return "adopted" as const;
+    }
+    if (!living && onGitHub) {
+      log(`adopted review ${onGitHub.githubReviewId} as the living review for run ${input.runId}`);
+      living = { githubReviewId: onGitHub.githubReviewId, kind: "adopted" };
+    }
     if (!living) {
-      try {
-        firstPostToken = await github.installationTokenById(armedPr.installationId);
-        const onGitHub = await livingReviewOnGitHub(github, reference, firstPostToken);
-        if (onGitHub?.headSha === headSha) {
-          log(`adopted review ${onGitHub.githubReviewId} already on GitHub for run ${input.runId}`);
-          await tx.insert(reviewPosted).values({
-            runId: input.runId,
-            armedPrId: armedPr.id,
-            headSha,
-            githubReviewId: onGitHub.githubReviewId,
-          });
-          return "posted" as const;
-        }
-        if (onGitHub) {
-          log(
-            `adopted review ${onGitHub.githubReviewId} as the living review for run ${input.runId}`,
-          );
-          living = { githubReviewId: onGitHub.githubReviewId, placeholder: true };
-        }
-      } catch (error) {
-        return { failed: error instanceof Error ? error.message : String(error) };
-      }
+      const own = await placeholderFor(tx, input.runId);
+      if (own) living = { githubReviewId: own.githubReviewId, kind: "placeholder" };
     }
     if (living) {
       const [inserted] = await tx
@@ -317,6 +334,10 @@ export async function postReviewForRun(
     );
     return reservation;
   }
+  if (reservation === "adopted") {
+    await closePlaceholder(deps, input, ALREADY_POSTED_BODY);
+    return "posted";
+  }
   if (typeof reservation === "string") return reservation;
   if ("failed" in reservation) return failRun(deps, input.runId, reservation.failed);
   const { living } = reservation;
@@ -324,26 +345,31 @@ export async function postReviewForRun(
     db.update(reviewPosted).set({ githubReviewId }).where(eq(reviewPosted.id, reservation.id));
   const release = () => db.delete(reviewPosted).where(eq(reviewPosted.id, reservation.id));
 
-  const placeholder = "placeholder" in living;
+  const ownPlaceholderId = async () =>
+    living.kind === "placeholder"
+      ? living.githubReviewId
+      : ((await placeholderFor(db, input.runId))?.githubReviewId ?? null);
   const clear = async (token: string, closing: string) =>
     clearReviewing(deps, {
       reference,
       headSha,
       token,
       runId: input.runId,
-      livingReviewId: placeholder
-        ? (await livingReviewFor(db, armedPr))?.githubReviewId
-        : living.githubReviewId,
-      placeholderReviewId: placeholder ? living.githubReviewId : null,
+      livingReviewId:
+        living.kind === "placeholder"
+          ? (await livingReviewFor(db, armedPr))?.githubReviewId
+          : living.githubReviewId,
+      placeholderReviewId: await ownPlaceholderId(),
       closing,
     });
   let githubWrote = false;
   let token: string | undefined;
   try {
     token = await github.installationTokenById(armedPr.installationId);
-    const { previousIds, priorClaims } = placeholder
-      ? { previousIds: new Set<string>(), priorClaims: {} }
-      : await previousRoundFindings(db, armedPr);
+    const { previousIds, priorClaims } =
+      living.kind === "living"
+        ? await previousRoundFindings(db, armedPr)
+        : { previousIds: new Set<string>(), priorClaims: {} };
     const rounds = await roundsFor(db, armedPr, input.runId);
     const render = (map: Map<string, Set<number>>) =>
       renderLivingReview({
@@ -387,7 +413,7 @@ export async function postReviewForRun(
       log(`living body not patched for run ${input.runId}: a newer head is being reviewed`);
       if (githubWrote) return "posted";
       await release();
-      if (placeholder) await clear(token, SUPERSEDED_BODY);
+      if (living.kind !== "living") await clear(token, SUPERSEDED_BODY);
       return "superseded";
     }
     try {
@@ -414,7 +440,8 @@ export async function postReviewForRun(
         .where(eq(run.id, input.runId));
     }
     githubWrote = true;
-    if (!supplementalPosted || placeholder) await record(living.githubReviewId);
+    if (!supplementalPosted || living.kind !== "living") await record(living.githubReviewId);
+    if (living.kind === "adopted") await closePlaceholder(deps, input, ALREADY_POSTED_BODY);
     return "posted";
   } catch (error) {
     if (!githubWrote) await release();
