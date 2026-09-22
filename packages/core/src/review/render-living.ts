@@ -120,6 +120,7 @@ function footerFor(input: RenderLivingReviewInput): string[] {
   return footerLines(input.repositoryUrl, {
     ...(current ? { round: current.round } : {}),
     ...(current?.turns === undefined ? {} : { turns: current.turns }),
+    ...(current?.refusedModel === undefined ? {} : { refusedModel: current.refusedModel }),
   });
 }
 

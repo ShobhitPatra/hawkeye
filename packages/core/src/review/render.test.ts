@@ -200,6 +200,11 @@ describe("renderReview", () => {
       "Reviewed by [Hawkeye](https://x) on the author's own plan",
     );
   });
+  it("says which model was refused when the review ran on the default", () => {
+    expect(footerLines("https://x", { round: 1, refusedModel: "claude-fable-5-1" }).at(-1)).toBe(
+      "Reviewed by [Hawkeye](https://x) on the author's own plan · round 1 · reviewed on the default model because claude-fable-5-1 was refused",
+    );
+  });
   it("keeps the lens table on one row per lens", () => {
     const i = input();
     i.result.lenses = i.result.lenses.map((l) =>

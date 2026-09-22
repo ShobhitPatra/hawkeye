@@ -164,6 +164,47 @@ describe("runReviewJob", () => {
     });
     expect(d.createWorktree).not.toHaveBeenCalled();
   });
+  it("reviews again on the CLI default when the chosen model is refused", async () => {
+    const d = deps();
+    const run = vi.mocked(d.harness.run);
+    const review = run.getMockImplementation()!;
+    run.mockImplementationOnce(async () => ({
+      status: "error",
+      turns: 0,
+      error: "Model claude-fable-5-1 was refused by the claude CLI; choose another in Settings.",
+      refusedModel: "claude-fable-5-1",
+    }));
+    run.mockImplementationOnce(review);
+
+    const outcome = await runReviewJob(await input({ model: "claude-fable-5-1" }), d);
+
+    expect(outcome).toMatchObject({ status: "ok", turns: 2, refusedModel: "claude-fable-5-1" });
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(run.mock.calls[0]![0].model).toBe("claude-fable-5-1");
+    expect(run.mock.calls[1]![0]).not.toHaveProperty("model");
+  });
+
+  it("reports the refused model when the review on the default fails too", async () => {
+    const d = deps();
+    const run = vi.mocked(d.harness.run);
+    run.mockImplementationOnce(async () => ({
+      status: "error",
+      turns: 0,
+      error: "Model claude-fable-5-1 was refused by the claude CLI; choose another in Settings.",
+      refusedModel: "claude-fable-5-1",
+    }));
+    run.mockImplementationOnce(async () => ({ status: "error", turns: 1, error: "boom" }));
+
+    const outcome = await runReviewJob(await input({ model: "claude-fable-5-1" }), d);
+
+    expect(outcome).toEqual({
+      status: "error",
+      turns: 1,
+      error: "boom",
+      refusedModel: "claude-fable-5-1",
+    });
+  });
+
   it("passes a failure after the clone through even once the wall clock is over", async () => {
     const d = deps();
     vi.mocked(d.harness.run).mockImplementation(async () => {

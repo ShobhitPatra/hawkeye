@@ -6,6 +6,7 @@ export type HarnessResult = {
   status: "ok" | "max-turns" | "timeout" | "error" | "superseded";
   turns: number;
   error?: string;
+  refusedModel?: string;
 };
 export type HarnessRunInput = {
   cwd: string;

@@ -113,6 +113,13 @@ describe("listRunsForPullRequest", () => {
     });
   });
 
+  it("carries the refused model when the review ran on the default", async () => {
+    const jobId = (await seedJob("armed-1")).id;
+    await seedRun(jobId, { status: "ok", result, refusedModel: "claude-fable-5-1" });
+    const [row] = await listRunsForPullRequest(db, coordinates);
+    expect(row).toMatchObject({ refusedModel: "claude-fable-5-1" });
+  });
+
   it("carries no result fields for a run without a result", async () => {
     const jobId = (await seedJob("armed-1")).id;
     await seedRun(jobId);

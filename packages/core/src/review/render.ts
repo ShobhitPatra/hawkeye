@@ -10,7 +10,7 @@ export type RenderedReview = {
   body: string;
   comments: ReviewComment[];
 };
-export type FooterMeta = { round?: number; turns?: number };
+export type FooterMeta = { round?: number; turns?: number; refusedModel?: string };
 export type RenderInput = {
   result: ReviewResult;
   headSha: string;
@@ -143,6 +143,9 @@ export function footerLines(repositoryUrl: string, meta: FooterMeta = {}): strin
     `Reviewed by [Hawkeye](${repositoryUrl}) on the author's own plan`,
     ...(meta.round === undefined ? [] : [`round ${meta.round}`]),
     ...(meta.turns === undefined ? [] : [`${meta.turns} turn${meta.turns === 1 ? "" : "s"}`]),
+    ...(meta.refusedModel === undefined
+      ? []
+      : [`reviewed on the default model because ${meta.refusedModel} was refused`]),
   ];
   return ["", "---", facts.join(" · ")];
 }

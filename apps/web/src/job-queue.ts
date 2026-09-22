@@ -228,6 +228,7 @@ export async function completeRun(
     turns: number;
     result?: ReviewResult;
     error?: string;
+    refusedModel?: string;
   },
 ): Promise<Run | undefined> {
   return db.transaction(async (tx) => {
@@ -255,6 +256,7 @@ export async function completeRun(
         turns: input.turns,
         result: input.status === "ok" ? (input.result ?? null) : null,
         error: input.error ?? null,
+        refusedModel: input.refusedModel ?? null,
         endedAt: new Date(),
       })
       .where(

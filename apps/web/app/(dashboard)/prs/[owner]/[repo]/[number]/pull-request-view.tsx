@@ -208,6 +208,12 @@ export function PullRequestView({
                   <td className="hk-mono">{shortSha(run.headSha)}</td>
                   <td>
                     <RunResult run={run} />
+                    {run.refusedModel && (
+                      <span className="hk-muted">
+                        {" "}
+                        · on the default model, {run.refusedModel} was refused
+                      </span>
+                    )}
                   </td>
                   <td className="hk-numeric">{run.turns}</td>
                   <td className="hk-numeric hk-mono">{formatDuration(run)}</td>
