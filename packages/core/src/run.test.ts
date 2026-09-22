@@ -43,6 +43,7 @@ function deps(
       baseRef: "main",
       cloneUrl: "https://github.com/o/r.git",
       commits: 1,
+      updatedAt: "2026-01-01T00:00:00Z",
     })),
     mergeBase: vi.fn(async () => "m".repeat(40)),
     linkedIssue: vi.fn(async () => ({ number: 2, title: "I", body: "ib" })),

@@ -46,6 +46,7 @@ function deps(
           repo: { clone_url: "https://github.com/o/r.git" },
         },
         commits: 2,
+        updated_at: "2026-01-01T00:00:00Z",
       })
     );
   });

@@ -1,0 +1,1 @@
+ALTER TABLE "job" ADD COLUMN "head_current_at" timestamp with time zone DEFAULT now() NOT NULL;

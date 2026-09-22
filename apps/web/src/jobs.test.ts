@@ -24,24 +24,26 @@ describe("enqueueJob", () => {
   it("inserts a queued job", async () => {
     const notBefore = new Date("2026-01-01T00:00:00.000Z");
     const enqueued = await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: "a".repeat(40),
       baseSha: "b".repeat(40),
       notBefore,
     });
 
-    expect(enqueued).toMatchObject({
+    expect(enqueued!).toMatchObject({
       armedPrId: "armed-1",
       headSha: "a".repeat(40),
       baseSha: "b".repeat(40),
       state: "queued",
     });
-    expect(enqueued.notBefore.toISOString()).toBe(notBefore.toISOString());
+    expect(enqueued!.notBefore.toISOString()).toBe(notBefore.toISOString());
     expect(await jobsFor("armed-1")).toHaveLength(1);
   });
 
   it("collapses a second enqueue onto the waiting job", async () => {
     const first = await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-2",
       headSha: "1".repeat(40),
       baseSha: "2".repeat(40),
@@ -49,24 +51,47 @@ describe("enqueueJob", () => {
     });
     const notBefore = new Date("2026-01-01T00:05:00.000Z");
     const second = await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-2",
       headSha: "3".repeat(40),
       baseSha: "4".repeat(40),
       notBefore,
     });
 
-    expect(second.id).toBe(first.id);
-    expect(second).toMatchObject({
+    expect(second!.id).toBe(first!.id);
+    expect(second!).toMatchObject({
       headSha: "3".repeat(40),
       baseSha: "4".repeat(40),
       state: "queued",
     });
-    expect(second.notBefore.toISOString()).toBe(notBefore.toISOString());
+    expect(second!.notBefore.toISOString()).toBe(notBefore.toISOString());
     expect(await jobsFor("armed-2")).toHaveLength(1);
+  });
+
+  it("discards an enqueue whose head is older than the waiting job's", async () => {
+    await seedArmedPullRequest(db, { armedPrId: "armed-3", repo: "c", number: 3 });
+    const newer = await enqueueJob(db, {
+      armedPrId: "armed-3",
+      headSha: "5".repeat(40),
+      baseSha: "6".repeat(40),
+      headCurrentAt: new Date("2026-01-01T00:00:05.000Z"),
+      notBefore: new Date("2026-01-01T00:00:05.000Z"),
+    });
+    const older = await enqueueJob(db, {
+      armedPrId: "armed-3",
+      headSha: "7".repeat(40),
+      baseSha: "8".repeat(40),
+      headCurrentAt: new Date("2026-01-01T00:00:00.000Z"),
+      notBefore: new Date("2026-01-01T00:10:00.000Z"),
+    });
+
+    expect(older).toBeUndefined();
+    expect(await jobsFor("armed-3")).toEqual([newer]);
   });
 
   it("enqueues a new job when the waiting job was claimed", async () => {
     const claimed = await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-2",
       headSha: "5".repeat(40),
       baseSha: "6".repeat(40),
@@ -75,17 +100,18 @@ describe("enqueueJob", () => {
     await db
       .update(schema.job)
       .set({ state: "claimed", claimedByRunnerId: "runner-1", claimedAt: new Date() })
-      .where(eq(schema.job.id, claimed.id));
+      .where(eq(schema.job.id, claimed!.id));
 
     const fresh = await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-2",
       headSha: "7".repeat(40),
       baseSha: "8".repeat(40),
       notBefore: new Date("2026-01-01T00:15:00.000Z"),
     });
 
-    expect(fresh.id).not.toBe(claimed.id);
-    expect(fresh.state).toBe("queued");
+    expect(fresh!.id).not.toBe(claimed!.id);
+    expect(fresh!.state).toBe("queued");
     const rows = await jobsFor("armed-2");
     expect(rows).toHaveLength(2);
     expect(rows.filter((row) => row.state === "queued")).toHaveLength(1);

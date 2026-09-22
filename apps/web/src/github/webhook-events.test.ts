@@ -83,6 +83,7 @@ function pullRequestPayload(
       merged: false,
       head: { sha: "h".repeat(40) },
       base: { sha: "b".repeat(40) },
+      updated_at: "2026-01-01T00:00:00Z",
       user: { id: 501 },
       ...pullRequestOverrides,
     },
@@ -98,11 +99,18 @@ describe("parseWebhookEvent for pull_request", () => {
       number: 7,
       headSha: "h".repeat(40),
       baseSha: "b".repeat(40),
+      updatedAt: "2026-01-01T00:00:00Z",
       draft: false,
       merged: false,
       installationId: "10",
       authorId: "501",
     });
+  });
+
+  it("rejects a pull request payload without its update time", () => {
+    expect(() =>
+      parseWebhookEvent("pull_request", pullRequestPayload({}, { updated_at: undefined })),
+    ).toThrow("missing required pull request fields");
   });
 
   it("parses a ready_for_review event", () => {
