@@ -46,6 +46,7 @@ function fakeGitHub(
     installationTokenById,
     listInstallationRepositories,
     listUserInstallations: vi.fn(async () => []),
+    botLogin: unsupported(),
     listOpenPullRequestsByAuthor,
     installationToken: unsupported(),
     pullRequest: unsupported(),

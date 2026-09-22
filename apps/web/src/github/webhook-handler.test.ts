@@ -40,6 +40,7 @@ const github: GitHubClient = {
   createCommitStatus: unsupported(),
   listInstallationRepositories: unsupported(),
   listUserInstallations: unsupported(),
+  botLogin: unsupported(),
   listOpenPullRequestsByAuthor: unsupported(),
 };
 

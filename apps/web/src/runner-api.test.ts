@@ -24,7 +24,7 @@ function createGitHub(): GitHubClient {
     pullRequest: unsupported(),
     mergeBase: unsupported(),
     linkedIssue: unsupported(),
-    reviews: unsupported(),
+    reviews: vi.fn(async () => []),
     postReview: vi.fn(async () => ({
       url: "https://github.com/octo/a/pull/1#pullrequestreview-9",
       id: "9",
@@ -34,6 +34,7 @@ function createGitHub(): GitHubClient {
     createCommitStatus: vi.fn(async () => {}),
     listInstallationRepositories: unsupported(),
     listUserInstallations: unsupported(),
+    botLogin: vi.fn(async () => "hawkeye-review[bot]"),
     listOpenPullRequestsByAuthor: unsupported(),
   };
 }
