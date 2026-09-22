@@ -243,6 +243,38 @@ describe("postReviewForRun", () => {
     expect(await db.select().from(schema.reviewPosted)).toHaveLength(0);
   });
 
+  it("closes only its own placeholder when a newer head starts before the patch of an adopted review", async () => {
+    await db.update(schema.run).set({ placeholderReviewId: "42" }).where(eq(schema.run.id, runId));
+    github.reviews = vi.fn(async () => [
+      {
+        authorLogin: "hawkeye-review[bot]",
+        body: `<!-- hawkeye: head=${previousHead} -->\n\n### Ship\n\nfine`,
+        id: "41",
+      },
+    ]);
+    github.review = vi.fn(async () => ({ body: "### Ship\n\nfine" }));
+    github.updateReview = vi.fn(async () => {});
+    github.installationTokenById = vi.fn(async () => {
+      if ((github.installationTokenById as ReturnType<typeof vi.fn>).mock.calls.length === 2)
+        await db.insert(schema.job).values({
+          armedPrId: armedPr.id,
+          headSha: "d".repeat(40),
+          baseSha: "b".repeat(40),
+          notBefore: new Date(),
+          state: "done",
+        });
+      return "ghs_token";
+    });
+
+    await expect(post({})).resolves.toBe("superseded");
+
+    const updates = (github.updateReview as ReturnType<typeof vi.fn>).mock.calls.map(
+      ([, id, body]) => [id, body],
+    );
+    expect(updates).toEqual([["42", "Superseded by a newer push; its review follows."]]);
+    expect(await db.select().from(schema.reviewPosted)).toHaveLength(0);
+  });
+
   it("writes nothing when GitHub cannot say what is already there", async () => {
     await db.update(schema.run).set({ placeholderReviewId: "42" }).where(eq(schema.run.id, runId));
     github.reviews = vi.fn(async () => {
