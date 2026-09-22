@@ -352,6 +352,41 @@ describe("runRunnerLoop", () => {
     expect(d.reported.map((e) => e.state)).not.toContain("failed");
   });
 
+  it("reports the refused model with an ok result after the review on the default", async () => {
+    const plane = await fakeControlPlane(scripted([claimedJob]));
+    servers.push(plane.server);
+    const d = await deps(plane.baseUrl);
+    vi.mocked(d.harness.run).mockImplementationOnce(async () => ({
+      status: "error",
+      turns: 0,
+      error: "Model sonnet was refused by the claude CLI; choose another in Settings.",
+      refusedModel: "sonnet",
+    }));
+    await runRunnerLoop(d, { once: true });
+    expect(plane.received.find((r) => r.url.endsWith("/result"))?.body).toMatchObject({
+      status: "ok",
+      refusedModel: "sonnet",
+    });
+  });
+
+  it("reports the refused model when the review on the default fails too", async () => {
+    const plane = await fakeControlPlane(scripted([claimedJob]));
+    servers.push(plane.server);
+    const d = await deps(plane.baseUrl, {
+      harnessResult: {
+        status: "error",
+        turns: 0,
+        error: "Model sonnet was refused by the claude CLI; choose another in Settings.",
+        refusedModel: "sonnet",
+      },
+    });
+    await runRunnerLoop(d, { once: true });
+    expect(plane.received.find((r) => r.url.endsWith("/result"))?.body).toMatchObject({
+      status: "error",
+      refusedModel: "sonnet",
+    });
+  });
+
   it("reports a harness failure with its status", async () => {
     const plane = await fakeControlPlane(scripted([claimedJob]));
     servers.push(plane.server);
