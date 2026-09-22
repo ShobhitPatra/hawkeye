@@ -17,6 +17,7 @@ const routes: Record<string, unknown> = {
     head: { sha: headSha, ref: "feat" },
     base: { sha: "b".repeat(40), ref: "main", repo: { clone_url: "https://github.com/o/r.git" } },
     commits: 1,
+    updated_at: "2026-01-01T00:00:00Z",
   },
   "/repos/o/r/issues/3": { number: 3, title: "The issue", body: "Please add thing" },
   [`/repos/o/r/compare/${"b".repeat(40)}...${headSha}`]: {

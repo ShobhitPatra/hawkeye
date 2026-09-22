@@ -145,6 +145,7 @@ async function deps(
           repo: { clone_url: "https://github.com/o/r.git" },
         },
         commits: 1,
+        updated_at: "2026-01-01T00:00:00Z",
       })) as typeof fetch,
     report: (event) => reported.push(event),
     log: (line) => logged.push(line),

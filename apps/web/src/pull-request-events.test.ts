@@ -26,6 +26,7 @@ function pullRequestWithHead(headSha: string) {
     baseRef: "main",
     cloneUrl: "https://github.com/octo/repo.git",
     commits: 1,
+    updatedAt: "2026-01-01T00:00:00Z",
   };
 }
 
@@ -57,6 +58,7 @@ function event(overrides: Partial<PullRequestEvent> = {}): PullRequestEvent {
     number: 7,
     headSha: "h".repeat(40),
     baseSha: "b".repeat(40),
+    updatedAt: "2026-01-01T00:00:00Z",
     draft: false,
     merged: false,
     installationId: "10",
@@ -207,6 +209,24 @@ describe("handlePullRequestEvent", () => {
     const rows = await jobs();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ headSha: "c".repeat(40) });
+  });
+
+  it("keeps the newer head when an older delivery is applied last", async () => {
+    await seedArmedPullRequest(db);
+    const pullRequest = vi.fn();
+    pullRequest.mockResolvedValueOnce(pullRequestWithHead("c".repeat(40)));
+    pullRequest.mockResolvedValueOnce(pullRequestWithHead("h".repeat(40)));
+    const github = fakeGitHub({ pullRequest });
+    await handlePullRequestEvent(
+      { db, github },
+      event({ headSha: "c".repeat(40), updatedAt: "2026-01-01T00:00:05Z" }),
+    );
+    await handlePullRequestEvent({ db, github }, event({ updatedAt: "2026-01-01T00:00:00Z" }));
+
+    const rows = await jobs();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ headSha: "c".repeat(40) });
+    expect(rows[0]!.headCurrentAt.toISOString()).toBe("2026-01-01T00:00:05.000Z");
   });
 
   it("queues immediately when the user quiet window is zero", async () => {

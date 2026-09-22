@@ -12,6 +12,7 @@ export type PullRequestEvent = {
   number: number;
   headSha: string;
   baseSha: string;
+  updatedAt: string;
   draft: boolean;
   merged: boolean;
   installationId: string;
@@ -88,6 +89,7 @@ function parsePullRequestEvent(payload: unknown): WebhookEvent {
       merged?: unknown;
       head?: { sha?: unknown };
       base?: { sha?: unknown };
+      updated_at?: unknown;
       user?: { id?: unknown };
     };
   };
@@ -116,6 +118,7 @@ function parsePullRequestEvent(payload: unknown): WebhookEvent {
     typeof pullRequest.head.sha !== "string" ||
     !pullRequest.base ||
     typeof pullRequest.base.sha !== "string" ||
+    typeof pullRequest.updated_at !== "string" ||
     !pullRequest.user ||
     typeof pullRequest.user.id !== "number"
   ) {
@@ -129,6 +132,7 @@ function parsePullRequestEvent(payload: unknown): WebhookEvent {
     number: pullRequest.number,
     headSha: pullRequest.head.sha,
     baseSha: pullRequest.base.sha,
+    updatedAt: pullRequest.updated_at,
     draft: pullRequest.draft,
     merged: pullRequest.merged === true,
     installationId: String(body.installation.id),

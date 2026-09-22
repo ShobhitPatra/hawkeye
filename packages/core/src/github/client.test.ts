@@ -111,6 +111,7 @@ describe("createGitHubClient", () => {
           head: { sha: "h", ref: "feat" },
           base: { sha: "b", ref: "main", repo: { clone_url: "https://github.com/o/r.git" } },
           commits: 3,
+          updated_at: "2026-01-01T00:00:00Z",
         },
       }),
     });
@@ -131,6 +132,7 @@ describe("createGitHubClient", () => {
       baseRef: "main",
       cloneUrl: "https://github.com/o/r.git",
       commits: 3,
+      updatedAt: "2026-01-01T00:00:00Z",
     });
   });
   it("rejects a pull request payload without a commits count", async () => {
