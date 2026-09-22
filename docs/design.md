@@ -211,7 +211,7 @@ The prompt is repo-agnostic: *discover the repo's layout and conventions, don't 
 | `Runner` | token, last_seen; one per machine, revocable |
 | `Installation` | App install, account |
 | `ArmedPR` | repo, number, armed_by, quiet-window override |
-| `Job` | armed_pr, head_sha, base_sha, not_before, state queued/claimed/done/failed |
+| `Job` | armed_pr, head_sha, base_sha, head_current_at, not_before, state queued/claimed/done/failed |
 | `Run` | job, runner, started/ended, turns, status, error |
 | `Finding` | armed_pr, stable_id, detail, severity, first_seen_sha, resolved_sha?, github_comment_id |
 | `ReviewPosted` | run, armed_pr, head_sha, github_review_id? — null while a round's review is in flight; the earliest filled row per pull request is the living review |
@@ -391,7 +391,7 @@ At every sign-in, and each time the pull request listing is fetched (held a minu
 
 ### Webhook deliveries
 
-A push to an armed PR (`synchronize` and `ready_for_review`) queues a job for the new head after the quiet window (armed override, else the user setting, else 0 s), replacing any job still waiting. A job already claimed keeps running until its next heartbeat, whose response says it is superseded; the daemon then stops the review, reports it as `superseded`, and claims the newer job. A daemon with a free slot may claim the newer job first; it then stops the older review of that pull request at once rather than waiting for the heartbeat, and when the older result arrives the control plane leaves the living review's reviewing block alone, because the newer run owns it by then; the older run's own placeholder comment, when it has one, is still closed with the superseded sentence. Drafts are skipped unless the user opted into reviewing drafts. Closing or merging the PR disarms it for everyone and cancels any job still waiting. `reopened` does not trigger.
+A push to an armed PR (`synchronize` and `ready_for_review`) queues a job for the new head after the quiet window (armed override, else the user setting, else 0 s), replacing any job still waiting. The handler first checks that the delivery's head is still the pull request's current head, which drops a delivery that arrives late; two deliveries handled at the same time both pass that check, so each job also carries the moment GitHub says its head was current (`pull_request.updated_at`, or the time of the fetch when the dashboard queues a review), and a waiting job is only replaced by a newer moment. A job already claimed keeps running until its next heartbeat, whose response says it is superseded; the daemon then stops the review, reports it as `superseded`, and claims the newer job. A daemon with a free slot may claim the newer job first; it then stops the older review of that pull request at once rather than waiting for the heartbeat, and when the older result arrives the control plane leaves the living review's reviewing block alone, because the newer run owns it by then; the older run's own placeholder comment, when it has one, is still closed with the superseded sentence. Drafts are skipped unless the user opted into reviewing drafts. Closing or merging the PR disarms it for everyone and cancels any job still waiting. `reopened` does not trigger.
 
 ### Connecting a runner
 

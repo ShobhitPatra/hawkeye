@@ -70,6 +70,7 @@ beforeEach(async () => {
   db = await createTestDb();
   await seedArmedPullRequest(db);
   const queued = await enqueueJob(db, {
+    headCurrentAt: new Date(),
     armedPrId: armedPr.id,
     headSha,
     baseSha: "b".repeat(40),

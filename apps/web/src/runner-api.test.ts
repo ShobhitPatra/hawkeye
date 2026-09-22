@@ -76,6 +76,7 @@ function request(path: string, init: RequestInit & { bearer?: string | null } = 
 
 function enqueue(notBefore = new Date(now.getTime() - 60_000)) {
   return enqueueJob(db, {
+    headCurrentAt: new Date(),
     armedPrId: "armed-1",
     headSha: "a".repeat(40),
     baseSha: "b".repeat(40),
@@ -226,6 +227,7 @@ describe("claimJob", () => {
     (github.updateReview as ReturnType<typeof vi.fn>).mockClear();
     (github.postReview as ReturnType<typeof vi.fn>).mockClear();
     await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: "b".repeat(40),
       baseSha: "b".repeat(40),
@@ -256,6 +258,7 @@ describe("claimJob", () => {
     (github.updateReview as ReturnType<typeof vi.fn>).mockClear();
     (github.postReview as ReturnType<typeof vi.fn>).mockClear();
     await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: "b".repeat(40),
       baseSha: "b".repeat(40),
@@ -344,6 +347,7 @@ describe("claimJob", () => {
       number: 2,
     });
     await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-2",
       headSha: "c".repeat(40),
       baseSha: "d".repeat(40),
@@ -379,6 +383,7 @@ describe("claimJob", () => {
       firstRunId,
     );
     await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: "c".repeat(40),
       baseSha: "b".repeat(40),
@@ -423,6 +428,7 @@ describe("claimJob", () => {
       .returning();
     const other = await createRunnerToken(db, { userId: "user-2", name: "desk" });
     await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: sibling!.id,
       headSha: "c".repeat(40),
       baseSha: "b".repeat(40),
@@ -599,6 +605,7 @@ describe("heartbeat", () => {
     expect(await first.json()).toEqual({ ok: true, superseded: false });
 
     await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: "c".repeat(40),
       baseSha: "b".repeat(40),
@@ -616,6 +623,7 @@ describe("heartbeat", () => {
     const queued = await enqueue();
     await claimJob(request("/api/runner/jobs"), claimDeps());
     await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: queued.headSha,
       baseSha: "b".repeat(40),
@@ -895,6 +903,7 @@ describe("recordResult", () => {
       firstRunId,
     );
     await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: "c".repeat(40),
       baseSha: "b".repeat(40),
@@ -1081,6 +1090,7 @@ describe("recordResult", () => {
     });
     const other = await createRunnerToken(db, { userId: "user-2", name: "desk" });
     await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-2",
       headSha: "a".repeat(40),
       baseSha: "b".repeat(40),
@@ -1118,6 +1128,7 @@ describe("recordResult", () => {
   it("does not record findings from a result whose head a newer done job superseded", async () => {
     const runId = await claimedRunId();
     const newer = await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: "c".repeat(40),
       baseSha: "b".repeat(40),
@@ -1207,6 +1218,7 @@ describe("recordResult", () => {
     );
     const queue = (headSha: string) =>
       enqueueJob(db, {
+        headCurrentAt: new Date(),
         armedPrId: "armed-1",
         headSha,
         baseSha: "b".repeat(40),
@@ -1239,6 +1251,7 @@ describe("recordResult", () => {
   it("still closes the older run's own placeholder when a newer run is live", async () => {
     const olderRunId = await claimedRunId();
     await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: "c".repeat(40),
       baseSha: "b".repeat(40),

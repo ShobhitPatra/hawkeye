@@ -41,6 +41,7 @@ beforeEach(async () => {
 
 function enqueue(armedPrId: string, notBefore: Date) {
   return enqueueJob(db, {
+    headCurrentAt: new Date(),
     armedPrId,
     headSha: "a".repeat(40),
     baseSha: "b".repeat(40),

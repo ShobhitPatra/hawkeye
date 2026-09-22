@@ -69,7 +69,13 @@ describe("runnerStatus", () => {
     await seedArmedPullRequest(db, { armedPrId: "armed-3", userId: "user-1", number: 3 });
     await seedArmedPullRequest(db, { armedPrId: "armed-4", userId: "user-2", number: 4 });
     for (const armedPrId of ["armed-1", "armed-2", "armed-3", "armed-4"]) {
-      await enqueueJob(db, { armedPrId, headSha: "h", baseSha: "b", notBefore: now });
+      await enqueueJob(db, {
+        headCurrentAt: new Date(),
+        armedPrId,
+        headSha: "h",
+        baseSha: "b",
+        notBefore: now,
+      });
     }
     await db
       .update(schema.armedPr)
@@ -91,6 +97,7 @@ describe("reviewingByRunner", () => {
     const theirs = await createRunnerToken(db, { userId: "user-2", name: "theirs" });
     const seed = async (armedPrId: string, runnerId: string, state: "claimed" | "done") => {
       const job = await enqueueJob(db, {
+        headCurrentAt: new Date(),
         armedPrId,
         headSha: "a".repeat(40),
         baseSha: "b".repeat(40),

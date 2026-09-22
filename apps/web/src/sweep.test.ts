@@ -53,6 +53,7 @@ function request(authorization?: string, method = "POST") {
 
 async function staleClaim(): Promise<string> {
   const queued = await enqueueJob(db, {
+    headCurrentAt: new Date(),
     armedPrId: "armed-1",
     headSha: "a".repeat(40),
     baseSha: "b".repeat(40),
@@ -129,6 +130,7 @@ describe("sweep on GitHub", () => {
   }
   const queueNewerHead = () =>
     enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: "c".repeat(40),
       baseSha: "b".repeat(40),
@@ -209,6 +211,7 @@ describe("claimJob", () => {
     });
     const other = await createRunnerToken(db, { userId: "user-2", name: "desk" });
     const stale = await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-2",
       headSha: "c".repeat(40),
       baseSha: "b".repeat(40),

@@ -99,6 +99,7 @@ export async function handlePullRequestEvent(
     await enqueueJob(db, {
       armedPrId: row.id,
       ...target,
+      headCurrentAt: new Date(event.updatedAt),
       notBefore: new Date(Date.now() + delaySeconds * 1000),
     });
     enqueued += 1;

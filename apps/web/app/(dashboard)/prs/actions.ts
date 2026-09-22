@@ -36,7 +36,12 @@ export async function armAction(formData: FormData) {
 
   await db.transaction(async (tx) => {
     const armed = await armPullRequest(tx, { ...input, userId: session.user.id });
-    await enqueueJob(tx, { armedPrId: armed.id, ...target, notBefore: new Date() });
+    await enqueueJob(tx, {
+      armedPrId: armed.id,
+      ...target,
+      headCurrentAt: new Date(),
+      notBefore: new Date(),
+    });
   });
   revalidatePath("/prs");
 }

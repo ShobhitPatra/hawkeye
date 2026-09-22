@@ -26,6 +26,7 @@ beforeEach(async () => {
   db = await createTestDb();
   await seedArmedPullRequest(db);
   const own = await enqueueJob(db, {
+    headCurrentAt: new Date(),
     armedPrId: "armed-1",
     headSha: firstHead,
     baseSha: "b".repeat(40),
@@ -200,12 +201,14 @@ describe("recordFindings", () => {
       .values({ userId: "user-2", installationId: "10", owner: "octo", repo: "repo", number: 7 })
       .returning();
     const own = await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: firstHead,
       baseSha: "b".repeat(40),
       notBefore: new Date(),
     });
     const sibling = await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: otherArm!.id,
       headSha: firstHead,
       baseSha: "b".repeat(40),
@@ -224,6 +227,7 @@ describe("recordFindings", () => {
 
   it("reports superseded when a newer job for the pull request is done", async () => {
     const older = await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: firstHead,
       baseSha: "b".repeat(40),
@@ -231,6 +235,7 @@ describe("recordFindings", () => {
     });
     await db.update(schema.job).set({ state: "done" }).where(eq(schema.job.id, older.id));
     const newer = await enqueueJob(db, {
+      headCurrentAt: new Date(),
       armedPrId: "armed-1",
       headSha: secondHead,
       baseSha: "b".repeat(40),
