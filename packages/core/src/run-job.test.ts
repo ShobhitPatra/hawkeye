@@ -62,17 +62,19 @@ function deps(
       return { status: "ok", turns: 2 };
     }),
   };
-  const createWorktree = vi.fn(async (i: { directory: string; previousHeadSha?: string }) => {
-    await mkdir(join(i.directory, ".claude"), { recursive: true });
-    await writeFile(join(i.directory, "CLAUDE.md"), "project memory");
-    await writeFile(join(i.directory, ".claude", "settings.json"), "{}");
-    return {
-      path: i.directory,
-      diff: "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1,1 +1,2 @@\n one\n+two\n",
-      ...(i.previousHeadSha === undefined ? {} : { interdiff: "INTERDIFF-FIXTURE-TEXT" }),
-      remove: vi.fn(async () => {}),
-    };
-  });
+  const createWorktree = vi.fn(
+    async (i: { directory: string; previousHeadSha?: string; signal?: AbortSignal }) => {
+      await mkdir(join(i.directory, ".claude"), { recursive: true });
+      await writeFile(join(i.directory, "CLAUDE.md"), "project memory");
+      await writeFile(join(i.directory, ".claude", "settings.json"), "{}");
+      return {
+        path: i.directory,
+        diff: "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1,1 +1,2 @@\n one\n+two\n",
+        ...(i.previousHeadSha === undefined ? {} : { interdiff: "INTERDIFF-FIXTURE-TEXT" }),
+        remove: vi.fn(async () => {}),
+      };
+    },
+  );
   const readRepositoryRules = vi.fn(async () => [
     { path: "AGENTS.md", content: "RULES-FIXTURE-TEXT" },
   ]);
@@ -118,11 +120,73 @@ describe("runReviewJob", () => {
       baseSha,
       directory: join(i.runDirectory, "checkout"),
       depth: 3,
+      signal: expect.any(AbortSignal),
     });
     const [url, init] = d.fetch.mock.calls[0]!;
     expect(url).toBe("https://api.github.com/repos/o/r/pulls/1");
     expect((init!.headers as Record<string, string>).Authorization).toBe("Bearer ghs_t");
     expect(await readFile(join(i.runDirectory, "stream.jsonl"), "utf8")).toBe("{}");
+  });
+  it("ends the run as a timeout when the clone outlives the wall clock", async () => {
+    const d = deps();
+    d.createWorktree.mockImplementation(
+      (i) =>
+        new Promise((_resolve, reject) => {
+          i.signal!.addEventListener("abort", () => reject(new Error("git fetch failed: aborted")));
+        }),
+    );
+
+    const outcome = await runReviewJob(await input({ wallClockMs: 50 }), d);
+
+    expect(outcome).toEqual({
+      status: "timeout",
+      turns: 0,
+      error: "the wall clock of 0 minutes ran out while preparing the checkout",
+    });
+    expect(d.harness.run).not.toHaveBeenCalled();
+  });
+  it("ends the run as a timeout when the pull request fetch outlives the wall clock", async () => {
+    const d = deps();
+    d.fetch.mockImplementation(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init!.signal!.addEventListener("abort", () => reject(init!.signal!.reason));
+        }),
+    );
+
+    const outcome = await runReviewJob(await input({ wallClockMs: 50 }), d);
+
+    expect(outcome).toEqual({
+      status: "timeout",
+      turns: 0,
+      error: "the wall clock of 0 minutes ran out while fetching the pull request",
+    });
+    expect(d.createWorktree).not.toHaveBeenCalled();
+  });
+  it("passes a failure after the clone through even once the wall clock is over", async () => {
+    const d = deps();
+    vi.mocked(d.harness.run).mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      throw new Error("harness exploded");
+    });
+
+    await expect(runReviewJob(await input({ wallClockMs: 50 }), d)).rejects.toThrow(
+      "harness exploded",
+    );
+  });
+  it("gives the harness the wall clock that is left after the fetch and the clone", async () => {
+    const d = deps();
+    d.createWorktree.mockImplementation(async (i) => {
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      await mkdir(i.directory, { recursive: true });
+      return { path: i.directory, diff: "", remove: vi.fn(async () => {}) };
+    });
+
+    await runReviewJob(await input({ wallClockMs: 1_000 }), d);
+
+    const harnessInput = vi.mocked(d.harness.run).mock.calls[0]![0];
+    expect(harnessInput.wallClockMs).toBeLessThanOrEqual(940);
+    expect(harnessInput.wallClockMs).toBeGreaterThan(0);
   });
   it("returns superseded without running the harness when the signal is already aborted", async () => {
     const d = deps();

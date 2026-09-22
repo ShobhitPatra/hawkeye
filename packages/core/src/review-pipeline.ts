@@ -9,6 +9,8 @@ import type { createWorktree, readRepositoryRules } from "./worktree/worktree.js
 
 export type ReviewPipelineInput = {
   signal?: AbortSignal;
+  deadline?: AbortSignal;
+  startedAt?: number;
   cloneUrl: string;
   token: string;
   runDirectory: string;
@@ -30,21 +32,39 @@ export type ReviewPipelineOutcome =
   | { status: "ok"; turns: number; result: ReviewResult; diff: string }
   | { status: Exclude<RunResultStatus, "ok">; turns: number; error: string; diff: string };
 
+export function wallClockRanOut(wallClockMs: number, step: string) {
+  return {
+    status: "timeout" as const,
+    turns: 0,
+    error: `the wall clock of ${Math.round(wallClockMs / 60_000)} minutes ran out while ${step}`,
+  };
+}
+
 export async function runReviewPipeline(
   input: ReviewPipelineInput,
   deps: ReviewPipelineDependencies,
 ): Promise<ReviewPipelineOutcome> {
   const { runDirectory, prompt } = input;
-  const worktree = await deps.createWorktree({
-    cloneUrl: input.cloneUrl,
-    token: input.token,
-    pullRequestNumber: prompt.pullRequest.number,
-    headSha: prompt.pullRequest.headSha,
-    baseSha: prompt.pullRequest.baseSha,
-    directory: join(runDirectory, "checkout"),
-    ...(input.depth === undefined ? {} : { depth: input.depth }),
-    ...(input.previousRound === undefined ? {} : { previousHeadSha: input.previousRound.headSha }),
-  });
+  const startedAt = input.startedAt ?? Date.now();
+  let worktree: Awaited<ReturnType<typeof createWorktree>>;
+  try {
+    worktree = await deps.createWorktree({
+      cloneUrl: input.cloneUrl,
+      token: input.token,
+      pullRequestNumber: prompt.pullRequest.number,
+      headSha: prompt.pullRequest.headSha,
+      baseSha: prompt.pullRequest.baseSha,
+      directory: join(runDirectory, "checkout"),
+      ...(input.depth === undefined ? {} : { depth: input.depth }),
+      ...(input.previousRound === undefined
+        ? {}
+        : { previousHeadSha: input.previousRound.headSha }),
+      ...(input.deadline === undefined ? {} : { signal: input.deadline }),
+    });
+  } catch (error) {
+    if (!input.deadline?.aborted) throw error;
+    return { ...wallClockRanOut(input.wallClockMs, "preparing the checkout"), diff: "" };
+  }
   try {
     const repositoryRules = await deps.readRepositoryRules(worktree.path);
     await removeTrustedConfig(worktree.path);
@@ -86,7 +106,7 @@ export async function runReviewPipeline(
       resultPath,
       settingsPath,
       maxTurns: input.maxTurns,
-      wallClockMs: input.wallClockMs,
+      wallClockMs: Math.max(input.wallClockMs - (Date.now() - startedAt), 0),
       ...(input.model === undefined ? {} : { model: input.model }),
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       onEvent: (event) => {

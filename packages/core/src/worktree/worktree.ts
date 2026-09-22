@@ -33,6 +33,7 @@ export type CreateWorktreeInput = {
   directory: string;
   previousHeadSha?: string;
   depth?: number;
+  signal?: AbortSignal;
 };
 
 const AUTHORIZATION_ENV = "HAWKEYE_GIT_AUTHORIZATION";
@@ -107,6 +108,7 @@ export async function createWorktree(input: CreateWorktreeInput): Promise<Worktr
           cwd,
           env: { ...process.env, ...auth.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" },
           maxBuffer: 64 * 1024 * 1024,
+          ...(input.signal === undefined ? {} : { signal: input.signal }),
         })
       ).stdout;
     } catch (error) {

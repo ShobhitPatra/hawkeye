@@ -1,8 +1,13 @@
-import { fetchLinkedIssue, fetchPullRequestDetails } from "./github/client.js";
+import {
+  fetchLinkedIssue,
+  fetchPullRequestDetails,
+  type LinkedIssue,
+  type PullRequestDetails,
+} from "./github/client.js";
 import type { PullRequestReference } from "./github/pull-request-reference.js";
 import type { HarnessSpec } from "./harness/harness.js";
 import { commentableLines } from "./review/diff-lines.js";
-import { runReviewPipeline } from "./review-pipeline.js";
+import { runReviewPipeline, wallClockRanOut } from "./review-pipeline.js";
 import type { RunResultStatus } from "./runner/protocol.js";
 import type { PriorFinding } from "./contract/prompt.js";
 import type { ReviewResult } from "./contract/schema.js";
@@ -38,13 +43,25 @@ export async function runReviewJob(
   deps: RunReviewJobDependencies,
 ): Promise<RunReviewJobOutcome> {
   const { reference } = input;
-  const pullRequest = await fetchPullRequestDetails({ fetch: deps.fetch }, reference, input.token);
-  const linkedIssue = await fetchLinkedIssue(
-    { fetch: deps.fetch },
-    reference,
-    pullRequest.body,
-    input.token,
-  );
+  const startedAt = Date.now();
+  const deadline = AbortSignal.timeout(input.wallClockMs);
+  let pullRequest: PullRequestDetails;
+  let linkedIssue: LinkedIssue | undefined;
+  try {
+    pullRequest = await fetchPullRequestDetails({ fetch: deps.fetch }, reference, input.token, {
+      signal: deadline,
+    });
+    linkedIssue = await fetchLinkedIssue(
+      { fetch: deps.fetch },
+      reference,
+      pullRequest.body,
+      input.token,
+      { signal: deadline },
+    );
+  } catch (error) {
+    if (!deadline.aborted) throw error;
+    return wallClockRanOut(input.wallClockMs, "fetching the pull request");
+  }
   const outcome = await runReviewPipeline(
     {
       cloneUrl: pullRequest.cloneUrl,
@@ -52,6 +69,8 @@ export async function runReviewJob(
       runDirectory: input.runDirectory,
       maxTurns: input.maxTurns,
       wallClockMs: input.wallClockMs,
+      startedAt,
+      deadline,
       ...(input.model === undefined ? {} : { model: input.model }),
       depth: pullRequest.commits + 1,
       ...(input.signal === undefined ? {} : { signal: input.signal }),

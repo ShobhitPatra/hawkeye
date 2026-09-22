@@ -92,6 +92,20 @@ describe("createWorktree", () => {
     expect(log).toContain("previous head");
     await wt.remove();
   });
+  it("stops at the first git command once the signal is aborted", async () => {
+    const control = new AbortController();
+    control.abort();
+    await expect(
+      createWorktree({
+        cloneUrl: origin,
+        pullRequestNumber: 1,
+        headSha,
+        baseSha,
+        directory: join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "aborted"),
+        signal: control.signal,
+      }),
+    ).rejects.toThrow(/^git init failed: /);
+  });
   it("rejects a depth that is not a positive integer", async () => {
     const directory = join(await mkdtemp(join(tmpdir(), "hawkeye-co-")), "checkout");
     for (const depth of [0, -1, 1.5]) {
