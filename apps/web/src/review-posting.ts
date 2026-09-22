@@ -32,6 +32,7 @@ export type ReviewPostingInput = {
   result: ReviewResult;
   commentable: Record<string, number[]>;
   turns?: number;
+  refusedModel?: string;
 };
 export type ReviewPostingOutcome = "posted" | "already-posted" | "superseded" | "failed";
 
@@ -171,6 +172,7 @@ async function roundsFor(
       startedAt: run.startedAt,
       result: run.result,
       turns: run.turns,
+      refusedModel: run.refusedModel,
     })
     .from(run)
     .innerJoin(job, eq(job.id, run.jobId))
@@ -192,6 +194,7 @@ async function roundsFor(
       verdict: row.result.verdict,
       startedAt: `${row.startedAt.toISOString().slice(0, 16).replace("T", " ")} UTC`,
       turns: row.turns,
+      ...(row.refusedModel === null ? {} : { refusedModel: row.refusedModel }),
     };
   });
 }
@@ -308,7 +311,11 @@ export async function postReviewForRun(
           headSha,
           commentable,
           repositoryUrl: HAWKEYE_REPOSITORY_URL,
-          footer: { round: 1, ...(input.turns === undefined ? {} : { turns: input.turns }) },
+          footer: {
+            round: 1,
+            ...(input.turns === undefined ? {} : { turns: input.turns }),
+            ...(input.refusedModel === undefined ? {} : { refusedModel: input.refusedModel }),
+          },
         });
       const { posted } = await postRenderedReview({
         github,

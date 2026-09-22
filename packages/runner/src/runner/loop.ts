@@ -106,14 +106,16 @@ async function reportFor(
       },
     },
   );
+  const fallback = outcome.refusedModel === undefined ? {} : { refusedModel: outcome.refusedModel };
   return outcome.status === "ok"
     ? {
         status: "ok",
         turns: outcome.turns,
         result: outcome.result,
         commentable: outcome.commentable,
+        ...fallback,
       }
-    : { status: outcome.status, turns: outcome.turns, error: outcome.error };
+    : { status: outcome.status, turns: outcome.turns, error: outcome.error, ...fallback };
 }
 
 function isRetryable(error: unknown): boolean {

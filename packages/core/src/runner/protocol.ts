@@ -44,6 +44,7 @@ export type RunResultReport = {
   result?: ReviewResult;
   error?: string;
   commentable?: Record<string, number[]>;
+  refusedModel?: string;
 };
 
 export type RunEvent = { type: string; at: string; data?: unknown };

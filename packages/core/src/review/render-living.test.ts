@@ -111,6 +111,18 @@ describe("renderLivingReview", () => {
     expect(body).toContain(`| 1 | \`${"c".repeat(7)}\` | Invalid | 2026-01-01 |`);
     expect(body).toContain(`| 2 | \`${"b".repeat(7)}\` | Pending | 2026-01-02 |`);
   });
+  it("names the refused model in the footer of the current round", () => {
+    const i = input();
+    i.rounds = i.rounds.map((round) =>
+      round.headSha === i.headSha ? { ...round, refusedModel: "claude-fable-5-1" } : round,
+    );
+    expect(
+      renderLivingReview(i)
+        .body.trimEnd()
+        .endsWith("reviewed on the default model because claude-fable-5-1 was refused"),
+    ).toBe(true);
+  });
+
   it("leaves round and turns off the footer when the current head has no round", () => {
     const i = input();
     i.rounds = [];

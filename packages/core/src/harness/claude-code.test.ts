@@ -149,13 +149,17 @@ describe("claude code harness", () => {
     ).resolves.toMatchObject({
       status: "error",
       error: "Model claude-fable-5-1 was refused by the claude CLI; choose another in Settings.",
+      refusedModel: "claude-fable-5-1",
     });
-    await expect(
-      createClaudeCodeHarness({ executable: exe, model: "claude-fable-5-1" }).run(input(s)),
-    ).resolves.toMatchObject({
+    const pinned = await createClaudeCodeHarness({
+      executable: exe,
+      model: "claude-fable-5-1",
+    }).run(input(s));
+    expect(pinned).toMatchObject({
       error:
         "Model claude-fable-5-1 was refused by the claude CLI; start the runner with another --model or without it.",
     });
+    expect(pinned).not.toHaveProperty("refusedModel");
   });
 
   it("uses the job's model unless the harness was started with one", async () => {

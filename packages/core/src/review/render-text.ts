@@ -8,6 +8,7 @@ export type RoundSummary = {
   verdict: Verdict | "pending" | "invalid";
   startedAt: string;
   turns?: number;
+  refusedModel?: string;
 };
 export type RenderTextInput = {
   result: ReviewResult;

@@ -316,7 +316,10 @@ function isRunResultStatus(value: unknown): value is RunResultStatus {
 function parseRunResultReport(payload: unknown): RunResultReport {
   if (typeof payload !== "object" || payload === null)
     throw new Error("a result must be an object");
-  const { status, turns, result, error, commentable } = payload as Record<string, unknown>;
+  const { status, turns, result, error, commentable, refusedModel } = payload as Record<
+    string,
+    unknown
+  >;
   if (!isRunResultStatus(status))
     throw new Error(`status must be one of ${RUN_RESULT_STATUSES.join(", ")}`);
   if (!Number.isInteger(turns) || (turns as number) < 0)
@@ -325,12 +328,15 @@ function parseRunResultReport(payload: unknown): RunResultReport {
     throw new Error("result must be an object");
   if (status === "ok" && !result) throw new Error("an ok result needs a review result");
   if (error !== undefined && typeof error !== "string") throw new Error("error must be a string");
+  if (refusedModel !== undefined && (typeof refusedModel !== "string" || refusedModel === ""))
+    throw new Error("refusedModel must be a non-empty string");
   return {
     status,
     turns: turns as number,
     ...(status === "ok" ? { result: parseReviewResult(result) } : {}),
     ...(error ? { error: error as string } : {}),
     ...(commentable === undefined ? {} : { commentable: parseCommentable(commentable) }),
+    ...(refusedModel === undefined ? {} : { refusedModel }),
   };
 }
 
@@ -429,6 +435,7 @@ export async function recordResult(
     result,
     commentable: report.commentable ?? {},
     turns: completed.turns,
+    ...(completed.refusedModel === null ? {} : { refusedModel: completed.refusedModel }),
   });
   await setCommitStatus(
     deps.github,

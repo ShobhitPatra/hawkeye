@@ -29,8 +29,14 @@ export type ReviewPipelineDependencies = {
   onTurn?(turns: number): void;
 };
 export type ReviewPipelineOutcome =
-  | { status: "ok"; turns: number; result: ReviewResult; diff: string }
-  | { status: Exclude<RunResultStatus, "ok">; turns: number; error: string; diff: string };
+  | { status: "ok"; turns: number; result: ReviewResult; diff: string; refusedModel?: string }
+  | {
+      status: Exclude<RunResultStatus, "ok">;
+      turns: number;
+      error: string;
+      diff: string;
+      refusedModel?: string;
+    };
 
 export function wallClockRanOut(wallClockMs: number, step: string) {
   return {
@@ -100,23 +106,31 @@ export async function runReviewPipeline(
         diff: worktree.diff,
       };
     const streamLines: string[] = [];
-    const harnessResult = await deps.harness.run({
-      cwd: worktree.path,
-      promptPath,
-      resultPath,
-      settingsPath,
-      maxTurns: input.maxTurns,
-      wallClockMs: Math.max(input.wallClockMs - (Date.now() - startedAt), 0),
-      ...(input.model === undefined ? {} : { model: input.model }),
-      ...(input.signal === undefined ? {} : { signal: input.signal }),
-      onEvent: (event) => {
-        if (event.type === "stdout") streamLines.push(event.line);
-        if (event.type === "turn") {
-          deps.log(`turn ${event.turns}`);
-          deps.onTurn?.(event.turns);
-        }
-      },
-    });
+    const runHarness = (model: string | undefined) =>
+      deps.harness.run({
+        cwd: worktree.path,
+        promptPath,
+        resultPath,
+        settingsPath,
+        maxTurns: input.maxTurns,
+        wallClockMs: Math.max(input.wallClockMs - (Date.now() - startedAt), 0),
+        ...(model === undefined ? {} : { model }),
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+        onEvent: (event) => {
+          if (event.type === "stdout") streamLines.push(event.line);
+          if (event.type === "turn") {
+            deps.log(`turn ${event.turns}`);
+            deps.onTurn?.(event.turns);
+          }
+        },
+      });
+    let harnessResult = await runHarness(input.model);
+    const refusedModel = harnessResult.refusedModel;
+    if (refusedModel !== undefined) {
+      deps.log(`model ${refusedModel} was refused; reviewing on the CLI default`);
+      harnessResult = await runHarness(undefined);
+    }
+    const fallback = refusedModel === undefined ? {} : { refusedModel };
     await writeFile(streamPath, streamLines.join("\n"));
     if (harnessResult.status !== "ok")
       return {
@@ -124,17 +138,19 @@ export async function runReviewPipeline(
         turns: harnessResult.turns,
         error: harnessResult.error ?? "stopped without a message",
         diff: worktree.diff,
+        ...fallback,
       };
 
     try {
       const result = parseReviewResult(JSON.parse(await readFile(resultPath, "utf8")));
-      return { status: "ok", turns: harnessResult.turns, result, diff: worktree.diff };
+      return { status: "ok", turns: harnessResult.turns, result, diff: worktree.diff, ...fallback };
     } catch (error) {
       return {
         status: "invalid-output",
         turns: harnessResult.turns,
         error: (error as Error).message,
         diff: worktree.diff,
+        ...fallback,
       };
     }
   } finally {

@@ -845,6 +845,42 @@ describe("recordResult", () => {
     });
   });
 
+  it("stores the refused model and names it in the review's footer", async () => {
+    const runId = await claimedRunId();
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, {
+        status: "ok",
+        turns: 3,
+        result: reviewResult,
+        refusedModel: "claude-fable-5-1",
+      }),
+      { db, github },
+      runId,
+    );
+
+    expect(response.status).toBe(200);
+    const [row] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
+    expect(row).toMatchObject({ status: "ok", refusedModel: "claude-fable-5-1" });
+    const [, , body] = (github.updateReview as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(body).toContain("reviewed on the default model because claude-fable-5-1 was refused");
+  });
+
+  it("rejects an empty refused model", async () => {
+    const runId = await claimedRunId();
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, {
+        status: "ok",
+        turns: 3,
+        result: reviewResult,
+        refusedModel: "",
+      }),
+      { db, github },
+      runId,
+    );
+    expect(response.status).toBe(400);
+  });
+
   it("records the findings of an ok result and reports the counts", async () => {
     const withFindings: ReviewResult = {
       ...reviewResult,

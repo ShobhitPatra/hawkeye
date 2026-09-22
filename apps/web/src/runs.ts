@@ -24,6 +24,7 @@ export type PullRequestRun = {
   summary?: string;
   lenses?: ReviewResult["lenses"];
   runnerName?: string;
+  refusedModel?: string;
 };
 
 export type PullRequestFinding = {
@@ -59,6 +60,7 @@ export async function listRunsForPullRequest(
       endedAt: run.endedAt,
       error: run.error,
       result: run.result,
+      refusedModel: run.refusedModel,
       headSha: job.headSha,
       githubReviewId: reviewPosted.githubReviewId,
       runnerName: runner.name,
@@ -84,6 +86,7 @@ export async function listRunsForPullRequest(
     ...(row.result?.reportedVerdict ? { reportedVerdict: row.result.reportedVerdict } : {}),
     ...(row.endedAt ? { endedAt: row.endedAt } : {}),
     ...(row.error ? { error: row.error } : {}),
+    ...(row.refusedModel ? { refusedModel: row.refusedModel } : {}),
     ...(row.githubReviewId
       ? {
           reviewUrl: `https://github.com/${input.owner}/${input.repo}/pull/${input.number}#pullrequestreview-${row.githubReviewId}`,

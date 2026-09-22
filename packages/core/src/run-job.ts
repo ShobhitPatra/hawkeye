@@ -35,8 +35,14 @@ export type RunReviewJobDependencies = {
   onTurn?(turns: number): void;
 };
 export type RunReviewJobOutcome =
-  | { status: "ok"; turns: number; result: ReviewResult; commentable: Record<string, number[]> }
-  | { status: Exclude<RunResultStatus, "ok">; turns: number; error: string };
+  | {
+      status: "ok";
+      turns: number;
+      result: ReviewResult;
+      commentable: Record<string, number[]>;
+      refusedModel?: string;
+    }
+  | { status: Exclude<RunResultStatus, "ok">; turns: number; error: string; refusedModel?: string };
 
 export async function runReviewJob(
   input: RunReviewJobInput,
@@ -93,14 +99,16 @@ export async function runReviewJob(
     },
     deps,
   );
+  const fallback = outcome.refusedModel === undefined ? {} : { refusedModel: outcome.refusedModel };
   return outcome.status === "ok"
     ? {
         status: "ok",
         turns: outcome.turns,
         result: outcome.result,
         commentable: toCommentableRecord(commentableLines(outcome.diff)),
+        ...fallback,
       }
-    : { status: outcome.status, turns: outcome.turns, error: outcome.error };
+    : { status: outcome.status, turns: outcome.turns, error: outcome.error, ...fallback };
 }
 
 function toCommentableRecord(lines: Map<string, Set<number>>): Record<string, number[]> {

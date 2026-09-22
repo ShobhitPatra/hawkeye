@@ -123,14 +123,17 @@ export function createClaudeCodeHarness(
       if (hasResult) return { status: "ok", turns };
       if (stopReason) return { status: stopReason, turns };
       if (model !== undefined && stderrTail.some((line) => line.includes("unrecognized_model"))) {
-        const remedy =
-          options.model === undefined
-            ? "choose another in Settings"
-            : "start the runner with another --model or without it";
+        if (options.model !== undefined)
+          return {
+            status: "error",
+            turns,
+            error: `Model ${model} was refused by the claude CLI; start the runner with another --model or without it.`,
+          };
         return {
           status: "error",
           turns,
-          error: `Model ${model} was refused by the claude CLI; ${remedy}.`,
+          error: `Model ${model} was refused by the claude CLI; choose another in Settings.`,
+          refusedModel: model,
         };
       }
       return {
