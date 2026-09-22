@@ -135,10 +135,12 @@ async function sendGitHubRequest(
   url: string,
   auth: string,
   body?: unknown,
+  signal?: AbortSignal,
 ): Promise<{ payload: unknown; response: Response }> {
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   const response = await fetchImpl(url, {
     method,
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: signal === undefined ? timeout : AbortSignal.any([timeout, signal]),
     headers: {
       Authorization: auth,
       Accept: "application/vnd.github+json",
@@ -161,12 +163,15 @@ export async function fetchPullRequestDetails(
   deps: { fetch: typeof fetch; apiBase?: string },
   reference: PullRequestReference,
   token: string,
+  options: { signal?: AbortSignal } = {},
 ): Promise<PullRequestDetails> {
   const { payload } = await sendGitHubRequest(
     deps.fetch,
     "GET",
     `${deps.apiBase ?? DEFAULT_API_BASE}${pulls(reference)}`,
     bearer(token),
+    undefined,
+    options.signal,
   );
   const pr = payload as {
     number: number;
@@ -202,6 +207,7 @@ export async function fetchLinkedIssue(
   reference: PullRequestReference,
   body: string,
   token: string,
+  options: { signal?: AbortSignal } = {},
 ): Promise<LinkedIssue | undefined> {
   const number = linkedIssueNumber(body);
   if (number === undefined) return undefined;
@@ -210,6 +216,8 @@ export async function fetchLinkedIssue(
     "GET",
     `${deps.apiBase ?? DEFAULT_API_BASE}/repos/${reference.owner}/${reference.repo}/issues/${number}`,
     bearer(token),
+    undefined,
+    options.signal,
   ).catch((error: unknown) => {
     if (error instanceof GitHubRequestError && error.status === 404) return undefined;
     throw error;

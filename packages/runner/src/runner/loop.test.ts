@@ -183,7 +183,9 @@ describe("runRunnerLoop", () => {
     expect(d.logged).toContain("turn 1");
     expect(d.reported[2]).toMatchObject({ state: "posted", result: review, turns: 1 });
     const harnessInput = (d.harness.run as ReturnType<typeof vi.fn>).mock.calls[0]![0];
-    expect(harnessInput).toMatchObject({ maxTurns: 3, wallClockMs: 60_000, model: "sonnet" });
+    expect(harnessInput).toMatchObject({ maxTurns: 3, model: "sonnet" });
+    expect(harnessInput.wallClockMs).toBeLessThanOrEqual(60_000);
+    expect(harnessInput.wallClockMs).toBeGreaterThan(59_000);
   });
   it("runs up to the job's concurrency at once and numbers the slots", async () => {
     const second: ClaimedJob = {

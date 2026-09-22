@@ -117,7 +117,9 @@ job: (repo, pr, head sha, merge base sha, previously reviewed sha?, open finding
    · Stop hook: refuse to stop until the result file is written
    · tools: bypassPermissions; Edit/Write/NotebookEdit/WebFetch/WebSearch removed with
      --disallowedTools; Bash runs with the user's environment and filesystem, not only the checkout
-   · budget: turns (harness-enforced, default 40), wall clock 15 min (per-user tunable)
+   · budget: turns (harness-enforced, default 40), wall clock 15 min (per-user tunable) over the
+     whole job: the pull request fetch and the clone run under it too, and the harness gets what is
+     left, so a hung clone ends the run as a timeout instead of holding the claim forever
         │
         ▼
  runner: parse + validate JSON (zod) → report to control plane

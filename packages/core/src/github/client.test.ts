@@ -4,6 +4,7 @@ import {
   createGitHubClient,
   fetchMergeBase,
   GitHubRequestError,
+  fetchPullRequestDetails,
   linkedIssueNumber,
 } from "./client.js";
 
@@ -167,6 +168,28 @@ describe("createGitHubClient", () => {
     });
     const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
     await expect(client.mergeBase(ref, "base", "head", "t")).rejects.toThrow(/merge base/);
+  });
+  it("combines the caller's signal with the request timeout when fetching a pull request", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      "GET /repos/o/r/pulls/5": () => ({
+        json: {
+          number: 5,
+          title: "t",
+          body: "",
+          draft: false,
+          user: { login: "a" },
+          head: { sha: "h", ref: "b" },
+          base: { sha: "b", ref: "main", repo: { clone_url: "https://github.com/o/r.git" } },
+          commits: 1,
+        },
+      }),
+    });
+    const control = new AbortController();
+    await fetchPullRequestDetails({ fetch: fetchImpl }, ref, "t", { signal: control.signal });
+    const sent = calls[0]!.init.signal as AbortSignal;
+    expect(sent.aborted).toBe(false);
+    control.abort();
+    expect(sent.aborted).toBe(true);
   });
   it("lists reviews with author login and body, and posts a review", async () => {
     const { fetchImpl, calls } = fakeFetch({
