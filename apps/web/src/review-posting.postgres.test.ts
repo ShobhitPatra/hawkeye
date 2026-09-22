@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { GitHubClient, ReviewResult } from "@hawkeye/core";
+import { eq, inArray } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createDb, type Db } from "./db/client";
@@ -70,6 +71,16 @@ function holdingCommit(db: Db, hold: { entered: () => void; released: Promise<vo
   });
 }
 
+const suffix = randomUUID();
+const armedPr = {
+  id: `armed-${suffix}`,
+  userId: `user-${suffix}`,
+  installationId: `installation-${suffix}`,
+  owner: `octo-${suffix}`,
+  repo: "repo",
+  number: 7,
+};
+
 describe.skipIf(!databaseUrl)("the posting lock against two Postgres connections", () => {
   let first: ReturnType<typeof createDb>;
   let second: ReturnType<typeof createDb>;
@@ -81,20 +92,24 @@ describe.skipIf(!databaseUrl)("the posting lock against two Postgres connections
   });
 
   afterAll(async () => {
+    const jobs = first
+      .select({ id: schema.job.id })
+      .from(schema.job)
+      .where(eq(schema.job.armedPrId, armedPr.id));
+    await first.delete(schema.reviewPosted).where(eq(schema.reviewPosted.armedPrId, armedPr.id));
+    await first.delete(schema.run).where(inArray(schema.run.jobId, jobs));
+    await first.delete(schema.job).where(eq(schema.job.armedPrId, armedPr.id));
+    await first.delete(schema.armedPr).where(eq(schema.armedPr.id, armedPr.id));
+    await first.delete(schema.runner).where(eq(schema.runner.userId, armedPr.userId));
+    await first
+      .delete(schema.installation)
+      .where(eq(schema.installation.id, armedPr.installationId));
+    await first.delete(schema.user).where(eq(schema.user.id, armedPr.userId));
     await first.$client.end();
     await second.$client.end();
   });
 
   it("lets only the round holding the lock post", async () => {
-    const suffix = randomUUID();
-    const armedPr = {
-      id: `armed-${suffix}`,
-      userId: `user-${suffix}`,
-      installationId: `installation-${suffix}`,
-      owner: `octo-${suffix}`,
-      repo: "repo",
-      number: 7,
-    };
     const headSha = "a".repeat(40);
     await first
       .insert(schema.user)
