@@ -163,6 +163,17 @@ describe("runReviewJob", () => {
     });
     expect(d.createWorktree).not.toHaveBeenCalled();
   });
+  it("passes a failure after the clone through even once the wall clock is over", async () => {
+    const d = deps();
+    vi.mocked(d.harness.run).mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      throw new Error("harness exploded");
+    });
+
+    await expect(runReviewJob(await input({ wallClockMs: 50 }), d)).rejects.toThrow(
+      "harness exploded",
+    );
+  });
   it("gives the harness the wall clock that is left after the fetch and the clone", async () => {
     const d = deps();
     d.createWorktree.mockImplementation(async (i) => {

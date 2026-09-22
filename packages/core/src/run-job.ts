@@ -1,8 +1,13 @@
-import { fetchLinkedIssue, fetchPullRequestDetails } from "./github/client.js";
+import {
+  fetchLinkedIssue,
+  fetchPullRequestDetails,
+  type LinkedIssue,
+  type PullRequestDetails,
+} from "./github/client.js";
 import type { PullRequestReference } from "./github/pull-request-reference.js";
 import type { HarnessSpec } from "./harness/harness.js";
 import { commentableLines } from "./review/diff-lines.js";
-import { runReviewPipeline } from "./review-pipeline.js";
+import { runReviewPipeline, wallClockRanOut } from "./review-pipeline.js";
 import type { RunResultStatus } from "./runner/protocol.js";
 import type { PriorFinding } from "./contract/prompt.js";
 import type { ReviewResult } from "./contract/schema.js";
@@ -37,42 +42,26 @@ export async function runReviewJob(
   input: RunReviewJobInput,
   deps: RunReviewJobDependencies,
 ): Promise<RunReviewJobOutcome> {
+  const { reference } = input;
   const startedAt = Date.now();
   const deadline = AbortSignal.timeout(input.wallClockMs);
-  let step = "fetching the pull request";
+  let pullRequest: PullRequestDetails;
+  let linkedIssue: LinkedIssue | undefined;
   try {
-    return await reviewWithin(input, deps, deadline, startedAt, (name) => {
-      step = name;
+    pullRequest = await fetchPullRequestDetails({ fetch: deps.fetch }, reference, input.token, {
+      signal: deadline,
     });
+    linkedIssue = await fetchLinkedIssue(
+      { fetch: deps.fetch },
+      reference,
+      pullRequest.body,
+      input.token,
+      { signal: deadline },
+    );
   } catch (error) {
     if (!deadline.aborted) throw error;
-    return {
-      status: "timeout",
-      turns: 0,
-      error: `the wall clock of ${Math.round(input.wallClockMs / 60_000)} minutes ran out while ${step}`,
-    };
+    return wallClockRanOut(input.wallClockMs, "fetching the pull request");
   }
-}
-
-async function reviewWithin(
-  input: RunReviewJobInput,
-  deps: RunReviewJobDependencies,
-  deadline: AbortSignal,
-  startedAt: number,
-  enter: (step: string) => void,
-): Promise<RunReviewJobOutcome> {
-  const { reference } = input;
-  const pullRequest = await fetchPullRequestDetails({ fetch: deps.fetch }, reference, input.token, {
-    signal: deadline,
-  });
-  const linkedIssue = await fetchLinkedIssue(
-    { fetch: deps.fetch },
-    reference,
-    pullRequest.body,
-    input.token,
-    { signal: deadline },
-  );
-  enter("preparing the checkout");
   const outcome = await runReviewPipeline(
     {
       cloneUrl: pullRequest.cloneUrl,
