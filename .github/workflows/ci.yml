@@ -17,6 +17,16 @@ jobs:
     name: ${{ matrix.gate }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: hawkeye
+          POSTGRES_PASSWORD: hawkeye
+          POSTGRES_DB: hawkeye
+        ports:
+          - 5432:5432
+        options: --health-cmd "pg_isready -U hawkeye -d hawkeye" --health-interval 5s --health-timeout 3s --health-retries 10
     strategy:
       fail-fast: false
       matrix:
@@ -46,4 +56,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - if: steps.changes.outputs.code != 'false' || !matrix.skipped_for_docs
+        env:
+          TEST_DATABASE_URL: postgres://hawkeye:hawkeye@localhost:5432/hawkeye
         run: pnpm ${{ matrix.gate }}
