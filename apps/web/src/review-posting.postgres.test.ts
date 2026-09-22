@@ -6,9 +6,9 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createDb, type Db } from "./db/client";
 import * as schema from "./db/schema";
 import { createRun } from "./job-queue";
-import { enqueueJob } from "./jobs";
 import { postReviewForRun } from "./review-posting";
 import { createRunnerToken } from "./runner-tokens";
+import { queueJob } from "./test/pglite";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -103,10 +103,11 @@ describe.skipIf(!databaseUrl)("the posting lock against two Postgres connections
       .insert(schema.installation)
       .values({ id: armedPr.installationId, accountLogin: armedPr.owner, accountType: "User" });
     await first.insert(schema.armedPr).values(armedPr);
-    const queued = await enqueueJob(first, {
+    const queued = await queueJob(first, {
       armedPrId: armedPr.id,
       headSha,
       baseSha: "b".repeat(40),
+      headCurrentAt: new Date(),
       notBefore: new Date(),
     });
     const { runner } = await createRunnerToken(first, { userId: armedPr.userId, name: "laptop" });
