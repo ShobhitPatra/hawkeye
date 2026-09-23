@@ -79,6 +79,7 @@ export const armedPr = pgTable(
     owner: text("owner").notNull(),
     repo: text("repo").notNull(),
     number: integer("number").notNull(),
+    title: text("title"),
     quietWindowSeconds: integer("quiet_window_s"),
     armedAt: timestamp("armed_at", { withTimezone: true }).notNull().defaultNow(),
     disarmedAt: timestamp("disarmed_at", { withTimezone: true }),

@@ -56,6 +56,7 @@ function event(overrides: Partial<PullRequestEvent> = {}): PullRequestEvent {
     action: "synchronize",
     repository: { owner: "octo", name: "repo" },
     number: 7,
+    title: "Add thing",
     headSha: "h".repeat(40),
     baseSha: "b".repeat(40),
     updatedAt: "2026-01-01T00:00:00Z",
@@ -111,7 +112,13 @@ describe("handlePullRequestEvent on opened", () => {
     );
     expect(result).toEqual({ armed: 1, enqueued: 1, disarmed: 0, cancelled: 0 });
     const [row] = await armedRows();
-    expect(row).toMatchObject({ userId: "author", installationId: "10", owner: "octo", number: 7 });
+    expect(row).toMatchObject({
+      userId: "author",
+      installationId: "10",
+      owner: "octo",
+      number: 7,
+      title: "Add thing",
+    });
     expect(await jobs()).toHaveLength(1);
   });
 

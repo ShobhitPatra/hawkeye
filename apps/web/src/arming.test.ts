@@ -39,6 +39,7 @@ function rowsFor(owner: string) {
 describe("armPullRequest", () => {
   it("inserts an armed row", async () => {
     const armed = await armPullRequest(db, {
+      title: "Add thing",
       userId: "user-1",
       installationId: "10",
       owner: "insert",
@@ -59,6 +60,7 @@ describe("armPullRequest", () => {
 
   it("returns the existing row when the pull request is already armed", async () => {
     const input = {
+      title: "Add thing",
       userId: "user-1",
       installationId: "10",
       owner: "twice",
@@ -74,6 +76,7 @@ describe("armPullRequest", () => {
 
   it("updates the installation on an already-armed row when it changes", async () => {
     const input = {
+      title: "Add thing",
       userId: "user-1",
       installationId: "10",
       owner: "reinstall",
@@ -88,8 +91,24 @@ describe("armPullRequest", () => {
     expect(await rowsFor("reinstall")).toHaveLength(1);
   });
 
+  it("stores a new title on an already-armed row", async () => {
+    const input = {
+      title: "Add thing",
+      userId: "user-1",
+      installationId: "10",
+      owner: "octo",
+      repo: "repo",
+      number: 9,
+    };
+    const first = await armPullRequest(db, input);
+    const second = await armPullRequest(db, { ...input, title: "Add the thing" });
+    expect(second.id).toBe(first.id);
+    expect(second.title).toBe("Add the thing");
+  });
+
   it("arms again after a disarm, leaving the disarmed row behind", async () => {
     const input = {
+      title: "Add thing",
       userId: "user-1",
       installationId: "10",
       owner: "again",
@@ -109,6 +128,7 @@ describe("armPullRequest", () => {
 describe("disarmPullRequest", () => {
   it("stamps disarmed_at on the active row", async () => {
     await armPullRequest(db, {
+      title: "Add thing",
       userId: "user-1",
       installationId: "10",
       owner: "off",
@@ -135,6 +155,7 @@ describe("disarmPullRequest", () => {
 
   it("does not disarm another user's row", async () => {
     await armPullRequest(db, {
+      title: "Add thing",
       userId: "user-1",
       installationId: "10",
       owner: "mine",
