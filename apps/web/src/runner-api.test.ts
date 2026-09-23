@@ -1052,6 +1052,77 @@ describe("recordResult", () => {
     expect(row?.detail).toBe("Close it.");
   });
 
+  it("replies to and resolves the thread of a finding the next round reports addressed", async () => {
+    const leak = {
+      path: "a.txt",
+      line: 2,
+      severity: "should_fix",
+      claim: "Leaks a handle",
+      detail: "Close it.",
+    };
+    github.reviewComments = vi.fn(async () => [
+      {
+        id: "91",
+        path: "a.txt",
+        line: 2,
+        body: encodeFindingMarker(findingId("a.txt", "Leaks a handle")),
+      },
+    ]);
+    github.reviewThreads = vi.fn(async () => [{ id: "T1", isResolved: false, commentIds: ["91"] }]);
+    github.replyToReviewComment = vi.fn(async () => {});
+    github.resolveReviewThread = vi.fn(async () => {});
+    const firstRunId = await claimedRunId();
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${firstRunId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: { ...reviewResult, verdict: "changes_needed", findings: [leak] },
+        commentable: { "a.txt": [2] },
+      }),
+      { db, github },
+      firstRunId,
+    );
+    expect(github.replyToReviewComment).not.toHaveBeenCalled();
+    await queueJob(db, {
+      headCurrentAt: new Date(),
+      armedPrId: "armed-1",
+      headSha: "c".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: new Date(now.getTime() - 60_000),
+    });
+    const claim = await claimJob(request("/api/runner/jobs"), claimDeps());
+    const secondRunId = (await claim.json()).job.runId as string;
+    github.updateReview = vi.fn(async () => {});
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${secondRunId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: {
+          ...reviewResult,
+          priorFindings: [
+            { id: findingId("a.txt", "Leaks a handle"), status: "addressed", note: "closed" },
+          ],
+        },
+      }),
+      { db, github },
+      secondRunId,
+    );
+
+    expect(await response.json()).toEqual({
+      ok: true,
+      posted: "posted",
+      findings: { created: 0, updated: 0, resolved: 1 },
+    });
+    expect(github.replyToReviewComment).toHaveBeenCalledWith(
+      { owner: "octo", repo: "a", number: 1 },
+      "91",
+      "Addressed in ccccccc.",
+      "ghs_token",
+    );
+    expect(github.resolveReviewThread).toHaveBeenCalledWith("T1", "ghs_token");
+  });
+
   it("does not post twice for the same head", async () => {
     const firstRunId = await claimedRunId();
     await recordResult(
