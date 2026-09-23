@@ -636,6 +636,39 @@ describe("postReviewForRun", () => {
     expect(github.postReview).not.toHaveBeenCalled();
   });
 
+  it("keeps counting from the full history when a round from scratch never posted", async () => {
+    github.updateReview = vi.fn(async () => {});
+    await seedLivingReview({ ...result, findings: [] });
+    const [failedJob] = await db
+      .insert(schema.job)
+      .values({
+        armedPrId: armedPr.id,
+        headSha: "e".repeat(40),
+        baseSha: "b".repeat(40),
+        notBefore: new Date(),
+        state: "done",
+        fromScratch: true,
+        createdAt: new Date("2026-01-01T12:00:00Z"),
+      })
+      .returning({ id: schema.job.id });
+    const [failedRun] = await db
+      .insert(schema.run)
+      .values({ jobId: failedJob!.id, runnerId, status: "ok", result })
+      .returning({ id: schema.run.id });
+    await db.insert(schema.reviewPosted).values({
+      runId: failedRun!.id,
+      armedPrId: armedPr.id,
+      headSha: "e".repeat(40),
+      githubReviewId: null,
+      postedAt: new Date("2026-01-01T12:00:00Z"),
+    });
+
+    await expect(post()).resolves.toBe("posted");
+    const [, , body] = (github.updateReview as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(body).toContain(`| 1 | \`${"c".repeat(7)}\` | Changes needed |`);
+    expect(body).toContain(`| 2 | \`${"a".repeat(7)}\` | Changes needed |`);
+  });
+
   it("patches the living review without a supplemental review when nothing is new", async () => {
     github.updateReview = vi.fn(async () => {});
     await seedLivingReview(result);
