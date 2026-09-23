@@ -1,14 +1,8 @@
 import { type Lens, type PullRequestReference, SEVERITIES, type Severity } from "@hawkeye/core";
 import Link from "next/link";
 import { formatUpdated } from "@/format-updated";
-import {
-  formatDuration,
-  formatError,
-  postingNote,
-  runFailureLabel,
-  shortSha,
-  verdictLabel,
-} from "@/run-format";
+import { postingNote } from "@/posting-note";
+import { formatDuration, formatError, runFailureLabel, shortSha, verdictLabel } from "@/run-format";
 import type { ArmedPullRequestSummary, PullRequestFinding, PullRequestRun } from "@/runs";
 import { ReviewControl } from "../../../review-control";
 
