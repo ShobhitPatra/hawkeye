@@ -8,6 +8,7 @@ import { Command } from "commander";
 import packageJson from "../package.json" with { type: "json" };
 import {
   createClaudeCodeHarness,
+  createCodexHarness,
   createGitHubClient,
   createWorktree,
   HAWKEYE_REPOSITORY_URL,
@@ -234,7 +235,7 @@ export function createProgram(io: {
     .command("runner")
     .description("review armed pull requests claimed from the control plane")
     .option("--once", "claim at most one job, then exit", false)
-    .option("--model <name>", "model passed to the claude CLI (else its default)")
+    .option("--model <name>", "model passed to the CLI each job names (else its default)")
     .option(
       "--contract <path>",
       "review contract that replaces the built-in lens and finding rules",
@@ -282,6 +283,11 @@ export function createProgram(io: {
               harness: createClaudeCodeHarness(
                 options.model === undefined ? {} : { model: options.model },
               ),
+              harnesses: {
+                codex: createCodexHarness(
+                  options.model === undefined ? {} : { model: options.model },
+                ),
+              },
               createWorktree,
               readRepositoryRules,
               createRunDirectory: (reference) =>

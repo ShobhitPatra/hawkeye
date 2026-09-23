@@ -360,9 +360,9 @@ The daemon then loops: claim a job, clone the PR with the one-hour token the job
 
 **Retries.** `--once` handles a single job and exits non-zero when three claims in a row fail or the result cannot be delivered. The daemon waits a second after an empty poll, or as long as the answer's `Retry-After` says (1 to 300 seconds; it logs `idle` once when that starts), retries a failed claim after five seconds, and retries a failed result report three times (2 s, 4 s, 8 s) before logging it and moving on. The control plane requeues a claim that stops heartbeating. When a run fails because the plan rate-limited or overloaded the CLI (the run error, which holds the stderr tail and the text of a failed result event, names `rate_limit_error`, `overloaded_error`, a 429 or 529 API error, or a usage limit), the run is reported failed as any other and the daemon stops claiming for a minute, doubling while it keeps happening up to sixteen minutes, logging `waiting` with the reason; reviews already running finish, and a successful run resets the pause.
 
-**Flags.** `--contract <path>` overrides the built-in contract (else the job's per-user override, else the default); `--model <name>` picks the claude CLI model for every job this runner claims.
+**Flags.** `--contract <path>` overrides the built-in contract (else the job's per-user override, else the default); `--model <name>` picks the model for every job this runner claims, whichever CLI the job names.
 
-The daemon never posts to GitHub; the control plane does. It needs Node 22+, git 2.31 or newer and the `claude` CLI signed in; it holds no GitHub credentials of its own.
+The daemon never posts to GitHub; the control plane does. It needs Node 22+, git 2.31 or newer and the CLI the user's Settings name signed in (`claude`, or `codex` once Settings can name it); a job naming a harness this runner does not have fails with a sentence pointing at Settings. It holds no GitHub credentials of its own.
 
 ## The control plane
 
