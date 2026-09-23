@@ -7,7 +7,12 @@ import { promisify } from "node:util";
 import { Command } from "commander";
 import packageJson from "../package.json" with { type: "json" };
 import {
+  type ContainerRuntime,
   createClaudeCodeHarness,
+  createContainerSpawn,
+  ensureRunnerImage,
+  RUNNER_IMAGE,
+  type SpawnLike,
   createGitHubClient,
   createWorktree,
   HAWKEYE_REPOSITORY_URL,
@@ -36,6 +41,30 @@ const CONFIG_PATH = join(homedir(), ".config", "hawkeye", "config.json");
 const RUNNER_CONFIG_PATH = join(homedir(), ".config", "hawkeye", "runner.json");
 const DEFAULT_CONTRACT_PATH = join(homedir(), ".config", "hawkeye", "contract.md");
 const RUNS_ROOT = join(homedir(), ".cache", "hawkeye", "runs");
+
+async function sandboxSpawn(
+  runtime: ContainerRuntime,
+  report: (event: { state: "sandbox"; detail: string }) => void,
+): Promise<SpawnLike> {
+  const built = await ensureRunnerImage(runtime, {
+    log: (line) => report({ state: "sandbox", detail: line }),
+  });
+  report({ state: "sandbox", detail: `${runtime} · ${RUNNER_IMAGE} ${built}` });
+  const home = homedir();
+  return createContainerSpawn({
+    runtime,
+    home,
+    mounts: [
+      { path: RUNS_ROOT },
+      { path: join(home, ".claude") },
+      { path: join(home, ".claude.json") },
+      { path: join(home, ".codex") },
+    ],
+    ...(process.getuid === undefined || process.getgid === undefined
+      ? {}
+      : { user: `${process.getuid()}:${process.getgid()}` }),
+  });
+}
 const REVIEWS_ROOT = join(homedir(), ".cache", "hawkeye", "reviews");
 
 const execFileAsync = promisify(execFile);
@@ -236,73 +265,90 @@ export function createProgram(io: {
     .option("--once", "claim at most one job, then exit", false)
     .option("--model <name>", "model passed to the claude CLI (else its default)")
     .option(
+      "--sandbox <runtime>",
+      "run each review's CLI inside a container (docker or podman) that sees only the run directory and the CLI's login files",
+    )
+    .option(
       "--contract <path>",
       "review contract that replaces the built-in lens and finding rules",
     )
-    .action(async (options: { once: boolean; contract?: string; model?: string }) => {
-      try {
-        const config = await loadRunnerConfig({
-          env: process.env,
-          configPath: RUNNER_CONFIG_PATH,
-          readFile: (p) => readFile(p, "utf8"),
-        });
-        const contract = await loadContractOverride({
-          ...(options.contract === undefined ? {} : { explicitPath: options.contract }),
-          env: process.env,
-          home: homedir(),
-          defaultPath: DEFAULT_CONTRACT_PATH,
-          readFile: (p) => readFile(p, "utf8"),
-        });
-        const terminal = runnerConsole({
-          stderr: io.stderr,
-          appendFile: (path, line) => appendFileSync(path, line),
-          home: homedir(),
-          ...(io.stderrStyle === undefined ? {} : { style: io.stderrStyle }),
-        });
-        if (contract) terminal.report({ state: "contract", detail: contract.path });
-        const stop = new AbortController();
-        const onSignal = (signal: NodeJS.Signals) => {
-          terminal.report({
-            state: "stopping",
-            detail: `${signal} received; finishing the current job`,
-          });
-          stop.abort();
-        };
-        process.once("SIGINT", onSignal);
-        process.once("SIGTERM", onSignal);
-        terminal.report({ state: "polling", detail: config.controlPlaneUrl });
+    .action(
+      async (options: { once: boolean; contract?: string; model?: string; sandbox?: string }) => {
         try {
-          await runRunnerLoop(
-            {
-              client: createControlPlaneClient({
-                baseUrl: config.controlPlaneUrl,
-                token: config.token,
+          if (
+            options.sandbox !== undefined &&
+            options.sandbox !== "docker" &&
+            options.sandbox !== "podman"
+          )
+            throw new Error(`--sandbox takes docker or podman, not ${options.sandbox}`);
+          const config = await loadRunnerConfig({
+            env: process.env,
+            configPath: RUNNER_CONFIG_PATH,
+            readFile: (p) => readFile(p, "utf8"),
+          });
+          const contract = await loadContractOverride({
+            ...(options.contract === undefined ? {} : { explicitPath: options.contract }),
+            env: process.env,
+            home: homedir(),
+            defaultPath: DEFAULT_CONTRACT_PATH,
+            readFile: (p) => readFile(p, "utf8"),
+          });
+          const terminal = runnerConsole({
+            stderr: io.stderr,
+            appendFile: (path, line) => appendFileSync(path, line),
+            home: homedir(),
+            ...(io.stderrStyle === undefined ? {} : { style: io.stderrStyle }),
+          });
+          if (contract) terminal.report({ state: "contract", detail: contract.path });
+          const sandbox =
+            options.sandbox === undefined
+              ? undefined
+              : await sandboxSpawn(options.sandbox, terminal.report);
+          const stop = new AbortController();
+          const onSignal = (signal: NodeJS.Signals) => {
+            terminal.report({
+              state: "stopping",
+              detail: `${signal} received; finishing the current job`,
+            });
+            stop.abort();
+          };
+          process.once("SIGINT", onSignal);
+          process.once("SIGTERM", onSignal);
+          terminal.report({ state: "polling", detail: config.controlPlaneUrl });
+          try {
+            await runRunnerLoop(
+              {
+                client: createControlPlaneClient({
+                  baseUrl: config.controlPlaneUrl,
+                  token: config.token,
+                  fetch,
+                }),
+                harness: createClaudeCodeHarness({
+                  ...(options.model === undefined ? {} : { model: options.model }),
+                  ...(sandbox === undefined ? {} : { spawn: sandbox }),
+                }),
+                createWorktree,
+                readRepositoryRules,
+                createRunDirectory: (reference) =>
+                  createRunDirectory({ root: RUNS_ROOT, reference, now: new Date() }),
                 fetch,
-              }),
-              harness: createClaudeCodeHarness(
-                options.model === undefined ? {} : { model: options.model },
-              ),
-              createWorktree,
-              readRepositoryRules,
-              createRunDirectory: (reference) =>
-                createRunDirectory({ root: RUNS_ROOT, reference, now: new Date() }),
-              fetch,
-              report: terminal.report,
-              log: terminal.log,
-              ...(contract ? { contractOverride: contract.content } : {}),
-              signal: stop.signal,
-            },
-            { once: options.once },
-          );
-        } finally {
-          process.off("SIGINT", onSignal);
-          process.off("SIGTERM", onSignal);
+                report: terminal.report,
+                log: terminal.log,
+                ...(contract ? { contractOverride: contract.content } : {}),
+                signal: stop.signal,
+              },
+              { once: options.once },
+            );
+          } finally {
+            process.off("SIGINT", onSignal);
+            process.off("SIGTERM", onSignal);
+          }
+        } catch (error) {
+          io.stderr((error as Error).message);
+          process.exitCode = 1;
         }
-      } catch (error) {
-        io.stderr((error as Error).message);
-        process.exitCode = 1;
-      }
-    });
+      },
+    );
 
   runner
     .command("login")

@@ -5,7 +5,7 @@ import type { RunnerEvent } from "./loop.js";
 
 export type ConsoleEvent =
   | RunnerEvent
-  | { state: "polling" | "contract" | "stopping"; detail: string };
+  | { state: "polling" | "contract" | "sandbox" | "stopping"; detail: string };
 
 const STATE_WIDTH = 10;
 const PLAIN: TerminalStyle = {

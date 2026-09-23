@@ -13,7 +13,14 @@ export type {
   ReviewCommentSummary,
   ReviewThread,
 } from "./github/client.js";
-export { createClaudeCodeHarness } from "./harness/claude-code.js";
+export { createClaudeCodeHarness, type SpawnLike } from "./harness/claude-code.js";
+export {
+  createContainerSpawn,
+  ensureRunnerImage,
+  RUNNER_IMAGE,
+  type ContainerMount,
+  type ContainerRuntime,
+} from "./harness/container.js";
 export type { HarnessSpec, HarnessEvent, HarnessResult } from "./harness/harness.js";
 export { planLimitIn, type PlanLimit } from "./harness/plan-limit.js";
 export {
