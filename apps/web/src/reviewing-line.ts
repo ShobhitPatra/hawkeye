@@ -11,17 +11,10 @@ export function reviewingBadgeUrl(controlPlaneUrl: string, runnerName: string): 
   return `${controlPlaneUrl}/status/reviewing?runner=${encodeURIComponent(runnerName)}`;
 }
 
-export function reviewingBlock(input: {
-  controlPlaneUrl: string;
-  runnerName: string;
-  startedAt: Date;
-}): string {
-  const started = `${input.startedAt.toISOString().slice(11, 16)} UTC`;
+export function reviewingBlock(input: { controlPlaneUrl: string; runnerName: string }): string {
   return [
     OPEN,
     `![Reviewing on ${input.runnerName}](${reviewingBadgeUrl(input.controlPlaneUrl, input.runnerName)})`,
-    "",
-    `Started ${started}. This comment is replaced when the review lands.`,
     CLOSE,
     "",
     "",
