@@ -52,7 +52,7 @@ Design in monochrome on a warm neutral. Color is a secondary cue, always paired 
 - Amber (`--hk-warn`) only for states that need the user to act: runner offline, pull requests waiting.
 - No green. A posted review, a passing verdict, an online runner are the normal state and stay neutral.
 - No blue. Focus rings use the foreground color.
-- Whether a pull request is reviewed is the review control (`.hk-review-control`): a filled or hollow circle with its word beside it, Reviewing or Review, never a color. Hovering shows what a click does, Pause or Review; the moment after a click the word shimmers Starting or Pausing, and a refusal rolls the control back with one sentence under it.
+- Whether a pull request is reviewed is the review control (`.hk-review-control`): a filled or hollow circle with its word beside it, Reviewing or Review, never a color. Hovering shows what a click does, Pause or Review; the moment after a click the word shimmers Starting or Pausing, and a refusal rolls the control back with one sentence under it. On a pull request page that has a posted review, a plain button beside it reads Review from scratch; while the click is in flight it reads Queuing, and a refusal puts one sentence under it.
 - Both themes always. The system preference is the default; the theme choice (Light, Dark, System) in the account menu and the landing bar is kept in a cookie and stamped on `<html>` as `data-theme` by the server, so no page flashes; System stamps nothing and follows the media query. Never ship a color that only exists in one theme.
 
 ### Typography
