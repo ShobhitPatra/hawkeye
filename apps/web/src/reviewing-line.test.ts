@@ -17,7 +17,6 @@ const reference = { owner: "octo", repo: "repo", number: 7 };
 const block = reviewingBlock({
   controlPlaneUrl: "https://hawkeye.review",
   runnerName: "laptop",
-  startedAt: new Date("2026-09-06T03:47:12Z"),
 });
 
 let db: Db;
@@ -45,11 +44,11 @@ beforeEach(async () => {
 });
 
 describe("reviewing block", () => {
-  it("wraps the badge and the started sentence in markers and strips cleanly", () => {
+  it("wraps the badge alone in markers and strips cleanly", () => {
     expect(block).toContain(
       "![Reviewing on laptop](https://hawkeye.review/status/reviewing?runner=laptop)",
     );
-    expect(block).toContain("Started 03:47 UTC. This comment is replaced when the review lands.");
+    expect(block).not.toMatch(/Started|replaced/);
     const body = `${block}<!-- hawkeye: head=abc -->\n\n### Ship\n`;
     expect(hasReviewingBlock(body)).toBe(true);
     expect(stripReviewingBlock(body)).toBe("<!-- hawkeye: head=abc -->\n\n### Ship\n");

@@ -90,12 +90,20 @@ export function createClaudeCodeHarness(
 
       createInterface({ input: child.stdout! }).on("line", (line) => {
         input.onEvent({ type: "stdout", line });
-        let parsed: { type?: string; message?: { id?: string } } | undefined;
+        let parsed:
+          | { type?: string; message?: { id?: string }; is_error?: boolean; result?: unknown }
+          | undefined;
         try {
-          parsed = JSON.parse(line) as { type?: string; message?: { id?: string } };
+          parsed = JSON.parse(line) as typeof parsed;
         } catch {
           return;
         }
+        if (
+          parsed?.type === "result" &&
+          parsed.is_error === true &&
+          typeof parsed.result === "string"
+        )
+          stderrTail.push(parsed.result);
         if (parsed?.type === "assistant") {
           const messageId = parsed.message?.id;
           if (messageId !== undefined && messageId === lastMessageId) return;

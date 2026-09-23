@@ -6,7 +6,6 @@ export const LANDING_REVIEW = {
   branch: "feat/web-reviewing-line",
   headSha: "989dcb7",
   runner: "shobhit-fedora",
-  startedAt: "05:57 UTC",
   url: "https://github.com/ShobhitPatra/hawkeye/pull/87",
   terminal: [
     { at: "05:57:40", state: "claimed", detail: "ShobhitPatra/hawkeye#87 at 989dcb7", delayMs: 0 },

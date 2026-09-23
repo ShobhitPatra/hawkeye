@@ -214,11 +214,7 @@ export async function claimJob(request: Request, deps: ClaimDeps): Promise<Respo
         runId: created.id,
         livingReviewId: living?.githubReviewId,
         closedPlaceholderId: closedPlaceholder?.githubReviewId,
-        block: reviewingBlock({
-          controlPlaneUrl: deps.controlPlaneUrl,
-          runnerName: runner.name,
-          startedAt: now(),
-        }),
+        block: reviewingBlock({ controlPlaneUrl: deps.controlPlaneUrl, runnerName: runner.name }),
       });
       const body: ClaimedJob = {
         job: {

@@ -15,6 +15,7 @@ import {
 import { and, asc, desc, eq, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
+import { failedPostNote, shortFormNote } from "./posting-note";
 import { armedPr as armedPrTable, job, reviewPosted, run } from "./db/schema";
 import {
   ALREADY_POSTED_BODY,
@@ -442,7 +443,7 @@ export async function postReviewForRun(
       await db
         .update(run)
         .set({
-          error: `post: GitHub refused the full review (${error.message}); the short form was posted`,
+          error: shortFormNote(error.message),
         })
         .where(eq(run.id, input.runId));
     }
@@ -465,7 +466,7 @@ async function failRun(
   deps.log?.(`review not posted for run ${runId}: ${message}`);
   await deps.db
     .update(run)
-    .set({ error: `post: ${message}` })
+    .set({ error: failedPostNote(message) })
     .where(eq(run.id, runId));
   return "failed";
 }
