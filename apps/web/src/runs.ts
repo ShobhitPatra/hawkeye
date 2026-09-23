@@ -135,7 +135,12 @@ export async function listFindingsForPullRequest(
   );
 }
 
-export type ArmedPullRequestSummary = { id: string; installationId: string; armed: boolean };
+export type ArmedPullRequestSummary = {
+  id: string;
+  installationId: string;
+  title?: string;
+  armed: boolean;
+};
 
 export async function findArmedPullRequest(
   db: Db,
@@ -145,6 +150,7 @@ export async function findArmedPullRequest(
     .select({
       id: armedPr.id,
       installationId: armedPr.installationId,
+      title: armedPr.title,
       disarmedAt: armedPr.disarmedAt,
     })
     .from(armedPr)
@@ -152,6 +158,11 @@ export async function findArmedPullRequest(
     .orderBy(desc(armedPr.armedAt))
     .limit(1);
   return row
-    ? { id: row.id, installationId: row.installationId, armed: row.disarmedAt === null }
+    ? {
+        id: row.id,
+        installationId: row.installationId,
+        ...(row.title === null ? {} : { title: row.title }),
+        armed: row.disarmedAt === null,
+      }
     : undefined;
 }
