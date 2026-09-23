@@ -275,7 +275,6 @@ export function LandingHero() {
                   <p>
                     <ReviewingBadge />
                   </p>
-                  <p>Started {review.startedAt}. This comment is replaced when the review lands.</p>
                 </div>
                 <div
                   className="ld-md"

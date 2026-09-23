@@ -206,7 +206,7 @@ describe("claimJob", () => {
     expect(review.body).toContain(
       "![Reviewing on laptop](https://hawkeye.test/status/reviewing?runner=laptop)",
     );
-    expect(review.body).toContain("This comment is replaced when the review lands.");
+    expect(review.body).not.toContain("replaced when the review lands");
     const [run] = await db.select().from(schema.run).where(eq(schema.run.id, body.job.runId));
     expect(run?.placeholderReviewId).toBe("9");
   });
