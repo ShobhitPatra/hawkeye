@@ -162,7 +162,7 @@ async function previousRoundFindings(
   return { previousIds, priorClaims };
 }
 
-async function roundsFor(
+export async function roundsFor(
   db: Db,
   armedPr: ReviewPostingInput["armedPr"],
   currentRunId: string,
