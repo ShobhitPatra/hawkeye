@@ -233,7 +233,9 @@ export async function claimJob(request: Request, deps: ClaimDeps): Promise<Respo
         installationToken,
         settings: await settingsFor(deps.db, runner.userId),
       };
-      const previousRound = await previousRoundFor(deps.db, armed.id);
+      const previousRound = claimed.fromScratch
+        ? undefined
+        : await previousRoundFor(deps.db, armed.id);
       if (previousRound !== undefined) body.previousRound = previousRound;
       return Response.json(body, { status: 200 });
     }

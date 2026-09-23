@@ -118,6 +118,7 @@ export const job = pgTable(
     headSha: text("head_sha").notNull(),
     baseSha: text("base_sha").notNull(),
     headCurrentAt: timestamp("head_current_at", { withTimezone: true }).notNull().defaultNow(),
+    fromScratch: boolean("from_scratch").notNull().default(false),
     notBefore: timestamp("not_before", { withTimezone: true }).notNull(),
     state: jobState("state").notNull().default("queued"),
     claimedByRunnerId: text("claimed_by_runner_id").references(() => runner.id),

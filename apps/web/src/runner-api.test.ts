@@ -461,6 +461,31 @@ describe("claimJob", () => {
     });
   });
 
+  it("carries no previous round on a job queued from scratch", async () => {
+    const firstRunId = await claimedRunId();
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${firstRunId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: reviewResult,
+      }),
+      { db, github },
+      firstRunId,
+    );
+    await queueJob(db, {
+      headCurrentAt: new Date(),
+      armedPrId: "armed-1",
+      headSha: "c".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: new Date(now.getTime() - 60_000),
+      fromScratch: true,
+    });
+
+    const response = await claimJob(request("/api/runner/jobs"), claimDeps());
+
+    expect((await response.json()).previousRound).toBeUndefined();
+  });
+
   it("returns no previous round when no review was posted", async () => {
     const firstRunId = await claimedRunId();
     github.updateReview = vi.fn(async () => {
