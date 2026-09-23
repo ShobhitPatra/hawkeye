@@ -1,6 +1,7 @@
 import { type Lens, type PullRequestReference, SEVERITIES, type Severity } from "@hawkeye/core";
 import Link from "next/link";
 import { formatUpdated } from "@/format-updated";
+import { postingNote } from "@/posting-note";
 import { formatDuration, formatError, runFailureLabel, shortSha, verdictLabel } from "@/run-format";
 import type { ArmedPullRequestSummary, PullRequestFinding, PullRequestRun } from "@/runs";
 import { ReviewControl } from "../../../review-control";
@@ -38,6 +39,7 @@ export function PullRequestView({
 }) {
   const htmlUrl = `https://github.com/${reference.owner}/${reference.repo}/pull/${reference.number}`;
   const latest = runs[0];
+  const note = postingNote(latest?.error);
   const posted = runs.filter((run) => run.status === "ok" && run.reviewUrl).toReversed();
   const lastReview = posted.at(-1);
   const roundOf = (run: PullRequestRun) => posted.indexOf(run) + 1;
@@ -140,6 +142,24 @@ export function PullRequestView({
             {latest.error ? `. ${formatError(latest.error)}` : "."}
           </p>
           <p>The pull request was not touched. The next push queues a new review.</p>
+        </div>
+      )}
+
+      {latest?.status === "ok" && note && (
+        <div className="hk-state">
+          <p>
+            <span className="hk-status" data-state="attention">
+              {note.kind === "short-form" ? "Posted short" : "Not posted"}
+            </span>{" "}
+            {note.kind === "short-form"
+              ? `GitHub refused the full review, so the short form is on the pull request: ${formatError(note.detail)}.`
+              : `The review did not reach the pull request: ${formatError(note.detail)}.`}
+          </p>
+          <p>
+            {note.kind === "short-form"
+              ? "The full findings are below."
+              : "The findings are below. The next push posts again."}
+          </p>
         </div>
       )}
 
