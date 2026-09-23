@@ -387,6 +387,44 @@ describe("runRunnerLoop", () => {
     });
   });
 
+  it("pauses claiming after the plan rate-limits a run, doubling while it keeps happening", async () => {
+    const limited: ClaimedJob = {
+      ...claimedJob,
+      job: { ...claimedJob.job, id: "job-2", runId: "run-2" },
+      pullRequest: { owner: "o", repo: "r", number: 8 },
+    };
+    const plane = await fakeControlPlane(scripted([claimedJob, limited, undefined]));
+    servers.push(plane.server);
+    const stop = new AbortController();
+    const sleeps: number[] = [];
+    const d = await deps(plane.baseUrl, {
+      signal: stop.signal,
+      harnessResult: {
+        status: "error",
+        turns: 0,
+        error:
+          'claude exited with 1: API Error: 429 {"type":"error","error":{"type":"rate_limit_error"}}',
+      },
+      sleep: async (milliseconds) => {
+        sleeps.push(milliseconds);
+        if (sleeps.length === 2) stop.abort();
+      },
+    });
+    await runRunnerLoop(d);
+    const waits = d.reported.flatMap((event) =>
+      event.state === "waiting" && event.detail.includes("rate limit") ? [event.detail] : [],
+    );
+    expect(waits).toEqual([
+      "the plan answered with a rate limit; claiming again in 1 min",
+      "the plan answered with a rate limit; claiming again in 2 min",
+    ]);
+    expect(sleeps[0]).toBeGreaterThan(59_000);
+    expect(sleeps[0]).toBeLessThanOrEqual(60_000);
+    expect(sleeps[1]).toBeGreaterThan(119_000);
+    expect(sleeps[1]).toBeLessThanOrEqual(120_000);
+    expect(plane.received.filter((r) => r.url.endsWith("/result"))).toHaveLength(2);
+  });
+
   it("reports a harness failure with its status", async () => {
     const plane = await fakeControlPlane(scripted([claimedJob]));
     servers.push(plane.server);

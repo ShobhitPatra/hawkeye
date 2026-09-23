@@ -2,6 +2,8 @@ import {
   type ClaimedJob,
   createWorktree,
   type HarnessSpec,
+  type PlanLimit,
+  planLimitIn,
   readRepositoryRules,
   type ReviewResult,
   type RunResultReport,
@@ -15,6 +17,14 @@ export const DEFAULT_EMPTY_POLL_DELAY_MS = 1_000;
 export const DEFAULT_RESULT_RETRY_DELAYS_MS = [2_000, 4_000, 8_000];
 export const ONCE_CLAIM_ATTEMPTS = 3;
 export const DEFAULT_CONCURRENCY = 1;
+export const PLAN_LIMIT_PAUSE_MS = 60_000;
+export const PLAN_LIMIT_PAUSE_CAP_MS = 16 * 60_000;
+
+export type JobOutcome = {
+  delivery: "delivered" | "dropped" | "undelivered";
+  succeeded: boolean;
+  planLimit?: PlanLimit;
+};
 
 export type RunnerEvent = { slot?: number } & (
   | { state: "claimed"; subject: string; headSha: string }
@@ -202,7 +212,7 @@ export async function runJob(
   claimed: ClaimedJob,
   loopDeps: RunnerLoopDependencies,
   options: { slot?: number; superseded?: AbortSignal } = {},
-): Promise<"delivered" | "dropped" | "undelivered"> {
+): Promise<JobOutcome> {
   const { slot } = options;
   const deps: RunnerLoopDependencies =
     slot === undefined
@@ -250,7 +260,18 @@ export async function runJob(
       state: "failed",
       detail: `${report.error ?? report.status} after ${turnsOf(report.turns)}${keptIn(runDirectory)}`,
     });
-  return deliverResult(job.runId, report, { headSha: job.headSha, durationMs, runDirectory }, deps);
+  const delivery = await deliverResult(
+    job.runId,
+    report,
+    { headSha: job.headSha, durationMs, runDirectory },
+    deps,
+  );
+  const planLimit = report.status === "error" ? planLimitIn(report.error ?? "") : undefined;
+  return {
+    delivery,
+    succeeded: report.status === "ok",
+    ...(planLimit === undefined ? {} : { planLimit }),
+  };
 }
 
 export async function runRunnerLoop(
@@ -261,6 +282,21 @@ export async function runRunnerLoop(
   let failedClaims = 0;
   let concurrency = DEFAULT_CONCURRENCY;
   let lastWaitMs: number | undefined;
+  let limitedRuns = 0;
+  let pausedUntil = 0;
+  const settle = (outcome: JobOutcome) => {
+    if (outcome.planLimit === undefined) {
+      if (outcome.succeeded) limitedRuns = 0;
+      return;
+    }
+    limitedRuns += 1;
+    const pauseMs = Math.min(PLAN_LIMIT_PAUSE_MS * 2 ** (limitedRuns - 1), PLAN_LIMIT_PAUSE_CAP_MS);
+    pausedUntil = Date.now() + pauseMs;
+    deps.report({
+      state: "waiting",
+      detail: `the plan answered with a ${outcome.planLimit}; claiming again in ${pauseMs / 60_000} min`,
+    });
+  };
   const running = new Map<number, { subject: string; finished: Promise<unknown>; stop(): void }>();
   const freeSlot = () => {
     for (let slot = 1; ; slot += 1) if (!running.has(slot)) return slot;
@@ -268,6 +304,13 @@ export async function runRunnerLoop(
   while (!deps.signal?.aborted) {
     if (running.size >= concurrency) {
       await Promise.race([...running.values()].map((job) => job.finished));
+      continue;
+    }
+    const pauseLeftMs = pausedUntil - Date.now();
+    if (pauseLeftMs > 0) {
+      const pausedFor = pausedUntil;
+      await sleep(pauseLeftMs, deps.signal);
+      if (pausedUntil === pausedFor) pausedUntil = 0;
       continue;
     }
     let claimed: ClaimedJob | undefined;
@@ -308,7 +351,7 @@ export async function runRunnerLoop(
       continue;
     }
     if (options.once) {
-      const delivery = await runJob(claimed, deps);
+      const { delivery } = await runJob(claimed, deps);
       if (delivery === "undelivered") throw new Error("the result was not delivered");
       return;
     }
@@ -322,7 +365,9 @@ export async function runRunnerLoop(
     const finished = runJob(claimed, deps, {
       ...(concurrency > 1 ? { slot } : {}),
       superseded: superseded.signal,
-    }).finally(() => running.delete(slot));
+    })
+      .then(settle)
+      .finally(() => running.delete(slot));
     running.set(slot, { subject, finished, stop: () => superseded.abort() });
   }
   await Promise.all([...running.values()].map((job) => job.finished));
