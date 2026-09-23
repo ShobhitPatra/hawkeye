@@ -415,14 +415,19 @@ export function createGitHubClient(input: {
       );
     },
     async reviewComments(reference, reviewId, token) {
-      return paginate(`${pulls(reference)}/reviews/${reviewId}/comments`, token, (payload) =>
-        (payload as { id: number; path: string; line?: number | null; body?: string }[]).map(
-          (comment) => ({
-            id: String(comment.id),
-            path: comment.path,
-            line: comment.line ?? null,
-            body: comment.body ?? "",
-          }),
+      const path = `${pulls(reference)}/reviews/${reviewId}/comments`;
+      return paginate(path, token, (payload) =>
+        (payload as { id: number; path: string; line?: number | null; body?: unknown }[]).map(
+          (comment) => {
+            if (typeof comment.body !== "string")
+              throw new Error(`GitHub GET ${path} returned a comment without a body`);
+            return {
+              id: String(comment.id),
+              path: comment.path,
+              line: comment.line ?? null,
+              body: comment.body,
+            };
+          },
         ),
       );
     },
@@ -443,7 +448,7 @@ export function createGitHubClient(input: {
                 nodes: {
                   id: string;
                   isResolved: boolean;
-                  comments: { nodes: { databaseId: number }[] };
+                  comments: { pageInfo: { hasNextPage: boolean }; nodes: { databaseId: number }[] };
                 }[];
               };
             };
@@ -462,6 +467,9 @@ export function createGitHubClient(input: {
                       id
                       isResolved
                       comments(first: 100) {
+                        pageInfo {
+                          hasNextPage
+                        }
                         nodes {
                           databaseId
                         }
@@ -476,12 +484,15 @@ export function createGitHubClient(input: {
           token,
         );
         const connection = page.repository.pullRequest.reviewThreads;
-        for (const node of connection.nodes)
+        for (const node of connection.nodes) {
+          if (node.comments.pageInfo.hasNextPage)
+            throw new Error(`review thread ${node.id} has more than 100 comments`);
           threads.push({
             id: node.id,
             isResolved: node.isResolved,
             commentIds: node.comments.nodes.map((comment) => String(comment.databaseId)),
           });
+        }
         cursor = connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null;
       } while (cursor !== null);
       return threads;
