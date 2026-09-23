@@ -109,6 +109,12 @@ describe("parseWebhookEvent for pull_request", () => {
     });
   });
 
+  it("rejects a pull request payload without its title", () => {
+    expect(() =>
+      parseWebhookEvent("pull_request", pullRequestPayload({}, { title: undefined })),
+    ).toThrow("missing required pull request fields");
+  });
+
   it("rejects a pull request payload without its update time", () => {
     expect(() =>
       parseWebhookEvent("pull_request", pullRequestPayload({}, { updated_at: undefined })),
