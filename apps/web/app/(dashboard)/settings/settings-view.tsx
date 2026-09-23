@@ -22,8 +22,8 @@ export function SettingsView({ reviews, runner }: { reviews: ReactNode; runner: 
           Runner
         </h2>
         <p className="hk-compact hk-muted hk-prose">
-          What each review runs with on your machine. Reviews run with Claude Code under your own
-          login; the control plane never sees it.
+          What each review runs with on your machine. Reviews run with Claude Code or Codex under
+          your own login; the control plane never sees it.
         </p>
         {runner}
       </section>

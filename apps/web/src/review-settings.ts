@@ -6,6 +6,16 @@ export type ReviewSettings = {
   quietWindowSeconds: number;
 };
 
+export const HARNESSES = [
+  { value: "claude-code", label: "Claude Code" },
+  { value: "codex", label: "Codex" },
+] as const;
+export type HarnessChoice = (typeof HARNESSES)[number]["value"];
+
+export function isHarnessChoice(value: string): value is HarnessChoice {
+  return HARNESSES.some((harness) => harness.value === value);
+}
+
 export const MODELS = [
   { value: "claude-fable-5-1", label: "Fable 5.1" },
   { value: "claude-fable-5", label: "Fable 5" },
@@ -23,6 +33,7 @@ export const WALL_CLOCK_MINUTES_RANGE = { min: 1, max: 60 } as const;
 export const CONCURRENCY_RANGE = { min: 1, max: 3 } as const;
 
 export type RunnerSettings = {
+  harness: string;
   model: string | null;
   maxTurns: number;
   wallClockMinutes: number;

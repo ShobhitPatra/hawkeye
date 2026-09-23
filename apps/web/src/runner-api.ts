@@ -94,7 +94,9 @@ async function settingsFor(db: Db, userId: string): Promise<ClaimedJob["settings
     maxTurns: row?.maxTurns ?? DEFAULT_MAX_TURNS,
     wallClockMinutes: row?.wallClockMinutes ?? DEFAULT_WALL_CLOCK_MINUTES,
     ...(row?.promptOverride ? { promptOverride: row.promptOverride } : {}),
-    ...(row?.model ? { model: row.model } : {}),
+    ...(row?.model && (row.harness ?? DEFAULT_HARNESS) === "claude-code"
+      ? { model: row.model }
+      : {}),
     harness: row?.harness ?? DEFAULT_HARNESS,
     concurrency: row?.concurrency ?? DEFAULT_CONCURRENCY,
   };

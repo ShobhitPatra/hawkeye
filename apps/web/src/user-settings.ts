@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { Db } from "./db/client";
 import {
   DEFAULT_CONCURRENCY,
+  DEFAULT_HARNESS,
   DEFAULT_MAX_TURNS,
   DEFAULT_QUIET_WINDOW_SECONDS,
   DEFAULT_WALL_CLOCK_MINUTES,
@@ -9,6 +10,7 @@ import {
 } from "./db/schema";
 import {
   CONCURRENCY_RANGE,
+  isHarnessChoice,
   isModelChoice,
   MAX_QUIET_WINDOW_SECONDS,
   MAX_TURNS_RANGE,
@@ -63,6 +65,7 @@ export function parseReviewSettings(formData: FormData): ReviewSettings {
 }
 
 export const DEFAULT_RUNNER_SETTINGS: RunnerSettings = {
+  harness: DEFAULT_HARNESS,
   model: null,
   maxTurns: DEFAULT_MAX_TURNS,
   wallClockMinutes: DEFAULT_WALL_CLOCK_MINUTES,
@@ -72,6 +75,7 @@ export const DEFAULT_RUNNER_SETTINGS: RunnerSettings = {
 export async function readRunnerSettings(db: Db, userId: string): Promise<RunnerSettings> {
   const [row] = await db
     .select({
+      harness: userSettings.harness,
       model: userSettings.model,
       maxTurns: userSettings.maxTurns,
       wallClockMinutes: userSettings.wallClockMinutes,
@@ -109,11 +113,14 @@ function wholeNumber(
 }
 
 export function parseRunnerSettings(formData: FormData): RunnerSettings {
+  const harness = String(formData.get("harness") ?? "");
+  if (!isHarnessChoice(harness)) throw new Error("That harness is not in the list.");
   const rawModel = String(formData.get("model") ?? "");
   if (rawModel !== "" && !isModelChoice(rawModel)) {
     throw new Error("That model is not in the list.");
   }
   return {
+    harness,
     model: rawModel === "" ? null : rawModel,
     maxTurns: wholeNumber(formData, "maxTurns", "Turns per review", MAX_TURNS_RANGE),
     wallClockMinutes: wholeNumber(
