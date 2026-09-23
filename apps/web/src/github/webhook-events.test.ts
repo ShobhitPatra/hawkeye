@@ -79,6 +79,7 @@ function pullRequestPayload(
     ...overrides,
     pull_request: {
       number: 7,
+      title: "Add thing",
       draft: false,
       merged: false,
       head: { sha: "h".repeat(40) },
@@ -97,6 +98,7 @@ describe("parseWebhookEvent for pull_request", () => {
       action: "synchronize",
       repository: { owner: "octo", name: "repo" },
       number: 7,
+      title: "Add thing",
       headSha: "h".repeat(40),
       baseSha: "b".repeat(40),
       updatedAt: "2026-01-01T00:00:00Z",
@@ -105,6 +107,12 @@ describe("parseWebhookEvent for pull_request", () => {
       installationId: "10",
       authorId: "501",
     });
+  });
+
+  it("rejects a pull request payload without its title", () => {
+    expect(() =>
+      parseWebhookEvent("pull_request", pullRequestPayload({}, { title: undefined })),
+    ).toThrow("missing required pull request fields");
   });
 
   it("rejects a pull request payload without its update time", () => {

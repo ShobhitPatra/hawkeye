@@ -127,6 +127,7 @@ describe("handleWebhook", () => {
         repository: { name: armed.repo, owner: { login: armed.owner } },
         pull_request: {
           number: armed.number,
+          title: "Add thing",
           draft: false,
           merged: false,
           head: { sha: "h".repeat(40) },

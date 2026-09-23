@@ -10,6 +10,7 @@ export type PullRequestEvent = {
   action: string;
   repository: { owner: string; name: string };
   number: number;
+  title: string;
   headSha: string;
   baseSha: string;
   updatedAt: string;
@@ -85,6 +86,7 @@ function parsePullRequestEvent(payload: unknown): WebhookEvent {
     repository?: { name?: unknown; owner?: { login?: unknown } };
     pull_request?: {
       number?: unknown;
+      title?: unknown;
       draft?: unknown;
       merged?: unknown;
       head?: { sha?: unknown };
@@ -113,6 +115,7 @@ function parsePullRequestEvent(payload: unknown): WebhookEvent {
   if (
     !pullRequest ||
     typeof pullRequest.number !== "number" ||
+    typeof pullRequest.title !== "string" ||
     typeof pullRequest.draft !== "boolean" ||
     !pullRequest.head ||
     typeof pullRequest.head.sha !== "string" ||
@@ -130,6 +133,7 @@ function parsePullRequestEvent(payload: unknown): WebhookEvent {
     action: body.action,
     repository: { owner: repository.owner.login, name: repository.name },
     number: pullRequest.number,
+    title: pullRequest.title,
     headSha: pullRequest.head.sha,
     baseSha: pullRequest.base.sha,
     updatedAt: pullRequest.updated_at,

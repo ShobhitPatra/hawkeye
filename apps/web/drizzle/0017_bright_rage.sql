@@ -1,0 +1,1 @@
+ALTER TABLE "armed_pr" ADD COLUMN "title" text;

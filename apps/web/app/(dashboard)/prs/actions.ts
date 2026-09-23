@@ -35,7 +35,11 @@ export async function armAction(formData: FormData) {
   });
 
   await db.transaction(async (tx) => {
-    const armed = await armPullRequest(tx, { ...input, userId: session.user.id });
+    const armed = await armPullRequest(tx, {
+      ...input,
+      userId: session.user.id,
+      title: pullRequest.title,
+    });
     await enqueueJob(tx, {
       armedPrId: armed.id,
       ...target,
