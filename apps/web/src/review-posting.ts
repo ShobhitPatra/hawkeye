@@ -12,7 +12,7 @@ import {
   renderReview,
   type ReviewResult,
 } from "@hawkeye/core";
-import { and, asc, desc, eq, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import { failedPostNote, shortFormNote } from "./posting-note";
@@ -138,18 +138,51 @@ async function closePlaceholder(
   }
 }
 
+async function historyStartFor(
+  db: Db,
+  armedPr: ReviewPostingInput["armedPr"],
+  currentRunId: string,
+): Promise<Date | undefined> {
+  const [latest] = await db
+    .select({ createdAt: job.createdAt })
+    .from(job)
+    .innerJoin(run, eq(run.jobId, job.id))
+    .innerJoin(reviewPosted, eq(reviewPosted.runId, run.id))
+    .innerJoin(armedPrTable, eq(armedPrTable.id, job.armedPrId))
+    .where(
+      and(
+        samePullRequest(armedPr),
+        eq(job.fromScratch, true),
+        or(isNotNull(reviewPosted.githubReviewId), eq(run.id, currentRunId)),
+      ),
+    )
+    .orderBy(desc(job.createdAt))
+    .limit(1);
+  return latest?.createdAt;
+}
+
 async function previousRoundFindings(
   db: Db,
   armedPr: ReviewPostingInput["armedPr"],
+  currentRunId: string,
 ): Promise<{ previousIds: Set<string>; priorClaims: Record<string, string> }> {
+  const start = await historyStartFor(db, armedPr, currentRunId);
   const [latest] = await db
     .select({ result: run.result })
     .from(reviewPosted)
     .innerJoin(run, eq(run.id, reviewPosted.runId))
+    .innerJoin(job, eq(job.id, run.jobId))
     .innerJoin(armedPrTable, eq(armedPrTable.id, reviewPosted.armedPrId))
-    .where(and(samePullRequest(armedPr), isNotNull(reviewPosted.githubReviewId)))
+    .where(
+      and(
+        samePullRequest(armedPr),
+        isNotNull(reviewPosted.githubReviewId),
+        ...(start === undefined ? [] : [gte(job.createdAt, start)]),
+      ),
+    )
     .orderBy(desc(reviewPosted.postedAt))
     .limit(1);
+  if (!latest && start !== undefined) return { previousIds: new Set(), priorClaims: {} };
   if (!latest?.result) throw new Error("the living review has no run result behind it");
   const previousIds = new Set<string>();
   const priorClaims: Record<string, string> = {};
@@ -167,6 +200,7 @@ async function roundsFor(
   armedPr: ReviewPostingInput["armedPr"],
   currentRunId: string,
 ): Promise<RoundSummary[]> {
+  const start = await historyStartFor(db, armedPr, currentRunId);
   const rows = await db
     .select({
       headSha: job.headSha,
@@ -184,6 +218,7 @@ async function roundsFor(
         samePullRequest(armedPr),
         eq(run.status, "ok"),
         or(isNotNull(reviewPosted.githubReviewId), eq(run.id, currentRunId)),
+        ...(start === undefined ? [] : [gte(job.createdAt, start)]),
       ),
     )
     .orderBy(asc(run.startedAt));
@@ -377,7 +412,7 @@ export async function postReviewForRun(
     token = await github.installationTokenById(armedPr.installationId);
     const { previousIds, priorClaims } =
       living.kind === "living"
-        ? await previousRoundFindings(db, armedPr)
+        ? await previousRoundFindings(db, armedPr, input.runId)
         : { previousIds: new Set<string>(), priorClaims: {} };
     const rounds = await roundsFor(db, armedPr, input.runId);
     const render = (map: Map<string, Set<number>>) =>
