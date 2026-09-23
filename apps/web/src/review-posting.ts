@@ -164,9 +164,8 @@ async function historyStartFor(
 async function previousRoundFindings(
   db: Db,
   armedPr: ReviewPostingInput["armedPr"],
-  currentRunId: string,
+  start: Date | undefined,
 ): Promise<{ previousIds: Set<string>; priorClaims: Record<string, string> }> {
-  const start = await historyStartFor(db, armedPr, currentRunId);
   const [latest] = await db
     .select({ result: run.result })
     .from(reviewPosted)
@@ -199,8 +198,9 @@ async function roundsFor(
   db: Db,
   armedPr: ReviewPostingInput["armedPr"],
   currentRunId: string,
+  history?: { start: Date | undefined },
 ): Promise<RoundSummary[]> {
-  const start = await historyStartFor(db, armedPr, currentRunId);
+  const start = history ? history.start : await historyStartFor(db, armedPr, currentRunId);
   const rows = await db
     .select({
       headSha: job.headSha,
@@ -410,11 +410,12 @@ export async function postReviewForRun(
   let token: string | undefined;
   try {
     token = await github.installationTokenById(armedPr.installationId);
+    const historyStart = await historyStartFor(db, armedPr, input.runId);
     const { previousIds, priorClaims } =
       living.kind === "living"
-        ? await previousRoundFindings(db, armedPr, input.runId)
+        ? await previousRoundFindings(db, armedPr, historyStart)
         : { previousIds: new Set<string>(), priorClaims: {} };
-    const rounds = await roundsFor(db, armedPr, input.runId);
+    const rounds = await roundsFor(db, armedPr, input.runId, { start: historyStart });
     const render = (map: Map<string, Set<number>>) =>
       renderLivingReview({
         result: input.result,
