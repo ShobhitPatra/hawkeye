@@ -117,7 +117,7 @@ describe("handlePullRequestEvent on opened", () => {
       installationId: "10",
       owner: "octo",
       number: 7,
-      title: "Add thing",
+      title: "title",
     });
     expect(await jobs()).toHaveLength(1);
   });
@@ -380,6 +380,25 @@ describe("handlePullRequestEvent", () => {
       ignored: "stale head",
     });
     expect(await jobs()).toHaveLength(0);
+  });
+
+  it("stores the new title when the pull request is edited", async () => {
+    await seedArmedPullRequest(db);
+    const result = await handlePullRequestEvent(
+      { db, github: fakeGitHub() },
+      event({ action: "edited", title: "Renamed" }),
+    );
+    expect(result).toEqual({ armed: 0, enqueued: 0, disarmed: 0, cancelled: 0, retitled: 1 });
+    const [row] = await armedRows();
+    expect(row?.title).toBe("Renamed");
+    expect(await jobs()).toHaveLength(0);
+  });
+
+  it("refreshes the title from the fetched pull request on a push", async () => {
+    await seedArmedPullRequest(db);
+    await handlePullRequestEvent({ db, github: fakeGitHub() }, event());
+    const [row] = await armedRows();
+    expect(row?.title).toBe("title");
   });
 
   it("reports an action it does not act on", async () => {
