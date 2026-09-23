@@ -1,6 +1,9 @@
 import type { GitHubClient } from "@hawkeye/core";
 import { describe, expect, it, vi } from "vitest";
-import { pullRequestTitles } from "./pull-request-titles";
+import { eq } from "drizzle-orm";
+import * as schema from "./db/schema";
+import { fillTitles, pullRequestTitles } from "./pull-request-titles";
+import { createTestDb, seedArmedPullRequest } from "./test/pglite";
 
 const references = [
   { owner: "octo", repo: "repo", number: 1, installationId: "10" },
@@ -82,5 +85,45 @@ describe("pullRequestTitles", () => {
     expect(a.get("octo/repo#1")).toBe("PR 1");
     expect(b.get("octo/repo#1")).toBe("PR 1");
     expect(github.pullRequest).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("fillTitles", () => {
+  it("fetches and stores only the titles the rows are missing", async () => {
+    const db = await createTestDb();
+    await seedArmedPullRequest(db, { armedPrId: "armed-1", number: 1 });
+    await seedArmedPullRequest(db, { armedPrId: "armed-2", number: 2 });
+    const github = client();
+    const rows = [
+      { owner: "octo", repo: "repo", number: 1, installationId: "10", armedPrId: "armed-1" },
+      {
+        owner: "octo",
+        repo: "repo",
+        number: 2,
+        installationId: "10",
+        armedPrId: "armed-2",
+        title: "Stored",
+      },
+    ];
+
+    const filled = await fillTitles(db, github, rows);
+
+    expect(filled.map((row) => row.title)).toEqual(["PR 1", "Stored"]);
+    expect(github.pullRequest).toHaveBeenCalledTimes(1);
+    const [stored] = await db
+      .select({ title: schema.armedPr.title })
+      .from(schema.armedPr)
+      .where(eq(schema.armedPr.id, "armed-1"));
+    expect(stored?.title).toBe("PR 1");
+  });
+
+  it("asks GitHub for nothing when every row has a title", async () => {
+    const db = await createTestDb();
+    const github = client();
+    const rows = [
+      { owner: "octo", repo: "repo", number: 1, installationId: "10", armedPrId: "a", title: "T" },
+    ];
+    expect(await fillTitles(db, github, rows)).toBe(rows);
+    expect(github.pullRequest).not.toHaveBeenCalled();
   });
 });

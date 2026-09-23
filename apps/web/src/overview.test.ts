@@ -1,4 +1,5 @@
 import type { ReviewResult } from "@hawkeye/core";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
@@ -135,6 +136,13 @@ describe("loadOverview", () => {
     expect(overview.reviewsByDay.has("2025-09-01")).toBe(false);
     expect(overview.recent).toHaveLength(5);
     expect(overview.recent[0]?.endedAt).toEqual(new Date("2026-09-07T18:00:00Z"));
+    expect(overview.recent[0]).toMatchObject({ armedPrId: "armed-1" });
+    expect(overview.recent[0]).not.toHaveProperty("title");
+    await db
+      .update(schema.armedPr)
+      .set({ title: "Add thing" })
+      .where(eq(schema.armedPr.id, "armed-1"));
+    expect((await loadOverview(db, "user-1", now)).recent[0]?.title).toBe("Add thing");
     expect(overview.allTime.reviews).toBe(9);
   });
 
