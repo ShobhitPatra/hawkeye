@@ -70,7 +70,7 @@ export function PullRequestView({
               installationId={arm.installationId}
               reviewing={arm.armed}
             />
-            {lastReview && (
+            {lastReview && arm.armed && (
               <ReviewFromScratch reference={reference} installationId={arm.installationId} />
             )}
             <a className="hk-button" href={htmlUrl}>
