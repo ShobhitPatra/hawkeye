@@ -32,6 +32,7 @@ import {
   setCommitStatus,
   SUPERSEDED_DESCRIPTION,
 } from "./commit-status";
+import { closeFindingThreads } from "./finding-threads";
 import { recordFindings, storeCommentIds } from "./findings";
 import {
   claimNextJob,
@@ -44,7 +45,12 @@ import {
   newerRunIsLive,
   userHasReviewsOn,
 } from "./job-queue";
-import { closedPlaceholderFor, livingReviewFor, postReviewForRun } from "./review-posting";
+import {
+  closedPlaceholderFor,
+  livingReviewFor,
+  postReviewForRun,
+  roundsFor,
+} from "./review-posting";
 import {
   clearReviewing,
   markReviewing,
@@ -468,25 +474,35 @@ export async function recordResult(
     deps.log?.(`findings not recorded for run ${runId}: ${message}`);
     return "failed" as const;
   });
-  if (typeof findings === "object") {
-    try {
-      const [own] = await deps.db
-        .select({ githubReviewId: reviewPosted.githubReviewId })
-        .from(reviewPosted)
-        .where(eq(reviewPosted.runId, runId));
-      if (own?.githubReviewId) {
-        const comments = await deps.github.reviewComments(
-          statusTarget.reference,
-          own.githubReviewId,
-          await statusTarget.token(),
-        );
-        await storeCommentIds(deps.db, target.armedPr.id, comments);
-      }
-    } catch (error) {
-      deps.log?.(
-        `comment ids not stored for run ${runId}: ${error instanceof Error ? error.message : String(error)}`,
+  if (typeof findings !== "object")
+    return Response.json({ ok: true, posted, findings }, { status: 200 });
+  const { closed, ...counts } = findings;
+  try {
+    const token = await statusTarget.token();
+    const [own] = await deps.db
+      .select({ githubReviewId: reviewPosted.githubReviewId })
+      .from(reviewPosted)
+      .where(eq(reviewPosted.runId, runId));
+    if (own?.githubReviewId) {
+      const comments = await deps.github.reviewComments(
+        statusTarget.reference,
+        own.githubReviewId,
+        token,
+      );
+      await storeCommentIds(deps.db, target.armedPr.id, comments);
+    }
+    if (closed.length > 0) {
+      const round = (await roundsFor(deps.db, target.armedPr, runId)).length;
+      await closeFindingThreads(
+        deps.github,
+        { reference: statusTarget.reference, token, headSha: target.headSha, round, closed },
+        deps.log,
       );
     }
+  } catch (error) {
+    deps.log?.(
+      `finding threads not updated for run ${runId}: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
-  return Response.json({ ok: true, posted, findings }, { status: 200 });
+  return Response.json({ ok: true, posted, findings: counts }, { status: 200 });
 }

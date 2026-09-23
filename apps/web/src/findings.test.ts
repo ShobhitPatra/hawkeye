@@ -42,7 +42,7 @@ const rows = () => db.select().from(schema.finding).where(eq(schema.finding.arme
 
 describe("recordFindings", () => {
   it("creates a row per finding with the head as first seen", async () => {
-    await expect(record(firstHead, [anchored, unanchored])).resolves.toEqual({
+    await expect(record(firstHead, [anchored, unanchored])).resolves.toMatchObject({
       created: 2,
       updated: 0,
       resolved: 0,
@@ -71,7 +71,7 @@ describe("recordFindings", () => {
 
     await expect(
       record(secondHead, [{ ...anchored, line: 5, severity: "must_fix" }]),
-    ).resolves.toEqual({ created: 0, updated: 1, resolved: 0 });
+    ).resolves.toMatchObject({ created: 0, updated: 1, resolved: 0 });
 
     const [row] = await rows();
     expect(row).toMatchObject({
@@ -85,7 +85,7 @@ describe("recordFindings", () => {
   it("resolves a finding missing from the next result at that head", async () => {
     await record(firstHead, [anchored, unanchored]);
 
-    await expect(record(secondHead, [anchored])).resolves.toEqual({
+    await expect(record(secondHead, [anchored])).resolves.toMatchObject({
       created: 0,
       updated: 1,
       resolved: 1,
@@ -100,7 +100,7 @@ describe("recordFindings", () => {
     await record(firstHead, [anchored]);
     await record(secondHead, []);
 
-    await expect(record(thirdHead, [anchored])).resolves.toEqual({
+    await expect(record(thirdHead, [anchored])).resolves.toMatchObject({
       created: 0,
       updated: 1,
       resolved: 0,
@@ -113,7 +113,7 @@ describe("recordFindings", () => {
   it("collapses duplicate stable ids in one result to the first occurrence", async () => {
     await expect(
       record(firstHead, [anchored, { ...anchored, line: 9, severity: "inherited" }]),
-    ).resolves.toEqual({ created: 1, updated: 0, resolved: 0 });
+    ).resolves.toMatchObject({ created: 1, updated: 0, resolved: 0 });
 
     const stored = await rows();
     expect(stored).toHaveLength(1);
@@ -123,7 +123,7 @@ describe("recordFindings", () => {
   it("resolves every open finding on an empty result", async () => {
     await record(firstHead, [anchored, unanchored]);
 
-    await expect(record(secondHead, [])).resolves.toEqual({
+    await expect(record(secondHead, [])).resolves.toMatchObject({
       created: 0,
       updated: 0,
       resolved: 2,
@@ -152,7 +152,14 @@ describe("recordFindings", () => {
         ],
         jobId,
       }),
-    ).resolves.toEqual({ created: 0, updated: 1, resolved: 1 });
+    ).resolves.toMatchObject({
+      created: 0,
+      updated: 1,
+      resolved: 1,
+      closed: [
+        { stableId: findingId("a.txt", "Anchored claim"), status: "addressed", commentId: null },
+      ],
+    });
 
     const stored = await rows();
     expect(stored.find((row) => row.path === "a.txt")?.resolvedSha).toBe(secondHead);
@@ -172,7 +179,14 @@ describe("recordFindings", () => {
         ],
         jobId,
       }),
-    ).resolves.toEqual({ created: 0, updated: 1, resolved: 1 });
+    ).resolves.toMatchObject({
+      created: 0,
+      updated: 1,
+      resolved: 1,
+      closed: [
+        { stableId: findingId("a.txt", "Anchored claim"), status: "withdrawn", commentId: null },
+      ],
+    });
     expect((await rows())[0]?.resolvedSha).toBe(secondHead);
   });
 
@@ -189,7 +203,7 @@ describe("recordFindings", () => {
         ],
         jobId,
       }),
-    ).resolves.toEqual({ created: 0, updated: 1, resolved: 0 });
+    ).resolves.toMatchObject({ created: 0, updated: 1, resolved: 0 });
     expect((await rows())[0]?.resolvedSha).toBeNull();
   });
 
@@ -221,7 +235,7 @@ describe("recordFindings", () => {
         findings: [anchored],
         jobId: own.id,
       }),
-    ).resolves.toEqual({ created: 1, updated: 0, resolved: 0 });
+    ).resolves.toMatchObject({ created: 1, updated: 0, resolved: 0 });
   });
 
   it("stores the comment id of each inline comment that carries a finding marker", async () => {
@@ -265,7 +279,7 @@ describe("recordFindings", () => {
         findings: [anchored],
         jobId: older.id,
       }),
-    ).resolves.toEqual({ created: 1, updated: 0, resolved: 0 });
+    ).resolves.toMatchObject({ created: 1, updated: 0, resolved: 0 });
 
     await db.update(schema.job).set({ state: "done" }).where(eq(schema.job.id, newer.id));
     await expect(
