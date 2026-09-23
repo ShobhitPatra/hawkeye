@@ -13,6 +13,7 @@ export type PullRequestEventResult = {
   enqueued: number;
   disarmed: number;
   cancelled: number;
+  retitled?: number;
   ignored?: string;
 };
 
@@ -25,6 +26,15 @@ function activeRows(event: PullRequestEvent) {
     eq(armedPr.number, event.number),
     isNull(armedPr.disarmedAt),
   );
+}
+
+async function storeTitle(db: Db, event: PullRequestEvent, title: string): Promise<number> {
+  const rows = await db
+    .update(armedPr)
+    .set({ title })
+    .where(and(activeRows(event), sql`${armedPr.title} is distinct from ${title}`))
+    .returning({ id: armedPr.id });
+  return rows.length;
 }
 
 export async function handlePullRequestEvent(
@@ -56,6 +66,11 @@ export async function handlePullRequestEvent(
     });
   }
 
+  if (event.action === "edited") {
+    const retitled = await storeTitle(db, event, event.title);
+    return { armed: 0, enqueued: 0, disarmed: 0, cancelled: 0, retitled };
+  }
+
   if (!REVIEW_ACTIONS.has(event.action)) {
     return { armed: 0, enqueued: 0, disarmed: 0, cancelled: 0, ignored: event.action };
   }
@@ -76,6 +91,7 @@ export async function handlePullRequestEvent(
   if (current.headSha !== event.headSha) {
     return { armed: armedCount, enqueued: 0, disarmed: 0, cancelled: 0, ignored: "stale head" };
   }
+  await storeTitle(db, event, current.title);
 
   let pendingTarget: Promise<ReviewTarget> | undefined;
   const reviewTarget = () =>
