@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, formatError, runFailureLabel, shortSha } from "./run-format";
+import { formatDuration, formatError, postingNote, runFailureLabel, shortSha } from "./run-format";
 
 describe("run formatting", () => {
   it("shortens shas to seven characters", () => {
@@ -21,6 +21,18 @@ describe("run formatting", () => {
     expect(runFailureLabel("invalid-output")).toBe("returned a result Hawkeye could not read");
     expect(() => runFailureLabel("ok")).toThrow();
   });
+  it("reads a posting note off a run that posted", () => {
+    expect(
+      postingNote("post: GitHub refused the full review (422 too long); the short form was posted"),
+    ).toEqual({ kind: "short-form", detail: "GitHub refused the full review (422 too long)" });
+    expect(postingNote("post: GitHub POST /repos/o/r/pulls/1/reviews failed: 502")).toEqual({
+      kind: "not-posted",
+      detail: "GitHub POST /repos/o/r/pulls/1/reviews failed: 502",
+    });
+    expect(postingNote("claude exited with 1")).toBeUndefined();
+    expect(postingNote(undefined)).toBeUndefined();
+  });
+
   it("truncates long errors", () => {
     expect(formatError(undefined)).toBe("");
     expect(formatError("x".repeat(121))).toBe(`${"x".repeat(120)}…`);

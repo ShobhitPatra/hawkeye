@@ -38,6 +38,19 @@ const RUN_FAILURE_LABELS: Record<Exclude<PullRequestRun["status"], "running" | "
   superseded: "was superseded by a newer push",
 };
 
+const POSTING_NOTE = "post: ";
+const SHORT_FORM_NOTE = "; the short form was posted";
+
+export type PostingNote = { kind: "short-form" | "not-posted"; detail: string };
+
+export function postingNote(error: string | undefined): PostingNote | undefined {
+  if (!error?.startsWith(POSTING_NOTE)) return undefined;
+  const detail = error.slice(POSTING_NOTE.length);
+  return detail.endsWith(SHORT_FORM_NOTE)
+    ? { kind: "short-form", detail: detail.slice(0, -SHORT_FORM_NOTE.length) }
+    : { kind: "not-posted", detail };
+}
+
 export function runFailureLabel(status: PullRequestRun["status"]): string {
   if (status === "running" || status === "ok") throw new Error(`${status} is not a failure`);
   return RUN_FAILURE_LABELS[status];
