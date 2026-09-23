@@ -88,6 +88,15 @@ describe("enqueueJob", () => {
     });
     expect(fresh?.id).toBe(waiting?.id);
     expect(fresh?.fromScratch).toBe(true);
+    const pushed = await enqueueJob(db, {
+      armedPrId: "armed-4",
+      headSha: "3".repeat(40),
+      baseSha: "2".repeat(40),
+      headCurrentAt: new Date("2026-01-01T00:00:02.000Z"),
+      notBefore: new Date("2026-01-01T00:00:02.000Z"),
+    });
+    expect(pushed?.id).toBe(waiting?.id);
+    expect(pushed?.fromScratch).toBe(true);
   });
 
   it("discards an enqueue whose head is older than the waiting job's", async () => {
