@@ -18,6 +18,7 @@ export type RecentReview = {
   repo: string;
   number: number;
   installationId: string;
+  armedPrId: string;
   title?: string;
   verdict: Verdict;
   turns: number;
@@ -78,19 +79,23 @@ export async function loadOverview(db: Db, userId: string, now: Date): Promise<O
     reviewsByDay,
     recent: reviews
       .slice(0, 5)
-      .map(({ owner, repo, number, installationId, verdict, turns, endedAt }) => ({
-        owner,
-        repo,
-        number,
-        installationId,
-        verdict,
-        turns,
-        endedAt,
-      })),
+      .map(
+        ({ owner, repo, number, installationId, armedPrId, title, verdict, turns, endedAt }) => ({
+          owner,
+          repo,
+          number,
+          installationId,
+          armedPrId,
+          ...(title === undefined ? {} : { title }),
+          verdict,
+          turns,
+          endedAt,
+        }),
+      ),
   };
 }
 
-type PostedReview = RecentReview & { seconds: number; headSha: string; armedPrId: string };
+type PostedReview = RecentReview & { seconds: number; headSha: string };
 type FindingRow = { severity: (typeof SEVERITIES)[number]; resolved: boolean; raisedAt?: Date };
 
 function totals(reviews: PostedReview[], findings: FindingRow[]): Totals {
@@ -114,6 +119,7 @@ async function postedReviews(db: Db, userId: string): Promise<PostedReview[]> {
       number: armedPr.number,
       installationId: armedPr.installationId,
       armedPrId: armedPr.id,
+      title: armedPr.title,
       headSha: job.headSha,
       result: run.result,
       turns: run.turns,
@@ -142,6 +148,7 @@ async function postedReviews(db: Db, userId: string): Promise<PostedReview[]> {
             number: row.number,
             installationId: row.installationId,
             armedPrId: row.armedPrId,
+            ...(row.title === null ? {} : { title: row.title }),
             headSha: row.headSha,
             verdict: row.result.verdict,
             turns: row.turns,

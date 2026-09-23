@@ -1,7 +1,36 @@
 import type { GitHubClient, PullRequestReference } from "@hawkeye/core";
+import { and, eq, isNull } from "drizzle-orm";
+import type { Db } from "./db/client";
+import { armedPr } from "./db/schema";
 import { hold, type HoldStore } from "./hold";
 
 export type TitledReference = PullRequestReference & { installationId: string };
+export type StoredTitle = TitledReference & { armedPrId: string; title?: string };
+
+export async function fillTitles<T extends StoredTitle>(
+  db: Db,
+  github: GitHubClient,
+  rows: T[],
+  memory: { cache?: HoldStore<string | undefined>; now?: number } = {},
+): Promise<T[]> {
+  const missing = rows.filter((row) => row.title === undefined);
+  if (missing.length === 0) return rows;
+  const fetched = await pullRequestTitles(github, missing, memory);
+  await Promise.all(
+    missing.map(async (row) => {
+      const title = fetched.get(titleKey(row));
+      if (title !== undefined)
+        await db
+          .update(armedPr)
+          .set({ title })
+          .where(and(eq(armedPr.id, row.armedPrId), isNull(armedPr.title)));
+    }),
+  );
+  return rows.map((row) => {
+    const title = fetched.get(titleKey(row));
+    return row.title === undefined && title !== undefined ? { ...row, title } : row;
+  });
+}
 
 export const TITLE_TTL_MS = 10 * 60_000;
 export const MISSING_TITLE_TTL_MS = 15_000;

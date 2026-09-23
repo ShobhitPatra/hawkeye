@@ -256,6 +256,24 @@ describe("recordFindings", () => {
     expect(storedRows.find((row) => row.claim === "Unanchored claim")?.githubCommentId).toBeNull();
   });
 
+  it("stores the comment id of each inline comment that carries a finding marker", async () => {
+    await record(firstHead, [anchored, unanchored]);
+    const stored = await storeCommentIds(db, "armed-1", [
+      {
+        id: "91",
+        path: "a.txt",
+        line: 2,
+        body: `x\n\n${encodeFindingMarker(findingId("a.txt", "Anchored claim"))}`,
+      },
+      { id: "92", path: "a.txt", line: 3, body: "no marker" },
+      { id: "93", path: "z.ts", line: 1, body: encodeFindingMarker("abcdef012345") },
+    ]);
+    expect(stored).toBe(1);
+    const storedRows = await rows();
+    expect(storedRows.find((row) => row.claim === "Anchored claim")?.githubCommentId).toBe("91");
+    expect(storedRows.find((row) => row.claim === "Unanchored claim")?.githubCommentId).toBeNull();
+  });
+
   it("reports superseded when a newer job for the pull request is done", async () => {
     const older = await queueJob(db, {
       headCurrentAt: new Date(),
