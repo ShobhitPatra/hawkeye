@@ -584,6 +584,91 @@ describe("postReviewForRun", () => {
     expect(rows.find((row) => row.headSha === previousHead)?.githubReviewId).toBe("5");
   });
 
+  it("starts the history over on a round from scratch and counts from it afterwards", async () => {
+    github.updateReview = vi.fn(async () => {});
+    await seedLivingReview({
+      ...result,
+      findings: [
+        { path: "a.txt", line: 2, severity: "should_fix", claim: "anchored", detail: "d" },
+      ],
+    });
+    await db.update(schema.job).set({ fromScratch: true }).where(eq(schema.job.id, jobId));
+
+    await expect(post()).resolves.toBe("posted");
+    const [, , body] = (github.updateReview as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(body).not.toContain(`| 1 | \`${"c".repeat(7)}\` |`);
+    expect(body).toContain(`| 1 | \`${"a".repeat(7)}\` | Changes needed |`);
+    expect(body.trimEnd()).toMatch(/on the author's own plan · round 1 · \d+ turns$/);
+    const [, supplemental] = (github.postReview as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(supplemental.comments).toHaveLength(1);
+
+    const [nextJob] = await db
+      .insert(schema.job)
+      .values({
+        armedPrId: armedPr.id,
+        headSha: "d".repeat(40),
+        baseSha: "b".repeat(40),
+        notBefore: new Date(),
+        state: "done",
+      })
+      .returning({ id: schema.job.id });
+    const [nextRun] = await db
+      .insert(schema.run)
+      .values({ jobId: nextJob!.id, runnerId, status: "ok", result })
+      .returning({ id: schema.run.id });
+    (github.postReview as ReturnType<typeof vi.fn>).mockClear();
+    await expect(
+      postReviewForRun(
+        { db, github },
+        {
+          runId: nextRun!.id,
+          jobId: nextJob!.id,
+          armedPr,
+          headSha: "d".repeat(40),
+          result,
+          commentable: { "a.txt": [1, 2] },
+        },
+      ),
+    ).resolves.toBe("posted");
+    const [, , nextBody] = (github.updateReview as ReturnType<typeof vi.fn>).mock.calls[1]!;
+    expect(nextBody).toContain(`| 2 | \`${"d".repeat(7)}\` | Changes needed |`);
+    expect(nextBody).not.toContain(`\`${"c".repeat(7)}\``);
+    expect(github.postReview).not.toHaveBeenCalled();
+  });
+
+  it("keeps counting from the full history when a round from scratch never posted", async () => {
+    github.updateReview = vi.fn(async () => {});
+    await seedLivingReview({ ...result, findings: [] });
+    const [failedJob] = await db
+      .insert(schema.job)
+      .values({
+        armedPrId: armedPr.id,
+        headSha: "e".repeat(40),
+        baseSha: "b".repeat(40),
+        notBefore: new Date(),
+        state: "done",
+        fromScratch: true,
+        createdAt: new Date("2026-01-01T12:00:00Z"),
+      })
+      .returning({ id: schema.job.id });
+    const [failedRun] = await db
+      .insert(schema.run)
+      .values({ jobId: failedJob!.id, runnerId, status: "ok", result })
+      .returning({ id: schema.run.id });
+    await db.insert(schema.reviewPosted).values({
+      runId: failedRun!.id,
+      armedPrId: armedPr.id,
+      headSha: "e".repeat(40),
+      githubReviewId: null,
+      postedAt: new Date("2026-01-01T12:00:00Z"),
+    });
+
+    await expect(post()).resolves.toBe("posted");
+    const [, , body] = (github.updateReview as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(body).toContain(`| 1 | \`${"c".repeat(7)}\` | Changes needed |`);
+    expect(body).toContain(`| 2 | \`${"a".repeat(7)}\` | Changes needed |`);
+  });
+
   it("patches the living review without a supplemental review when nothing is new", async () => {
     github.updateReview = vi.fn(async () => {});
     await seedLivingReview(result);
