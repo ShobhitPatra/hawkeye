@@ -492,7 +492,10 @@ export async function recordResult(
       await storeCommentIds(deps.db, target.armedPr.id, comments);
     }
     if (closed.length > 0) {
-      const round = (await roundsFor(deps.db, target.armedPr, runId)).length;
+      const rounds = await roundsFor(deps.db, target.armedPr, runId);
+      const round = rounds.some((entry) => entry.headSha === target.headSha)
+        ? rounds.length
+        : rounds.length + 1;
       await closeFindingThreads(
         deps.github,
         { reference: statusTarget.reference, token, headSha: target.headSha, round, closed },
