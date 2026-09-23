@@ -10,6 +10,8 @@ export type {
   LinkedIssue,
   OpenPullRequest,
   PullRequestDetails,
+  ReviewCommentSummary,
+  ReviewThread,
 } from "./github/client.js";
 export { createClaudeCodeHarness } from "./harness/claude-code.js";
 export type { HarnessSpec, HarnessEvent, HarnessResult } from "./harness/harness.js";
@@ -36,7 +38,12 @@ export {
   type RenderLivingReviewInput,
   type RenderedLivingReview,
 } from "./review/render-living.js";
-export { decodeMarker, encodeMarker } from "./review/marker.js";
+export {
+  decodeFindingMarker,
+  decodeMarker,
+  encodeFindingMarker,
+  encodeMarker,
+} from "./review/marker.js";
 export {
   postRenderedReview,
   type PostRenderedReviewInput,

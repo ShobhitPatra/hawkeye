@@ -1,4 +1,9 @@
-import { findingId, type GitHubClient, type ReviewResult } from "@hawkeye/core";
+import {
+  encodeFindingMarker,
+  findingId,
+  type GitHubClient,
+  type ReviewResult,
+} from "@hawkeye/core";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "./db/client";
@@ -34,6 +39,10 @@ function createGitHub(): GitHubClient {
     listInstallationRepositories: unsupported(),
     listUserInstallations: unsupported(),
     botLogin: vi.fn(async () => "hawkeye-review[bot]"),
+    reviewComments: unsupported(),
+    replyToReviewComment: unsupported(),
+    reviewThreads: unsupported(),
+    resolveReviewThread: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
   };
 }
@@ -917,6 +926,48 @@ describe("recordResult", () => {
       firstSeenSha: "a".repeat(40),
       resolvedSha: null,
     });
+  });
+
+  it("stores the id of the inline comment GitHub posted for each finding", async () => {
+    const runId = await claimedRunId();
+    (github.postReview as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      url: "https://github.com/octo/a/pull/1#pullrequestreview-77",
+      id: "77",
+    });
+    const leak = {
+      path: "a.txt",
+      line: 2,
+      severity: "should_fix" as const,
+      claim: "Leaks a handle",
+      detail: "Close it.",
+    };
+    github.reviewComments = vi.fn(async () => [
+      {
+        id: "91",
+        path: "a.txt",
+        line: 2,
+        body: `**Should fix** · Leaks a handle\n\n${encodeFindingMarker(findingId("a.txt", "Leaks a handle"))}`,
+      },
+    ]);
+
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, {
+        status: "ok",
+        turns: 1,
+        result: { ...reviewResult, findings: [leak] },
+        commentable: { "a.txt": [2] },
+      }),
+      { db, github },
+      runId,
+    );
+
+    expect(github.reviewComments).toHaveBeenCalledWith(
+      { owner: "octo", repo: "a", number: 1 },
+      "77",
+      "ghs_token",
+    );
+    const [row] = await db.select().from(schema.finding);
+    expect(row?.githubCommentId).toBe("91");
   });
 
   it("resolves findings the result reports addressed even when repeated", async () => {

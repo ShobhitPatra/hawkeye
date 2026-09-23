@@ -1,7 +1,7 @@
 import { type Finding, type ReviewResult, SEVERITIES } from "../contract/schema.js";
 import { findingId } from "./finding-id.js";
 import { indentLines, LENS_LABELS, SEVERITY_LABELS, VERDICT_LABELS } from "./format.js";
-import { encodeMarker } from "./marker.js";
+import { encodeFindingMarker, encodeMarker } from "./marker.js";
 
 export type ReviewComment = { path: string; line: number; side: "RIGHT" | "LEFT"; body: string };
 export type RenderedReview = {
@@ -50,6 +50,7 @@ function findingBody(finding: Finding): string {
   ];
   if (finding.rationale !== undefined) parts.push("", ...collapsible("why", finding.rationale, ""));
   if (finding.suggestion !== undefined) parts.push("", "```suggestion", finding.suggestion, "```");
+  parts.push("", encodeFindingMarker(findingId(finding.path, finding.claim)));
   return parts.join("\n");
 }
 

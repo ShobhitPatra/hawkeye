@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LENSES, type ReviewResult, VERDICTS } from "../contract/schema.js";
+import { findingId } from "./finding-id.js";
 import { footerLines, renderReview } from "./render.js";
 
 const base = (): ReviewResult => ({
@@ -93,6 +94,11 @@ describe("renderReview", () => {
     expect(r.comments[0]).toMatchObject({ path: "src/a.ts", line: 3, side: "RIGHT" });
     expect(r.comments[0]!.body).toContain("```suggestion\nconst y = x ?? 0;\n```");
     expect(r.comments[0]!.body.startsWith("**Must fix** · Null deref")).toBe(true);
+    expect(
+      r.comments[0]!.body.endsWith(
+        `<!-- hawkeye: finding=${findingId("src/a.ts", "Null deref")} -->`,
+      ),
+    ).toBe(true);
   });
   it("forces RIGHT side even when the finding asks for LEFT", () => {
     const result = base();

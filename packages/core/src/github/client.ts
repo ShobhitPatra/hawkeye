@@ -18,6 +18,8 @@ export type PullRequestDetails = {
   updatedAt: string;
 };
 export type LinkedIssue = { number: number; title: string; body: string };
+export type ReviewCommentSummary = { id: string; path: string; line: number | null; body: string };
+export type ReviewThread = { id: string; isResolved: boolean; commentIds: string[] };
 export type CommitStatus = { state: "pending" | "success"; description: string; context: string };
 
 export type UserInstallation = {
@@ -71,6 +73,19 @@ export interface GitHubClient {
     token: string,
   ): Promise<LinkedIssue | undefined>;
   reviews(reference: PullRequestReference, token: string): Promise<ExistingReview[]>;
+  reviewComments(
+    reference: PullRequestReference,
+    reviewId: string,
+    token: string,
+  ): Promise<ReviewCommentSummary[]>;
+  replyToReviewComment(
+    reference: PullRequestReference,
+    commentId: string,
+    body: string,
+    token: string,
+  ): Promise<void>;
+  reviewThreads(reference: PullRequestReference, token: string): Promise<ReviewThread[]>;
+  resolveReviewThread(threadId: string, token: string): Promise<void>;
   botLogin(): Promise<string>;
   postReview(
     reference: PullRequestReference,
@@ -267,6 +282,23 @@ export function createGitHubClient(input: {
     return payload as T;
   }
 
+  async function graphql<T>(
+    query: string,
+    variables: Record<string, unknown>,
+    token: string,
+  ): Promise<T> {
+    const answer = await request<{ data?: T; errors?: { message: string }[] }>(
+      "POST",
+      "/graphql",
+      bearer(token),
+      { query, variables },
+    );
+    if (answer.errors?.length)
+      throw new Error(`GitHub GraphQL failed: ${answer.errors.map((e) => e.message).join("; ")}`);
+    if (answer.data === undefined) throw new Error("GitHub GraphQL returned no data");
+    return answer.data;
+  }
+
   async function paginate<T>(
     path: string,
     token: string,
@@ -380,6 +412,104 @@ export function createGitHubClient(input: {
             ...(typeof review.id === "number" ? { id: String(review.id) } : {}),
           }),
         ),
+      );
+    },
+    async reviewComments(reference, reviewId, token) {
+      const path = `${pulls(reference)}/reviews/${reviewId}/comments`;
+      return paginate(path, token, (payload) =>
+        (payload as { id: number; path: string; line?: number | null; body?: unknown }[]).map(
+          (comment) => {
+            if (typeof comment.body !== "string")
+              throw new Error(`GitHub GET ${path} returned a comment without a body`);
+            return {
+              id: String(comment.id),
+              path: comment.path,
+              line: comment.line ?? null,
+              body: comment.body,
+            };
+          },
+        ),
+      );
+    },
+    async replyToReviewComment(reference, commentId, body, token) {
+      await request("POST", `${pulls(reference)}/comments/${commentId}/replies`, bearer(token), {
+        body,
+      });
+    },
+    async reviewThreads(reference, token) {
+      const threads: ReviewThread[] = [];
+      let cursor: string | null = null;
+      do {
+        const page: {
+          repository: {
+            pullRequest: {
+              reviewThreads: {
+                pageInfo: { hasNextPage: boolean; endCursor: string | null };
+                nodes: {
+                  id: string;
+                  isResolved: boolean;
+                  comments: { pageInfo: { hasNextPage: boolean }; nodes: { databaseId: number }[] };
+                }[];
+              };
+            };
+          };
+        } = await graphql(
+          `
+            query ($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
+              repository(owner: $owner, name: $repo) {
+                pullRequest(number: $number) {
+                  reviewThreads(first: 100, after: $cursor) {
+                    pageInfo {
+                      hasNextPage
+                      endCursor
+                    }
+                    nodes {
+                      id
+                      isResolved
+                      comments(first: 100) {
+                        pageInfo {
+                          hasNextPage
+                        }
+                        nodes {
+                          databaseId
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          `,
+          { owner: reference.owner, repo: reference.repo, number: reference.number, cursor },
+          token,
+        );
+        const connection = page.repository.pullRequest.reviewThreads;
+        for (const node of connection.nodes) {
+          if (node.comments.pageInfo.hasNextPage)
+            throw new Error(`review thread ${node.id} has more than 100 comments`);
+          threads.push({
+            id: node.id,
+            isResolved: node.isResolved,
+            commentIds: node.comments.nodes.map((comment) => String(comment.databaseId)),
+          });
+        }
+        cursor = connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null;
+      } while (cursor !== null);
+      return threads;
+    },
+    async resolveReviewThread(threadId, token) {
+      await graphql(
+        `
+          mutation ($threadId: ID!) {
+            resolveReviewThread(input: { threadId: $threadId }) {
+              thread {
+                id
+              }
+            }
+          }
+        `,
+        { threadId },
+        token,
       );
     },
     async postReview(reference, review, token) {
