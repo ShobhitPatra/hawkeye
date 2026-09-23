@@ -412,17 +412,94 @@ describe("runRunnerLoop", () => {
     });
     await runRunnerLoop(d);
     const waits = d.reported.flatMap((event) =>
-      event.state === "waiting" && event.detail.includes("rate limit") ? [event.detail] : [],
+      event.state === "waiting" && event.detail.includes("rate-limited") ? [event.detail] : [],
     );
     expect(waits).toEqual([
-      "the plan answered with a rate limit; claiming again in 1 min",
-      "the plan answered with a rate limit; claiming again in 2 min",
+      "the plan rate-limited the run; claiming again in 1 min",
+      "the plan rate-limited the run; claiming again in 2 min",
     ]);
     expect(sleeps[0]).toBeGreaterThan(59_000);
     expect(sleeps[0]).toBeLessThanOrEqual(60_000);
     expect(sleeps[1]).toBeGreaterThan(119_000);
     expect(sleeps[1]).toBeLessThanOrEqual(120_000);
     expect(plane.received.filter((r) => r.url.endsWith("/result"))).toHaveLength(2);
+  });
+
+  it("counts slots that hit the same limit together as one wall", async () => {
+    const limited = (id: string, number: number): ClaimedJob =>
+      pool({
+        ...claimedJob,
+        job: { ...claimedJob.job, id, runId: `run-${id}` },
+        pullRequest: { owner: "o", repo: "r", number },
+      });
+    const plane = await fakeControlPlane(scripted([limited("job-1", 7), limited("job-2", 8)]));
+    servers.push(plane.server);
+    const stop = new AbortController();
+    const sleeps: number[] = [];
+    const { promise: bothStarted, open: release } = gate();
+    let started = 0;
+    const d = await deps(plane.baseUrl, {
+      signal: stop.signal,
+      sleep: async (milliseconds) => {
+        sleeps.push(milliseconds);
+        stop.abort();
+      },
+    });
+    d.harness = {
+      name: "limited",
+      run: async () => {
+        started += 1;
+        if (started === 2) release();
+        await bothStarted;
+        return { status: "error", turns: 0, error: "API Error: 529 overloaded_error" };
+      },
+    };
+    await runRunnerLoop(d);
+    const waits = d.reported.flatMap((event) =>
+      event.state === "waiting" && event.detail.includes("overload") ? [event.detail] : [],
+    );
+    expect(waits).toEqual(["the plan is overloaded; claiming again in 1 min"]);
+    expect(sleeps).toHaveLength(1);
+  });
+
+  it("starts the pause over after a run succeeds and stops doubling at sixteen minutes", async () => {
+    const limitedError =
+      'claude exited with 1: API Error: 429 {"type":"error","error":{"type":"rate_limit_error"}}';
+    const claims = [1, 2, 3, 4, 5, 6, 7].map((number) => ({
+      ...claimedJob,
+      job: { ...claimedJob.job, id: `job-${number}`, runId: `run-${number}` },
+      pullRequest: { owner: "o", repo: "r", number },
+    }));
+    const plane = await fakeControlPlane(scripted(claims));
+    servers.push(plane.server);
+    const stop = new AbortController();
+    const sleeps: number[] = [];
+    const d = await deps(plane.baseUrl, {
+      signal: stop.signal,
+      sleep: async (milliseconds) => {
+        sleeps.push(milliseconds);
+        if (sleeps.length === 6) stop.abort();
+      },
+    });
+    let runs = 0;
+    d.harness = {
+      name: "limited",
+      run: async (i) => {
+        runs += 1;
+        if (runs === 2) {
+          await writeFile(i.resultPath, JSON.stringify(review));
+          return { status: "ok", turns: 1 };
+        }
+        return { status: "error", turns: 0, error: limitedError };
+      },
+    };
+    await runRunnerLoop(d);
+    const minutes = d.reported.flatMap((event) =>
+      event.state === "waiting" && event.detail.includes("rate-limited")
+        ? [Number(/in (\d+) min/.exec(event.detail)![1])]
+        : [],
+    );
+    expect(minutes).toEqual([1, 1, 2, 4, 8, 16]);
   });
 
   it("reports a harness failure with its status", async () => {

@@ -22,6 +22,7 @@ export const PLAN_LIMIT_PAUSE_CAP_MS = 16 * 60_000;
 
 export type JobOutcome = {
   delivery: "delivered" | "dropped" | "undelivered";
+  startedAt: number;
   succeeded: boolean;
   planLimit?: PlanLimit;
 };
@@ -269,6 +270,7 @@ export async function runJob(
   const planLimit = report.status === "error" ? planLimitIn(report.error ?? "") : undefined;
   return {
     delivery,
+    startedAt,
     succeeded: report.status === "ok",
     ...(planLimit === undefined ? {} : { planLimit }),
   };
@@ -283,18 +285,21 @@ export async function runRunnerLoop(
   let concurrency = DEFAULT_CONCURRENCY;
   let lastWaitMs: number | undefined;
   let limitedRuns = 0;
+  let pausedAt = 0;
   let pausedUntil = 0;
   const settle = (outcome: JobOutcome) => {
     if (outcome.planLimit === undefined) {
       if (outcome.succeeded) limitedRuns = 0;
       return;
     }
+    if (outcome.startedAt < pausedAt) return;
     limitedRuns += 1;
+    pausedAt = Date.now();
     const pauseMs = Math.min(PLAN_LIMIT_PAUSE_MS * 2 ** (limitedRuns - 1), PLAN_LIMIT_PAUSE_CAP_MS);
     pausedUntil = Date.now() + pauseMs;
     deps.report({
       state: "waiting",
-      detail: `the plan answered with a ${outcome.planLimit}; claiming again in ${pauseMs / 60_000} min`,
+      detail: `${outcome.planLimit === "rate limit" ? "the plan rate-limited the run" : "the plan is overloaded"}; claiming again in ${pauseMs / 60_000} min`,
     });
   };
   const running = new Map<number, { subject: string; finished: Promise<unknown>; stop(): void }>();

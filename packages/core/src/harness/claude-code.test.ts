@@ -139,6 +139,16 @@ describe("claude code harness", () => {
     expect(() => createClaudeCodeHarness({ model: " " })).toThrow("model must not be empty");
   });
 
+  it("keeps the error text of a failed result event for the run error", async () => {
+    const s = await scratch();
+    const exe = await fakeClaude(
+      `echo '{"type":"result","is_error":true,"result":"API Error: 429 {\\"type\\":\\"error\\",\\"error\\":{\\"type\\":\\"rate_limit_error\\"}}"}'; exit 1`,
+    );
+    const result = await createClaudeCodeHarness({ executable: exe }).run(input(s));
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("rate_limit_error");
+  });
+
   it("names a refused model and where to change it", async () => {
     const s = await scratch();
     const exe = await fakeClaude(
