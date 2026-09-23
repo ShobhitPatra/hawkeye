@@ -117,6 +117,22 @@ describe("fillTitles", () => {
     expect(stored?.title).toBe("PR 1");
   });
 
+  it("leaves a title a webhook stored while the fill was fetching", async () => {
+    const db = await createTestDb();
+    await seedArmedPullRequest(db, { armedPrId: "armed-1", number: 1 });
+    const github = client({
+      pullRequest: async () => {
+        await db.update(schema.armedPr).set({ title: "Renamed meanwhile" });
+        return { title: "Stale" };
+      },
+    });
+    await fillTitles(db, github, [
+      { owner: "octo", repo: "repo", number: 1, installationId: "10", armedPrId: "armed-1" },
+    ]);
+    const [row] = await db.select({ title: schema.armedPr.title }).from(schema.armedPr);
+    expect(row?.title).toBe("Renamed meanwhile");
+  });
+
   it("asks GitHub for nothing when every row has a title", async () => {
     const db = await createTestDb();
     const github = client();

@@ -223,6 +223,8 @@ describe("findArmedPullRequest", () => {
       installationId: "10",
       armed: true,
     });
+    await db.update(schema.armedPr).set({ title: "Add thing" });
+    expect(await findArmedPullRequest(db, coordinates)).toMatchObject({ title: "Add thing" });
     await db.update(schema.armedPr).set({ disarmedAt: new Date() });
     expect(await findArmedPullRequest(db, coordinates)).toMatchObject({ armed: false });
     expect(await findArmedPullRequest(db, { ...coordinates, number: 99 })).toBeUndefined();

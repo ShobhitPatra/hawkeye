@@ -1,5 +1,5 @@
 import type { GitHubClient, PullRequestReference } from "@hawkeye/core";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { armedPr } from "./db/schema";
 import { hold, type HoldStore } from "./hold";
@@ -19,7 +19,10 @@ export async function fillTitles<T extends StoredTitle>(
     missing.map(async (row) => {
       const title = fetched.get(titleKey(row));
       if (title !== undefined)
-        await db.update(armedPr).set({ title }).where(eq(armedPr.id, row.armedPrId));
+        await db
+          .update(armedPr)
+          .set({ title })
+          .where(and(eq(armedPr.id, row.armedPrId), isNull(armedPr.title)));
     }),
   );
   return rows.map((row) => {
