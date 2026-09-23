@@ -9,6 +9,7 @@ import { and, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import { armedPr, finding, job } from "./db/schema";
+import type { ClosedFinding } from "./finding-threads";
 
 export type RecordFindingsInput = {
   armedPrId: string;
@@ -17,7 +18,12 @@ export type RecordFindingsInput = {
   priorFindings?: PriorFindingReport[];
   jobId: string;
 };
-export type RecordedFindings = { created: number; updated: number; resolved: number };
+export type RecordedFindings = {
+  created: number;
+  updated: number;
+  resolved: number;
+  closed: ClosedFinding[];
+};
 
 export async function recordFindings(
   db: Db,
@@ -33,7 +39,7 @@ export async function recordFindings(
   return db.transaction(async (tx) => {
     await tx.execute(sql`select 1 from ${armedPr} where ${armedPr.id} = ${armedPrId} for update`);
     if (await supersededBy(tx, armedPrId, input.jobId)) return "superseded";
-    const counts: RecordedFindings = { created: 0, updated: 0, resolved: 0 };
+    const counts: RecordedFindings = { created: 0, updated: 0, resolved: 0, closed: [] };
     if (byStableId.size > 0) {
       const rows = await tx
         .insert(finding)
@@ -68,10 +74,15 @@ export async function recordFindings(
       }
     }
 
-    const reportedClosed = (input.priorFindings ?? [])
-      .filter((prior) => prior.status !== "open")
-      .map((prior) => prior.id);
-    if (reportedClosed.length > 0) {
+    const reportedClosed = new Map(
+      (input.priorFindings ?? [])
+        .filter(
+          (prior): prior is PriorFindingReport & { status: ClosedFinding["status"] } =>
+            prior.status !== "open",
+        )
+        .map((prior) => [prior.id, prior.status]),
+    );
+    if (reportedClosed.size > 0) {
       const closed = await tx
         .update(finding)
         .set({ resolvedSha: headSha })
@@ -79,11 +90,16 @@ export async function recordFindings(
           and(
             eq(finding.armedPrId, armedPrId),
             isNull(finding.resolvedSha),
-            inArray(finding.stableId, reportedClosed),
+            inArray(finding.stableId, [...reportedClosed.keys()]),
           ),
         )
-        .returning({ id: finding.id });
+        .returning({ stableId: finding.stableId, githubCommentId: finding.githubCommentId });
       counts.resolved += closed.length;
+      counts.closed = closed.map((row) => ({
+        stableId: row.stableId,
+        status: reportedClosed.get(row.stableId)!,
+        commentId: row.githubCommentId,
+      }));
     }
 
     const stableIds = [...byStableId.keys()];
