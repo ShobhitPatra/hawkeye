@@ -253,6 +253,67 @@ describe("createGitHubClient", () => {
       { authorLogin: "alice", body: "y" },
     ]);
   });
+  it("lists a review's inline comments, replies to one, and resolves threads over GraphQL", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      "GET /repos/o/r/pulls/5/reviews/7/comments": () => ({
+        json: [
+          { id: 91, path: "a.ts", line: 3, body: "**Should fix** · x" },
+          { id: 92, path: "b.ts" },
+        ],
+      }),
+      "POST /repos/o/r/pulls/5/comments/91/replies": () => ({ status: 201, json: { id: 93 } }),
+      "POST /graphql": (init) => {
+        const { query, variables } = JSON.parse(String(init.body)) as {
+          query: string;
+          variables: Record<string, unknown>;
+        };
+        if (query.startsWith("mutation")) return { json: { data: { resolveReviewThread: {} } } };
+        return {
+          json: {
+            data: {
+              repository: {
+                pullRequest: {
+                  reviewThreads: {
+                    pageInfo: { hasNextPage: variables.cursor === null, endCursor: "c1" },
+                    nodes: [
+                      {
+                        id: variables.cursor === null ? "T1" : "T2",
+                        isResolved: false,
+                        comments: { nodes: [{ databaseId: 91 }] },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        };
+      },
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(client.reviewComments(ref, "7", "t")).resolves.toEqual([
+      { id: "91", path: "a.ts", line: 3, body: "**Should fix** · x" },
+      { id: "92", path: "b.ts", line: null, body: "" },
+    ]);
+    await client.replyToReviewComment(ref, "91", "Addressed in abc1234.", "t");
+    expect(JSON.parse(String(calls[1]!.init.body))).toEqual({ body: "Addressed in abc1234." });
+    await expect(client.reviewThreads(ref, "t")).resolves.toEqual([
+      { id: "T1", isResolved: false, commentIds: ["91"] },
+      { id: "T2", isResolved: false, commentIds: ["91"] },
+    ]);
+    await client.resolveReviewThread("T1", "t");
+    const mutation = JSON.parse(String(calls.at(-1)!.init.body)) as { variables: unknown };
+    expect(mutation.variables).toEqual({ threadId: "T1" });
+  });
+  it("surfaces GraphQL errors as failures", async () => {
+    const { fetchImpl } = fakeFetch({
+      "POST /graphql": () => ({ json: { errors: [{ message: "Could not resolve" }] } }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(client.resolveReviewThread("T1", "t")).rejects.toThrow(
+      "GitHub GraphQL failed: Could not resolve",
+    );
+  });
   it("follows the link header across review pages", async () => {
     const { fetchImpl, calls } = fakeFetch({
       "GET /repos/o/r/pulls/5/reviews": (_init, url) => ({

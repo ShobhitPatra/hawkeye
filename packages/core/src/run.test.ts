@@ -30,6 +30,10 @@ function deps(
     listInstallationRepositories: vi.fn(async () => []),
     listUserInstallations: vi.fn(async () => []),
     botLogin: vi.fn(),
+    reviewComments: vi.fn(),
+    replyToReviewComment: vi.fn(),
+    reviewThreads: vi.fn(),
+    resolveReviewThread: vi.fn(),
     listOpenPullRequestsByAuthor: vi.fn(async () => []),
     pullRequest: vi.fn(async () => ({
       number: 1,

@@ -47,6 +47,10 @@ function createGitHub(): GitHubClient {
     listInstallationRepositories: unsupported(),
     listUserInstallations: unsupported(),
     botLogin: vi.fn(async () => "hawkeye-review[bot]"),
+    reviewComments: unsupported(),
+    replyToReviewComment: unsupported(),
+    reviewThreads: unsupported(),
+    resolveReviewThread: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
   };
 }

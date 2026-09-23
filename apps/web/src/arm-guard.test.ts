@@ -23,6 +23,10 @@ function fakeGitHub(pullRequest: GitHubClient["pullRequest"]): GitHubClient {
     listInstallationRepositories: unsupported(),
     listUserInstallations: unsupported(),
     botLogin: unsupported(),
+    reviewComments: unsupported(),
+    replyToReviewComment: unsupported(),
+    reviewThreads: unsupported(),
+    resolveReviewThread: unsupported(),
     listOpenPullRequestsByAuthor: unsupported(),
   };
 }
