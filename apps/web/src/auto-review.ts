@@ -53,5 +53,6 @@ export async function armForAuthor(
     ...reference,
     userId: author.userId,
     installationId: event.installationId,
+    title: event.title,
   });
 }

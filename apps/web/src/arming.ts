@@ -21,7 +21,7 @@ function activeRow(userId: string, pullRequest: PullRequestReference) {
 
 export async function armPullRequest(
   db: Db,
-  input: PullRequestReference & { userId: string; installationId: string },
+  input: PullRequestReference & { userId: string; installationId: string; title: string },
 ): Promise<ArmedPullRequest> {
   const [inserted] = await db
     .insert(armedPr)
@@ -31,6 +31,7 @@ export async function armPullRequest(
       owner: input.owner,
       repo: input.repo,
       number: input.number,
+      title: input.title,
     })
     .onConflictDoNothing()
     .returning();
@@ -38,11 +39,12 @@ export async function armPullRequest(
 
   const [existing] = await db.select().from(armedPr).where(activeRow(input.userId, input));
   if (!existing) throw new Error(`${armedPullRequestKey(input)} was disarmed while arming`);
-  if (existing.installationId === input.installationId) return existing;
+  if (existing.installationId === input.installationId && existing.title === input.title)
+    return existing;
 
   const [updated] = await db
     .update(armedPr)
-    .set({ installationId: input.installationId })
+    .set({ installationId: input.installationId, title: input.title })
     .where(eq(armedPr.id, existing.id))
     .returning();
   if (!updated) throw new Error(`${armedPullRequestKey(input)} was disarmed while arming`);
