@@ -1,0 +1,1 @@
+ALTER TABLE "run" ADD COLUMN "comments_review_id" text;

@@ -161,6 +161,7 @@ export const run = pgTable("run", {
   result: jsonb("result").$type<ReviewResult>(),
   placeholderReviewId: text("placeholder_review_id"),
   refusedModel: text("refused_model"),
+  commentsReviewId: text("comments_review_id"),
 });
 
 export const finding = pgTable(

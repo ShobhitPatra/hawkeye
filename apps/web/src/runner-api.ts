@@ -471,13 +471,13 @@ export async function recordResult(
   if (typeof findings === "object") {
     try {
       const [own] = await deps.db
-        .select({ githubReviewId: reviewPosted.githubReviewId })
-        .from(reviewPosted)
-        .where(eq(reviewPosted.runId, runId));
-      if (own?.githubReviewId) {
+        .select({ commentsReviewId: run.commentsReviewId })
+        .from(run)
+        .where(eq(run.id, runId));
+      if (own?.commentsReviewId) {
         const comments = await deps.github.reviewComments(
           statusTarget.reference,
-          own.githubReviewId,
+          own.commentsReviewId,
           await statusTarget.token(),
         );
         await storeCommentIds(deps.db, target.armedPr.id, comments);

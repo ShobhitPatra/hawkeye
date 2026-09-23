@@ -930,6 +930,10 @@ describe("recordResult", () => {
 
   it("stores the id of the inline comment GitHub posted for each finding", async () => {
     const runId = await claimedRunId();
+    (github.postReview as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      url: "https://github.com/octo/a/pull/1#pullrequestreview-77",
+      id: "77",
+    });
     const leak = {
       path: "a.txt",
       line: 2,
@@ -959,7 +963,7 @@ describe("recordResult", () => {
 
     expect(github.reviewComments).toHaveBeenCalledWith(
       { owner: "octo", repo: "a", number: 1 },
-      "9",
+      "77",
       "ghs_token",
     );
     const [row] = await db.select().from(schema.finding);
