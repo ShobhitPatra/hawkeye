@@ -106,7 +106,7 @@ describe("fillTitles", () => {
       },
     ];
 
-    const filled = await fillTitles(db, github, rows);
+    const filled = await fillTitles(db, github, rows, { cache: new Map() });
 
     expect(filled.map((row) => row.title)).toEqual(["PR 1", "Stored"]);
     expect(github.pullRequest).toHaveBeenCalledTimes(1);
@@ -126,9 +126,12 @@ describe("fillTitles", () => {
         return { title: "Stale" };
       },
     });
-    await fillTitles(db, github, [
-      { owner: "octo", repo: "repo", number: 1, installationId: "10", armedPrId: "armed-1" },
-    ]);
+    await fillTitles(
+      db,
+      github,
+      [{ owner: "octo", repo: "repo", number: 1, installationId: "10", armedPrId: "armed-1" }],
+      { cache: new Map() },
+    );
     const [row] = await db.select({ title: schema.armedPr.title }).from(schema.armedPr);
     expect(row?.title).toBe("Renamed meanwhile");
   });

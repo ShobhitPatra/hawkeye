@@ -11,10 +11,11 @@ export async function fillTitles<T extends StoredTitle>(
   db: Db,
   github: GitHubClient,
   rows: T[],
+  memory: { cache?: HoldStore<string | undefined>; now?: number } = {},
 ): Promise<T[]> {
   const missing = rows.filter((row) => row.title === undefined);
   if (missing.length === 0) return rows;
-  const fetched = await pullRequestTitles(github, missing);
+  const fetched = await pullRequestTitles(github, missing, memory);
   await Promise.all(
     missing.map(async (row) => {
       const title = fetched.get(titleKey(row));
