@@ -25,7 +25,7 @@ export async function enqueueJob(db: Db, input: EnqueueJobInput): Promise<Job | 
         baseSha: input.baseSha,
         headCurrentAt: input.headCurrentAt,
         notBefore: input.notBefore,
-        fromScratch: input.fromScratch ?? false,
+        fromScratch: sql`${job.fromScratch} or excluded.from_scratch`,
       },
       setWhere: sql`${job.headCurrentAt} <= excluded.head_current_at`,
     })
