@@ -68,6 +68,28 @@ describe("enqueueJob", () => {
     expect(await jobsFor("armed-2")).toHaveLength(1);
   });
 
+  it("marks a job from scratch and carries the mark onto the waiting job it replaces", async () => {
+    await seedArmedPullRequest(db, { armedPrId: "armed-4", repo: "d", number: 4 });
+    const waiting = await enqueueJob(db, {
+      armedPrId: "armed-4",
+      headSha: "1".repeat(40),
+      baseSha: "2".repeat(40),
+      headCurrentAt: new Date("2026-01-01T00:00:00.000Z"),
+      notBefore: new Date("2026-01-01T00:00:00.000Z"),
+    });
+    expect(waiting?.fromScratch).toBe(false);
+    const fresh = await enqueueJob(db, {
+      armedPrId: "armed-4",
+      headSha: "1".repeat(40),
+      baseSha: "2".repeat(40),
+      headCurrentAt: new Date("2026-01-01T00:00:01.000Z"),
+      notBefore: new Date("2026-01-01T00:00:01.000Z"),
+      fromScratch: true,
+    });
+    expect(fresh?.id).toBe(waiting?.id);
+    expect(fresh?.fromScratch).toBe(true);
+  });
+
   it("discards an enqueue whose head is older than the waiting job's", async () => {
     await seedArmedPullRequest(db, { armedPrId: "armed-3", repo: "c", number: 3 });
     const newer = await enqueueJob(db, {

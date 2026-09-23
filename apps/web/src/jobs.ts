@@ -10,6 +10,7 @@ export type EnqueueJobInput = {
   baseSha: string;
   headCurrentAt: Date;
   notBefore: Date;
+  fromScratch?: boolean;
 };
 
 export async function enqueueJob(db: Db, input: EnqueueJobInput): Promise<Job | undefined> {
@@ -24,6 +25,7 @@ export async function enqueueJob(db: Db, input: EnqueueJobInput): Promise<Job | 
         baseSha: input.baseSha,
         headCurrentAt: input.headCurrentAt,
         notBefore: input.notBefore,
+        fromScratch: input.fromScratch ?? false,
       },
       setWhere: sql`${job.headCurrentAt} <= excluded.head_current_at`,
     })
