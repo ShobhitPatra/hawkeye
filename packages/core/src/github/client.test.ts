@@ -258,7 +258,7 @@ describe("createGitHubClient", () => {
       "GET /repos/o/r/pulls/5/reviews/7/comments": () => ({
         json: [
           { id: 91, path: "a.ts", line: 3, body: "**Should fix** · x" },
-          { id: 92, path: "b.ts" },
+          { id: 92, path: "b.ts", body: "" },
         ],
       }),
       "POST /repos/o/r/pulls/5/comments/91/replies": () => ({ status: 201, json: { id: 93 } }),
@@ -279,7 +279,7 @@ describe("createGitHubClient", () => {
                       {
                         id: variables.cursor === null ? "T1" : "T2",
                         isResolved: false,
-                        comments: { nodes: [{ databaseId: 91 }] },
+                        comments: { pageInfo: { hasNextPage: false }, nodes: [{ databaseId: 91 }] },
                       },
                     ],
                   },
@@ -304,6 +304,34 @@ describe("createGitHubClient", () => {
     await client.resolveReviewThread("T1", "t");
     const mutation = JSON.parse(String(calls.at(-1)!.init.body)) as { variables: unknown };
     expect(mutation.variables).toEqual({ threadId: "T1" });
+  });
+  it("refuses a comment without a body and a thread with more than 100 comments", async () => {
+    const { fetchImpl } = fakeFetch({
+      "GET /repos/o/r/pulls/5/reviews/7/comments": () => ({ json: [{ id: 91, path: "a.ts" }] }),
+      "POST /graphql": () => ({
+        json: {
+          data: {
+            repository: {
+              pullRequest: {
+                reviewThreads: {
+                  pageInfo: { hasNextPage: false, endCursor: null },
+                  nodes: [
+                    {
+                      id: "T1",
+                      isResolved: false,
+                      comments: { pageInfo: { hasNextPage: true }, nodes: [{ databaseId: 91 }] },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(client.reviewComments(ref, "7", "t")).rejects.toThrow("without a body");
+    await expect(client.reviewThreads(ref, "t")).rejects.toThrow("more than 100 comments");
   });
   it("surfaces GraphQL errors as failures", async () => {
     const { fetchImpl } = fakeFetch({
