@@ -157,6 +157,8 @@ describe("postReviewForRun", () => {
     expect(review.comments).toHaveLength(1);
     expect(review.comments[0]).toMatchObject({ path: "a.txt", line: 2, side: "RIGHT" });
     expect(review.comments[0].body).toContain("anchored");
+    const [own] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
+    expect(own?.commentsReviewId).toBe("9");
     expect(review.body).toContain("**unanchored**");
     expect(review.body.trimEnd().endsWith("on the author's own plan · round 1")).toBe(true);
     const rows = await db.select().from(schema.reviewPosted);
@@ -344,6 +346,8 @@ describe("postReviewForRun", () => {
     const rows = await db.select().from(schema.reviewPosted);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ runId, headSha, githubReviewId: "42" });
+    const [own] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
+    expect(own?.commentsReviewId).toBe("9");
   });
 
   it("closes a round-one placeholder when the head was already posted", async () => {

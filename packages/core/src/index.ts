@@ -10,10 +10,11 @@ export type {
   LinkedIssue,
   OpenPullRequest,
   PullRequestDetails,
+  ReviewCommentSummary,
+  ReviewThread,
 } from "./github/client.js";
 export { createClaudeCodeHarness } from "./harness/claude-code.js";
 export type { HarnessSpec, HarnessEvent, HarnessResult } from "./harness/harness.js";
-export type { ReviewCommentSummary, ReviewThread } from "./github/client.js";
 export { planLimitIn, type PlanLimit } from "./harness/plan-limit.js";
 export {
   createWorktree,

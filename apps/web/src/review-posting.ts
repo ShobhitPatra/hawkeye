@@ -329,6 +329,7 @@ export async function postReviewForRun(
       await tx
         .insert(reviewPosted)
         .values({ runId: input.runId, armedPrId: armedPr.id, headSha, githubReviewId: posted.id });
+      await tx.update(run).set({ commentsReviewId: posted.id }).where(eq(run.id, input.runId));
       return "posted" as const;
     } catch (error) {
       return { failed: error instanceof Error ? error.message : String(error) };
@@ -408,6 +409,10 @@ export async function postReviewForRun(
         );
         githubWrote = true;
         await record(supplemental.id);
+        await db
+          .update(run)
+          .set({ commentsReviewId: supplemental.id })
+          .where(eq(run.id, input.runId));
         supplementalPosted = true;
       } catch (error) {
         if (!(error instanceof GitHubRequestError && error.status === 422)) throw error;
