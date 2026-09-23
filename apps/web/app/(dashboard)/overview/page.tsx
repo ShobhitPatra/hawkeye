@@ -1,7 +1,7 @@
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
 import { loadOverview, type RecentReview } from "@/overview";
-import { pullRequestTitles, titleKey } from "@/pull-request-titles";
+import { fillTitles } from "@/pull-request-titles";
 import { requestRunnerStatus } from "@/request-runner-status";
 import { requireSession } from "@/session";
 import { Suspense } from "react";
@@ -29,11 +29,7 @@ export default async function OverviewPage() {
 }
 
 async function RecentReviewsWithTitles({ recent, now }: { recent: RecentReview[]; now: Date }) {
-  const titles = await pullRequestTitles(createGitHubAppClient({ fetch }), recent);
-  const titled = recent.map((review) => {
-    const title = titles.get(titleKey(review));
-    return title ? { ...review, title } : review;
-  });
+  const titled = await fillTitles(getDb(), createGitHubAppClient({ fetch }), recent);
   return <RecentReviews recent={titled} now={now} />;
 }
 
