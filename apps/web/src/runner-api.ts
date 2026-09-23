@@ -32,7 +32,7 @@ import {
   setCommitStatus,
   SUPERSEDED_DESCRIPTION,
 } from "./commit-status";
-import { recordFindings } from "./findings";
+import { recordFindings, storeCommentIds } from "./findings";
 import {
   claimNextJob,
   completeRun,
@@ -468,5 +468,25 @@ export async function recordResult(
     deps.log?.(`findings not recorded for run ${runId}: ${message}`);
     return "failed" as const;
   });
+  if (typeof findings === "object") {
+    try {
+      const [own] = await deps.db
+        .select({ githubReviewId: reviewPosted.githubReviewId })
+        .from(reviewPosted)
+        .where(eq(reviewPosted.runId, runId));
+      if (own?.githubReviewId) {
+        const comments = await deps.github.reviewComments(
+          statusTarget.reference,
+          own.githubReviewId,
+          await statusTarget.token(),
+        );
+        await storeCommentIds(deps.db, target.armedPr.id, comments);
+      }
+    } catch (error) {
+      deps.log?.(
+        `comment ids not stored for run ${runId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
   return Response.json({ ok: true, posted, findings }, { status: 200 });
 }

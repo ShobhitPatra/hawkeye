@@ -1,4 +1,10 @@
-import { type Finding, findingId, type PriorFindingReport } from "@hawkeye/core";
+import {
+  decodeFindingMarker,
+  type Finding,
+  findingId,
+  type PriorFindingReport,
+  type ReviewCommentSummary,
+} from "@hawkeye/core";
 import { and, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
@@ -95,6 +101,25 @@ export async function recordFindings(
     counts.resolved += resolved.length;
     return counts;
   });
+}
+
+export async function storeCommentIds(
+  db: Db,
+  armedPrId: string,
+  comments: ReviewCommentSummary[],
+): Promise<number> {
+  let stored = 0;
+  for (const comment of comments) {
+    const stableId = decodeFindingMarker(comment.body);
+    if (stableId === undefined) continue;
+    const rows = await db
+      .update(finding)
+      .set({ githubCommentId: comment.id })
+      .where(and(eq(finding.armedPrId, armedPrId), eq(finding.stableId, stableId)))
+      .returning({ id: finding.id });
+    stored += rows.length;
+  }
+  return stored;
 }
 
 async function supersededBy(db: Db, armedPrId: string, jobId: string): Promise<boolean> {
