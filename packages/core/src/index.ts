@@ -14,6 +14,7 @@ export type {
   ReviewThread,
 } from "./github/client.js";
 export { createClaudeCodeHarness } from "./harness/claude-code.js";
+export { createCodexHarness } from "./harness/codex.js";
 export type { HarnessSpec, HarnessEvent, HarnessResult } from "./harness/harness.js";
 export { planLimitIn, type PlanLimit } from "./harness/plan-limit.js";
 export {
