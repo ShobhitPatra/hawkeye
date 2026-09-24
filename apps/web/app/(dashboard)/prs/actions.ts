@@ -12,6 +12,14 @@ import { installationBelongsToUser } from "@/installations";
 import { requireSession } from "@/session";
 
 export async function armAction(formData: FormData) {
+  await armAndQueue(formData, { fromScratch: false });
+}
+
+export async function reviewFromScratchAction(formData: FormData) {
+  await armAndQueue(formData, { fromScratch: true });
+}
+
+async function armAndQueue(formData: FormData, options: { fromScratch: boolean }) {
   const session = await requireSession();
   const input = parseArmInput(formData);
   const db = getDb();
@@ -45,9 +53,11 @@ export async function armAction(formData: FormData) {
       ...target,
       headCurrentAt: new Date(pullRequest.updatedAt),
       notBefore: new Date(),
+      fromScratch: options.fromScratch,
     });
   });
   revalidatePath("/prs");
+  revalidatePath(`/prs/${input.owner}/${input.repo}/${input.number}`);
 }
 
 export async function disarmAction(formData: FormData) {
