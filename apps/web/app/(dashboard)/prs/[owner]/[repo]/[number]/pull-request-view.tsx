@@ -5,6 +5,7 @@ import { postingNote } from "@/posting-note";
 import { formatDuration, formatError, runFailureLabel, shortSha, verdictLabel } from "@/run-format";
 import type { ArmedPullRequestSummary, PullRequestFinding, PullRequestRun } from "@/runs";
 import { ReviewControl } from "../../../review-control";
+import { ReviewFromScratch } from "../../../review-from-scratch";
 
 const SEVERITY_LABELS: Record<Severity, string> = {
   must_fix: "Must fix",
@@ -69,6 +70,9 @@ export function PullRequestView({
               installationId={arm.installationId}
               reviewing={arm.armed}
             />
+            {lastReview && arm.armed && (
+              <ReviewFromScratch reference={reference} installationId={arm.installationId} />
+            )}
             <a className="hk-button" href={htmlUrl}>
               Open on GitHub
             </a>
