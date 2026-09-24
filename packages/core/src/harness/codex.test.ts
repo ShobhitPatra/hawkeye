@@ -118,8 +118,15 @@ describe("codex harness", () => {
     const exe = await fakeCodex(
       `cat > /dev/null; for i in 1 2 3; do echo '{"type":"item.completed","item":{"type":"agent_message"}}'; done; sleep 5`,
     );
-    const outcome = await createCodexHarness({ executable: exe }).run(input(s, { maxTurns: 2 }));
+    const turns: number[] = [];
+    const outcome = await createCodexHarness({ executable: exe }).run(
+      input(s, {
+        maxTurns: 2,
+        onEvent: (event) => event.type === "turn" && turns.push(event.turns),
+      }),
+    );
     expect(outcome).toEqual({ status: "max-turns", turns: 2 });
+    expect(turns).toEqual([1, 2]);
   });
 
   it("names a missing codex binary", async () => {

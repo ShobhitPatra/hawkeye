@@ -90,7 +90,7 @@ export function createCodexHarness(
 
       if (await exists(input.resultPath)) return { status: "ok", turns };
       if (await adoptLastMessage(lastMessagePath, input.resultPath)) return { status: "ok", turns };
-      if (stopReason) return { status: stopReason, turns: Math.min(turns, input.maxTurns) };
+      if (stopReason) return { status: stopReason, turns };
       return {
         status: "error",
         turns,
