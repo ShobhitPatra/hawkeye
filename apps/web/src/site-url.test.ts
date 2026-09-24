@@ -1,23 +1,30 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { siteUrl } from "./site-url";
 
-afterEach(() => vi.unstubAllEnvs());
+const original = { ...process.env };
+
+beforeEach(() => {
+  process.env = { ...original };
+});
+afterEach(() => {
+  process.env = original;
+});
 
 describe("siteUrl", () => {
   it("returns a URL without a trailing slash unchanged", () => {
-    vi.stubEnv("BETTER_AUTH_URL", "https://hawkeye.example");
+    process.env.BETTER_AUTH_URL = "https://hawkeye.example";
     expect(siteUrl()).toBe("https://hawkeye.example");
   });
   it("removes one trailing slash", () => {
-    vi.stubEnv("BETTER_AUTH_URL", "https://hawkeye.example/");
+    process.env.BETTER_AUTH_URL = "https://hawkeye.example/";
     expect(siteUrl()).toBe("https://hawkeye.example");
   });
   it("removes several trailing slashes", () => {
-    vi.stubEnv("BETTER_AUTH_URL", "https://hawkeye.example///");
+    process.env.BETTER_AUTH_URL = "https://hawkeye.example///";
     expect(siteUrl()).toBe("https://hawkeye.example");
   });
   it("leaves a slash inside the path alone", () => {
-    vi.stubEnv("BETTER_AUTH_URL", "https://hawkeye.example/app/");
+    process.env.BETTER_AUTH_URL = "https://hawkeye.example/app/";
     expect(siteUrl()).toBe("https://hawkeye.example/app");
   });
 });
