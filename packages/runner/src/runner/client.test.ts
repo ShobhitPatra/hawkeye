@@ -89,7 +89,31 @@ describe("createControlPlaneClient", () => {
     const controller = new AbortController();
     const { fetch, client: c } = client(() => new Response(null, { status: 204 }));
     await c.claimJob({ signal: controller.signal });
-    expect(fetch.mock.calls[0]![1].signal).toBe(controller.signal);
+    const passed = fetch.mock.calls[0]![1].signal as AbortSignal;
+    expect(passed.aborted).toBe(false);
+    controller.abort();
+    expect(passed.aborted).toBe(true);
+  });
+  it("gives up on a request the control plane never answers", async () => {
+    const fetch = vi.fn(
+      (_url: string, init: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        }),
+    );
+    const c = createControlPlaneClient({
+      baseUrl: "https://hawkeye.example",
+      token: "hk_1",
+      fetch: fetch as unknown as typeof globalThis.fetch,
+      requestTimeoutMs: 20,
+      claimRequestTimeoutMs: 40,
+    });
+    const started = Date.now();
+    await expect(c.claimJob()).rejects.toThrow(
+      "control plane GET /api/runner/jobs did not answer within 0.04s",
+    );
+    expect(Date.now() - started).toBeGreaterThanOrEqual(35);
+    await expect(c.heartbeat("job-1")).rejects.toThrow("did not answer within 0.02s");
   });
   it("throws a typed error with the status and server message", async () => {
     const { client: c } = client(() =>

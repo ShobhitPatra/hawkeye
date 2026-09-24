@@ -145,12 +145,19 @@ function claimWait(header: string | null): ClaimWait | undefined {
   return { retryAfterMs: seconds * 1000 };
 }
 
+export const CLAIM_REQUEST_TIMEOUT_MS = 60_000;
+export const REQUEST_TIMEOUT_MS = 30_000;
+
 export function createControlPlaneClient(input: {
   baseUrl: string;
   token: string;
   fetch: typeof fetch;
+  requestTimeoutMs?: number;
+  claimRequestTimeoutMs?: number;
 }): ControlPlaneClient {
   const baseUrl = input.baseUrl.replace(/\/+$/, "");
+  const requestTimeoutMs = input.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
+  const claimRequestTimeoutMs = input.claimRequestTimeoutMs ?? CLAIM_REQUEST_TIMEOUT_MS;
 
   async function send(
     method: "GET" | "POST",
@@ -158,18 +165,28 @@ export function createControlPlaneClient(input: {
     body?: unknown,
     signal?: AbortSignal,
     extraHeaders: Record<string, string> = {},
+    timeoutMs = requestTimeoutMs,
   ): Promise<Response> {
-    const response = await input.fetch(`${baseUrl}${path}`, {
-      method,
-      headers: {
-        Authorization: `Bearer ${input.token}`,
-        Accept: "application/json",
-        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-        ...extraHeaders,
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      ...(signal === undefined ? {} : { signal }),
-    });
+    const timeout = AbortSignal.timeout(timeoutMs);
+    const response = await input
+      .fetch(`${baseUrl}${path}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${input.token}`,
+          Accept: "application/json",
+          ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+          ...extraHeaders,
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        signal: signal === undefined ? timeout : AbortSignal.any([timeout, signal]),
+      })
+      .catch((error: unknown) => {
+        if (timeout.aborted && !signal?.aborted)
+          throw new Error(
+            `control plane ${method} ${path} did not answer within ${timeoutMs / 1000}s`,
+          );
+        throw error;
+      });
     if (!response.ok) {
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
       throw new ControlPlaneRequestError(
@@ -182,9 +199,14 @@ export function createControlPlaneClient(input: {
 
   return {
     async claimJob(options = {}) {
-      const response = await send("GET", "/api/runner/jobs", undefined, options.signal, {
-        [HONORS_RETRY_AFTER_HEADER]: "1",
-      });
+      const response = await send(
+        "GET",
+        "/api/runner/jobs",
+        undefined,
+        options.signal,
+        { [HONORS_RETRY_AFTER_HEADER]: "1" },
+        claimRequestTimeoutMs,
+      );
       if (response.status === 204) return claimWait(response.headers.get("retry-after"));
       return claimedJob(await response.json());
     },
