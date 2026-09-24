@@ -177,12 +177,12 @@ describe("the queue's indexes", () => {
 
   it("serves the claim from job_claimable and the stale sweep from job_stale, never a full scan", async () => {
     await seedQueue();
-    const claim = claimNextJobStatement(db, {
+    const claimStatement = claimNextJobStatement(db, {
       runnerId: "runner-1",
       userId: "seed-u5",
       now: new Date(),
     });
-    const claimPlan = await plan(claim);
+    const claimPlan = await plan(claimStatement);
     expect(claimPlan).not.toContain("Seq Scan on job");
     expect(claimPlan).toContain("job_claimable");
     const sweep = requeueStaleJobsStatement(db, new Date(Date.now() - 5 * 60_000));
