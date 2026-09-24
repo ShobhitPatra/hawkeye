@@ -40,6 +40,7 @@ export type RunnerEvent = { slot?: number } & (
 export type RunnerLoopDependencies = {
   client: ControlPlaneClient;
   harness: HarnessSpec;
+  harnesses?: Record<string, HarnessSpec>;
   createWorktree: typeof createWorktree;
   readRepositoryRules: typeof readRepositoryRules;
   createRunDirectory(reference: ClaimedJob["pullRequest"]): Promise<string>;
@@ -80,6 +81,14 @@ function keptIn(runDirectory: string | undefined): string {
   return runDirectory === undefined ? "" : ` · run kept in ${runDirectory}`;
 }
 
+function harnessFor(
+  name: string | undefined,
+  deps: RunnerLoopDependencies,
+): HarnessSpec | undefined {
+  if (name === undefined || name === deps.harness.name) return deps.harness;
+  return deps.harnesses?.[name];
+}
+
 async function reportFor(
   claimed: ClaimedJob,
   deps: RunnerLoopDependencies,
@@ -88,6 +97,13 @@ async function reportFor(
 ): Promise<RunResultReport> {
   const { job, pullRequest } = claimed;
   const contractOverride = deps.contractOverride ?? claimed.settings.promptOverride;
+  const harness = harnessFor(claimed.settings.harness, deps);
+  if (harness === undefined)
+    return {
+      status: "error",
+      turns: 0,
+      error: `Harness ${claimed.settings.harness} is not available on this runner; choose another in Settings.`,
+    };
   const outcome = await runReviewJob(
     {
       reference: pullRequest,
@@ -104,7 +120,7 @@ async function reportFor(
     },
     {
       fetch: deps.fetch,
-      harness: deps.harness,
+      harness,
       createWorktree: deps.createWorktree,
       readRepositoryRules: deps.readRepositoryRules,
       log: (line) => deps.log(line, runDirectory),

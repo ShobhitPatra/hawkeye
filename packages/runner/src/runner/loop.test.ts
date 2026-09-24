@@ -502,6 +502,46 @@ describe("runRunnerLoop", () => {
     expect(minutes).toEqual([1, 1, 2, 4, 8, 16]);
   });
 
+  it("runs the job on the harness its settings name and refuses one it does not have", async () => {
+    const codexJob: ClaimedJob = {
+      ...claimedJob,
+      settings: { ...claimedJob.settings, harness: "codex" },
+    };
+    const unknownJob: ClaimedJob = {
+      ...claimedJob,
+      job: { ...claimedJob.job, id: "job-2", runId: "run-2" },
+      settings: { ...claimedJob.settings, harness: "gemini" },
+    };
+    const plane = await fakeControlPlane(scripted([codexJob, unknownJob, undefined]));
+    servers.push(plane.server);
+    const stop = new AbortController();
+    const codexRuns: number[] = [];
+    const d = await deps(plane.baseUrl, {
+      signal: stop.signal,
+      sleep: async () => stop.abort(),
+    });
+    d.harnesses = {
+      codex: {
+        name: "codex",
+        run: async (i) => {
+          codexRuns.push(1);
+          await writeFile(i.resultPath, JSON.stringify(review));
+          return { status: "ok", turns: 1 };
+        },
+      },
+    };
+    await runRunnerLoop(d);
+    expect(codexRuns).toHaveLength(1);
+    expect(d.harness.run).not.toHaveBeenCalled();
+    const results = plane.received.filter((r) => r.url.endsWith("/result")).map((r) => r.body);
+    expect(results[0]).toMatchObject({ status: "ok" });
+    expect(results[1]).toEqual({
+      status: "error",
+      turns: 0,
+      error: "Harness gemini is not available on this runner; choose another in Settings.",
+    });
+  });
+
   it("reports a harness failure with its status", async () => {
     const plane = await fakeControlPlane(scripted([claimedJob]));
     servers.push(plane.server);
