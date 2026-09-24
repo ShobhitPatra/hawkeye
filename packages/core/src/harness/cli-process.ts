@@ -64,9 +64,9 @@ export async function runCliProcess(input: {
   if (input.signal?.aborted) abort();
   else input.signal?.addEventListener("abort", abort, { once: true });
 
-  createInterface({ input: child.stdout! }).on("line", (line) =>
-    input.onStdoutLine(line, { keep, stop }),
-  );
+  createInterface({ input: child.stdout! }).on("line", (line) => {
+    if (stopReason === undefined) input.onStdoutLine(line, { keep, stop });
+  });
   createInterface({ input: child.stderr! }).on("line", (line) => {
     input.onStderrLine(line);
     keep(line);
