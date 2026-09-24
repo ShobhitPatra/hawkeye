@@ -23,16 +23,16 @@ export function RunnerForm({ settings }: { settings: RunnerSettings }) {
     <form action={formAction} className="hk-section">
       <fieldset className="hk-choice" data-stack>
         <legend className="hk-compact">Harness</legend>
-        {HARNESSES.map((harness) => (
-          <label key={harness.value}>
+        {HARNESSES.map((choice) => (
+          <label key={choice.value}>
             <input
               type="radio"
               name="harness"
-              value={harness.value}
-              defaultChecked={settings.harness === harness.value}
-              onChange={() => setHarness(harness.value)}
+              value={choice.value}
+              defaultChecked={settings.harness === choice.value}
+              onChange={() => setHarness(choice.value)}
             />
-            {harness.label}
+            {choice.label}
           </label>
         ))}
       </fieldset>
