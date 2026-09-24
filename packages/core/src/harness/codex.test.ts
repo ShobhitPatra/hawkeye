@@ -2,7 +2,7 @@ import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createCodexHarness, reviewResultJsonSchema } from "./codex.js";
+import { createCodexHarness } from "./codex.js";
 
 const result = {
   verdict: "ship",
@@ -49,7 +49,7 @@ const input = (
 });
 
 describe("codex harness", () => {
-  it("passes the exec flags, the schema and the prompt, and reports ok when the result exists", async () => {
+  it("passes the exec flags and the prompt, and reports ok when the result exists", async () => {
     const s = await scratch();
     const exe = await fakeCodex(
       `printf '%s\\n' "$@" > "$(dirname "$0")/args"; cat > "$(dirname "$0")/stdin"; echo '{"type":"thread.started","thread_id":"t"}'; echo '{"type":"item.completed","item":{"type":"command_execution"}}'; echo '${JSON.stringify(result)}' > "${s.resultPath}"`,
@@ -73,19 +73,13 @@ describe("codex harness", () => {
       s.dir,
     ]);
     expect(args.slice(args.indexOf("--cd"), args.indexOf("--cd") + 2)).toEqual(["--cd", s.dir]);
-    expect(
-      args.slice(args.indexOf("--output-schema"), args.indexOf("--output-schema") + 2),
-    ).toEqual(["--output-schema", s.settingsPath]);
     expect(args.slice(args.indexOf("--model"), args.indexOf("--model") + 2)).toEqual([
       "--model",
       "gpt-5.5",
     ]);
     expect(args.at(-1)).toBe("-");
     expect(await readFile(join(exe, "..", "stdin"), "utf8")).toBe("prompt");
-    const schema = JSON.parse(await readFile(s.settingsPath, "utf8")) as {
-      properties: Record<string, unknown>;
-    };
-    expect(Object.keys(schema.properties)).toContain("verdict");
+    expect(args).not.toContain("--output-schema");
   });
 
   it("adopts the last message as the result when the model answered instead of writing the file", async () => {
@@ -133,17 +127,5 @@ describe("codex harness", () => {
     await expect(
       createCodexHarness({ executable: join(s.dir, "missing-codex") }).run(input(s)),
     ).rejects.toThrow(/ENOENT/);
-  });
-
-  it("describes the review result as a JSON schema with the verdict words", () => {
-    const schema = reviewResultJsonSchema() as {
-      properties: { verdict: { enum: string[] } };
-    };
-    expect(schema.properties.verdict.enum).toEqual([
-      "ship",
-      "mergeable",
-      "changes_needed",
-      "blocked",
-    ]);
   });
 });

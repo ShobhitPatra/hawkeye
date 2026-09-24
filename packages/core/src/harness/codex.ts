@@ -2,8 +2,7 @@ import { spawn as nodeSpawn } from "node:child_process";
 import { access, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
-import { z } from "zod";
-import { parseReviewResult, ReviewResultSchema } from "../contract/schema.js";
+import { parseReviewResult } from "../contract/schema.js";
 import type { SpawnLike } from "./claude-code.js";
 import type { HarnessResult, HarnessRunInput, HarnessSpec } from "./harness.js";
 
@@ -15,10 +14,6 @@ const exists = (path: string) =>
     () => true,
     () => false,
   );
-
-export function reviewResultJsonSchema(): unknown {
-  return z.toJSONSchema(ReviewResultSchema, { io: "input", unrepresentable: "any" });
-}
 
 async function adoptLastMessage(lastMessagePath: string, resultPath: string): Promise<boolean> {
   if (!(await exists(lastMessagePath))) return false;
@@ -48,7 +43,6 @@ export function createCodexHarness(
     async run(input: HarnessRunInput): Promise<HarnessResult> {
       const model = options.model ?? input.model;
       const prompt = await readFile(input.promptPath, "utf8");
-      await writeFile(input.settingsPath, JSON.stringify(reviewResultJsonSchema(), null, 2));
       const lastMessagePath = join(dirname(input.resultPath), "last-message.txt");
       const args = [
         "exec",
@@ -63,8 +57,6 @@ export function createCodexHarness(
         dirname(input.resultPath),
         "--cd",
         input.cwd,
-        "--output-schema",
-        input.settingsPath,
         "--output-last-message",
         lastMessagePath,
         ...(model === undefined ? [] : ["--model", model]),
