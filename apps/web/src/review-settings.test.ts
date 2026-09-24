@@ -12,8 +12,9 @@ describe("isModelChoice", () => {
     expect(isModelChoice("")).toBe(false);
   });
   it("rejects a value that differs only by case or whitespace", () => {
-    expect(isModelChoice("Claude-Fable-5-1")).toBe(false);
-    expect(isModelChoice(" claude-fable-5-1")).toBe(false);
-    expect(isModelChoice("claude-fable-5-1 ")).toBe(false);
+    const [{ value }] = MODELS;
+    expect(isModelChoice(value.toUpperCase())).toBe(false);
+    expect(isModelChoice(` ${value}`)).toBe(false);
+    expect(isModelChoice(`${value} `)).toBe(false);
   });
 });
