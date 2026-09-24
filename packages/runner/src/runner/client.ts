@@ -146,6 +146,7 @@ function claimWait(header: string | null): ClaimWait | undefined {
 }
 
 export const CLAIM_REQUEST_TIMEOUT_MS = 60_000;
+export const RESULT_REQUEST_TIMEOUT_MS = 300_000;
 export const REQUEST_TIMEOUT_MS = 30_000;
 
 export function createControlPlaneClient(input: {
@@ -154,10 +155,12 @@ export function createControlPlaneClient(input: {
   fetch: typeof fetch;
   requestTimeoutMs?: number;
   claimRequestTimeoutMs?: number;
+  resultRequestTimeoutMs?: number;
 }): ControlPlaneClient {
   const baseUrl = input.baseUrl.replace(/\/+$/, "");
   const requestTimeoutMs = input.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
   const claimRequestTimeoutMs = input.claimRequestTimeoutMs ?? CLAIM_REQUEST_TIMEOUT_MS;
+  const resultRequestTimeoutMs = input.resultRequestTimeoutMs ?? RESULT_REQUEST_TIMEOUT_MS;
 
   async function send(
     method: "GET" | "POST",
@@ -166,8 +169,10 @@ export function createControlPlaneClient(input: {
     signal?: AbortSignal,
     extraHeaders: Record<string, string> = {},
     timeoutMs = requestTimeoutMs,
-  ): Promise<Response> {
+  ): Promise<{ response: Response; json(): Promise<unknown> }> {
     const timeout = AbortSignal.timeout(timeoutMs);
+    const timedOut = () =>
+      new Error(`control plane ${method} ${path} did not answer within ${timeoutMs / 1000}s`);
     const response = await input
       .fetch(`${baseUrl}${path}`, {
         method,
@@ -181,25 +186,30 @@ export function createControlPlaneClient(input: {
         signal: signal === undefined ? timeout : AbortSignal.any([timeout, signal]),
       })
       .catch((error: unknown) => {
-        if (timeout.aborted && !signal?.aborted)
-          throw new Error(
-            `control plane ${method} ${path} did not answer within ${timeoutMs / 1000}s`,
-          );
+        if (timeout.aborted && !signal?.aborted) throw timedOut();
         throw error;
       });
+    const json = () =>
+      Promise.race([
+        response.json(),
+        new Promise<never>((_resolve, reject) => {
+          if (timeout.aborted) reject(timedOut());
+          timeout.addEventListener("abort", () => reject(timedOut()), { once: true });
+        }),
+      ]);
     if (!response.ok) {
-      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      const payload = (await json().catch(() => ({}))) as { error?: string };
       throw new ControlPlaneRequestError(
         response.status,
         `control plane ${method} ${path} failed: ${response.status}${payload.error ? ` ${payload.error}` : ""}`,
       );
     }
-    return response;
+    return { response, json };
   }
 
   return {
     async claimJob(options = {}) {
-      const response = await send(
+      const { response, json } = await send(
         "GET",
         "/api/runner/jobs",
         undefined,
@@ -208,27 +218,30 @@ export function createControlPlaneClient(input: {
         claimRequestTimeoutMs,
       );
       if (response.status === 204) return claimWait(response.headers.get("retry-after"));
-      return claimedJob(await response.json());
+      return claimedJob(await json());
     },
     async heartbeat(jobId) {
-      const response = await send(
+      const { json } = await send(
         "POST",
         `/api/runner/jobs/${encodeURIComponent(jobId)}/heartbeat`,
         {},
       );
-      const payload = (await response.json().catch(() => ({}))) as { superseded?: unknown };
+      const payload = (await json().catch(() => ({}))) as { superseded?: unknown };
       return { superseded: payload.superseded === true };
     },
     async sendEvents(runId, events) {
       await send("POST", `/api/runner/runs/${encodeURIComponent(runId)}/events`, events);
     },
     async sendResult(runId, report) {
-      const response = await send(
+      const { json } = await send(
         "POST",
         `/api/runner/runs/${encodeURIComponent(runId)}/result`,
         report,
+        undefined,
+        {},
+        resultRequestTimeoutMs,
       );
-      return acknowledgement(await response.json());
+      return acknowledgement(await json());
     },
   };
 }

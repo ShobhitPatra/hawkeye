@@ -115,6 +115,24 @@ describe("createControlPlaneClient", () => {
     expect(Date.now() - started).toBeGreaterThanOrEqual(35);
     await expect(c.heartbeat("job-1")).rejects.toThrow("did not answer within 0.02s");
   });
+  it("gives the result report its own longer limit and names a body that stalls", async () => {
+    const stalled = new Response(new ReadableStream({ start() {} }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+    const c = createControlPlaneClient({
+      baseUrl: "https://hawkeye.example",
+      token: "hk_1",
+      fetch: (async () => stalled) as unknown as typeof globalThis.fetch,
+      requestTimeoutMs: 20,
+      resultRequestTimeoutMs: 60,
+    });
+    const started = Date.now();
+    await expect(c.sendResult("run-1", { status: "error", turns: 0, error: "x" })).rejects.toThrow(
+      "control plane POST /api/runner/runs/run-1/result did not answer within 0.06s",
+    );
+    expect(Date.now() - started).toBeGreaterThanOrEqual(55);
+  });
   it("throws a typed error with the status and server message", async () => {
     const { client: c } = client(() =>
       Response.json({ error: "invalid runner token" }, { status: 401 }),
