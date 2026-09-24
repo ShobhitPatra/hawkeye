@@ -116,7 +116,7 @@ export function parseRunnerSettings(formData: FormData): RunnerSettings {
   const harness = String(formData.get("harness") ?? "");
   if (!isHarnessChoice(harness)) throw new Error("That harness is not in the list.");
   const rawModel = String(formData.get("model") ?? "");
-  if (rawModel !== "" && !isModelChoice(rawModel)) {
+  if (harness === "claude-code" && rawModel !== "" && !isModelChoice(rawModel)) {
     throw new Error("That model is not in the list.");
   }
   return {

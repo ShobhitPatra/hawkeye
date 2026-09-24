@@ -195,6 +195,20 @@ describe("runner settings", () => {
     ).toBe("codex");
   });
 
+  it("keeps a saved model that left the list while Codex is the harness", () => {
+    expect(
+      parseRunnerSettings(
+        form({
+          harness: "codex",
+          model: "claude-old",
+          maxTurns: "12",
+          wallClockMinutes: "5",
+          concurrency: "1",
+        }),
+      ).model,
+    ).toBe("claude-old");
+  });
+
   it("refuses an unknown model and limits outside the range", () => {
     expect(() =>
       parseRunnerSettings(

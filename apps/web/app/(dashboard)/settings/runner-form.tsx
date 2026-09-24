@@ -41,11 +41,19 @@ export function RunnerForm({ settings }: { settings: RunnerSettings }) {
         the review and says so.
       </p>
       {harness !== "claude-code" && (
-        <p className="hk-help">
-          Codex picks its own model; the choice below applies when the harness is Claude Code.
-        </p>
+        <>
+          <input type="hidden" name="model" value={settings.model ?? ""} />
+          <p className="hk-help">
+            Codex picks its own model; the saved Claude Code model is kept for when you switch back.
+          </p>
+        </>
       )}
-      <fieldset className="hk-choice" data-stack hidden={harness !== "claude-code"}>
+      <fieldset
+        className="hk-choice"
+        data-stack
+        hidden={harness !== "claude-code"}
+        disabled={harness !== "claude-code"}
+      >
         <legend className="hk-compact">Model</legend>
         {MODELS.map((model) => (
           <label key={model.value}>
