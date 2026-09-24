@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   CONCURRENCY_RANGE,
   HARNESSES,
@@ -18,6 +18,7 @@ export function RunnerForm({ settings }: { settings: RunnerSettings }) {
     {},
   );
   const retired = settings.model !== null && !isModelChoice(settings.model);
+  const [harness, setHarness] = useState(settings.harness);
   return (
     <form action={formAction} className="hk-section">
       <fieldset className="hk-choice" data-stack>
@@ -29,6 +30,7 @@ export function RunnerForm({ settings }: { settings: RunnerSettings }) {
               name="harness"
               value={harness.value}
               defaultChecked={settings.harness === harness.value}
+              onChange={() => setHarness(harness.value)}
             />
             {harness.label}
           </label>
@@ -38,7 +40,20 @@ export function RunnerForm({ settings }: { settings: RunnerSettings }) {
         The CLI the runner reviews with, signed in on your machine. A runner without that CLI fails
         the review and says so.
       </p>
-      <fieldset className="hk-choice" data-stack>
+      {harness !== "claude-code" && (
+        <>
+          <input type="hidden" name="model" value={settings.model ?? ""} />
+          <p className="hk-help">
+            Codex picks its own model; the saved Claude Code model is kept for when you switch back.
+          </p>
+        </>
+      )}
+      <fieldset
+        className="hk-choice"
+        data-stack
+        hidden={harness !== "claude-code"}
+        disabled={harness !== "claude-code"}
+      >
         <legend className="hk-compact">Model</legend>
         {MODELS.map((model) => (
           <label key={model.value}>
@@ -56,16 +71,18 @@ export function RunnerForm({ settings }: { settings: RunnerSettings }) {
           The CLI's default
         </label>
       </fieldset>
-      {retired && (
+      {retired && harness === "claude-code" && (
         <p className="hk-help">
           Your saved model, {settings.model}, is no longer in the list. Reviews still ask for it;
           saving switches to the choice above, or to the CLI's default if none is picked.
         </p>
       )}
-      <p className="hk-help">
-        Passed to the claude CLI as --model on every review from the next claim; Codex uses its own
-        default. A runner started with --model keeps that model instead.
-      </p>
+      {harness === "claude-code" && (
+        <p className="hk-help">
+          Passed to the claude CLI as --model on every review from the next claim. A runner started
+          with --model keeps that model instead.
+        </p>
+      )}
       <div className="hk-field">
         <label htmlFor="max-turns">Turns per review</label>
         <input
