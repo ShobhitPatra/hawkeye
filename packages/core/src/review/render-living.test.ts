@@ -41,6 +41,9 @@ const input = (previousIds = new Set([findingId("src/a.ts", "Old bug")])) => ({
   rounds,
 });
 
+const justOver = (over: Parameters<typeof renderLivingReview>[0]) =>
+  renderLivingReview({ ...over, maxBodyLength: renderLivingReview(over).body.length - 1 });
+
 describe("renderLivingReview", () => {
   it("orders marker, verdict, findings, prior findings, rounds and footer", () => {
     const r = renderLivingReview(input());
@@ -276,9 +279,6 @@ describe("renderLivingReview", () => {
       verdict: "changes_needed",
       startedAt: "2026-01-01 00:00 UTC",
     }));
-    const justOver = (over: Parameters<typeof renderLivingReview>[0]) =>
-      renderLivingReview({ ...over, maxBodyLength: renderLivingReview(over).body.length - 1 });
-
     const oneRound = justOver({ ...base, rounds: eleven });
     expect(oneRound.trimmed).toEqual(["older rounds"]);
     expect(oneRound.body).toContain("| 1 earlier round | | | |");
