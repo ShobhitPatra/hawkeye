@@ -1,13 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { siteUrl } from "./site-url";
 
 const original = { ...process.env };
 
-beforeEach(() => {
-  process.env = { ...original };
-});
 afterEach(() => {
-  process.env = original;
+  process.env = { ...original };
 });
 
 describe("siteUrl", () => {
