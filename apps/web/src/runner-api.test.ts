@@ -319,6 +319,21 @@ describe("claimJob", () => {
     expect(run).toMatchObject({ status: "error", error: "installation token" });
   });
 
+  it("names codex and drops the Claude model when the user chose Codex", async () => {
+    await enqueue();
+    await db.insert(schema.userSettings).values({
+      userId: "user-1",
+      harness: "codex",
+      model: "claude-opus-5",
+    });
+
+    const response = await claimJob(request("/api/runner/jobs"), claimDeps());
+
+    const { settings } = await response.json();
+    expect(settings.harness).toBe("codex");
+    expect(settings).not.toHaveProperty("model");
+  });
+
   it("uses the user's settings when they exist", async () => {
     await enqueue();
     await db.insert(schema.userSettings).values({

@@ -10,7 +10,7 @@ Hawkeye is a code reviewer that belongs to you, not to a repository. Open a pull
 
 - **What it costs:** nothing beyond that plan. No seat, no token bill.
 - **Why it is different:** every other AI reviewer is bought per seat and wired into a repository by an admin. This one runs on your subscription, on your hardware. Your plan credential and your repository never reach a server of ours; only the findings do.
-- **What it needs today:** a Claude Code login. Codex is next ([#170](https://github.com/ShobhitPatra/hawkeye/issues/170)).
+- **What it needs today:** a Claude Code or Codex login on the machine that runs the reviews.
 
 [Sign in with GitHub](https://hawkeye-review.vercel.app) to review every push, or try one review with no account:
 

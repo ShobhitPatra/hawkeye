@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import {
   CONCURRENCY_RANGE,
+  HARNESSES,
   isModelChoice,
   MAX_TURNS_RANGE,
   MODELS,
@@ -19,6 +20,24 @@ export function RunnerForm({ settings }: { settings: RunnerSettings }) {
   const retired = settings.model !== null && !isModelChoice(settings.model);
   return (
     <form action={formAction} className="hk-section">
+      <fieldset className="hk-choice" data-stack>
+        <legend className="hk-compact">Harness</legend>
+        {HARNESSES.map((harness) => (
+          <label key={harness.value}>
+            <input
+              type="radio"
+              name="harness"
+              value={harness.value}
+              defaultChecked={settings.harness === harness.value}
+            />
+            {harness.label}
+          </label>
+        ))}
+      </fieldset>
+      <p className="hk-help">
+        The CLI the runner reviews with, signed in on your machine. A runner without that CLI fails
+        the review and says so.
+      </p>
       <fieldset className="hk-choice" data-stack>
         <legend className="hk-compact">Model</legend>
         {MODELS.map((model) => (
@@ -44,8 +63,8 @@ export function RunnerForm({ settings }: { settings: RunnerSettings }) {
         </p>
       )}
       <p className="hk-help">
-        Passed to the claude CLI as --model on every review from the next claim. A runner started
-        with --model keeps that model instead.
+        Passed to the claude CLI as --model on every review from the next claim; Codex uses its own
+        default. A runner started with --model keeps that model instead.
       </p>
       <div className="hk-field">
         <label htmlFor="max-turns">Turns per review</label>
