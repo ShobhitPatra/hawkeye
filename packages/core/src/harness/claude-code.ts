@@ -80,7 +80,7 @@ export function createClaudeCodeHarness(
             typeof parsed.result === "string"
           )
             control.keep(parsed.result);
-          if (parsed?.type === "assistant") {
+          if (parsed?.type === "assistant" && !control.stopped) {
             const messageId = parsed.message?.id;
             if (messageId !== undefined && messageId === lastMessageId) return;
             lastMessageId = messageId;

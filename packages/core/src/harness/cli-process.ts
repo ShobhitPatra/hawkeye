@@ -22,7 +22,7 @@ export async function runCliProcess(input: {
   signal?: AbortSignal;
   onStdoutLine(
     line: string,
-    control: { keep(line: string): void; stop(reason: StopReason): void },
+    control: { keep(line: string): void; stop(reason: StopReason): void; stopped: boolean },
   ): void;
   onStderrLine(line: string): void;
 }): Promise<CliProcessOutcome> {
@@ -64,9 +64,9 @@ export async function runCliProcess(input: {
   if (input.signal?.aborted) abort();
   else input.signal?.addEventListener("abort", abort, { once: true });
 
-  createInterface({ input: child.stdout! }).on("line", (line) => {
-    if (stopReason === undefined) input.onStdoutLine(line, { keep, stop });
-  });
+  createInterface({ input: child.stdout! }).on("line", (line) =>
+    input.onStdoutLine(line, { keep, stop, stopped: stopReason !== undefined }),
+  );
   createInterface({ input: child.stderr! }).on("line", (line) => {
     input.onStderrLine(line);
     keep(line);

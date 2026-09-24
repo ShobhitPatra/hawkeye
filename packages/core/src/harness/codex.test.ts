@@ -119,14 +119,19 @@ describe("codex harness", () => {
       `cat > /dev/null; for i in 1 2 3; do echo '{"type":"item.completed","item":{"type":"agent_message"}}'; done; sleep 5`,
     );
     const turns: number[] = [];
+    let stdoutLines = 0;
     const outcome = await createCodexHarness({ executable: exe }).run(
       input(s, {
         maxTurns: 2,
-        onEvent: (event) => event.type === "turn" && turns.push(event.turns),
+        onEvent: (event) => {
+          if (event.type === "turn") turns.push(event.turns);
+          if (event.type === "stdout") stdoutLines += 1;
+        },
       }),
     );
     expect(outcome).toEqual({ status: "max-turns", turns: 2 });
     expect(turns).toEqual([1, 2]);
+    expect(stdoutLines).toBe(3);
   });
 
   it("names a missing codex binary", async () => {
