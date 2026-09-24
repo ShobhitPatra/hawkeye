@@ -4,7 +4,7 @@
 
 > The sharp-eyed one. `hawkeye[bot]` (currently `hawkeye-review[bot]`; the `hawkeye` slug is reserved for the hosted instance) looks over every PR you arm.
 
-Status: milestone 2 in progress; the CLI is published as [`hawkeye-review`](https://www.npmjs.com/package/hawkeye-review) on npm. This is the design document; the README is the front door.
+Status: milestones 1 to 4 shipped, 5 and 6 open; the CLI is published as [`hawkeye-review`](https://www.npmjs.com/package/hawkeye-review) on npm. This is the design document; the README is the front door.
 
 ## Contents
 
@@ -71,7 +71,7 @@ GitHub only lets an account comment on a PR if that account has access to the re
 | Where the PR lives | Posts as | Admin action needed |
 |---|---|---|
 | A repo with the Hawkeye App installed | The App — `hawkeye[bot]` on the official instance (currently `hawkeye-review[bot]`), `hawkeye-<handle>[bot]` on a self-hosted one | The App is installed once, by whoever admins the repo |
-| Any other PR you can see *(planned, milestone 4)* | **You**, the person who asked for the review | None |
+| Any other PR you can see *(planned, milestone 5)* | **You**, the person who asked for the review | None |
 
 **Resolution order:** an App installation exists on the repo → post as the bot; else → post as the requesting user. There is no third case and no machine user.
 
@@ -463,10 +463,16 @@ A Vercel project with a Neon Postgres and the same env, configured with Root Dir
 
 ## Milestones
 
-1. **Runner alone, manual.** `hawkeye review <pr-url>` from a laptop: worktree → `claude -p` → findings → posted via the same `core` posting module, using a locally held App key. Proves contract and identity. Dogfood. **(shipped)**
-2. **Control plane + arm.** Next.js app with GitHub sign-in, App webhooks, PR list, Arm, jobs; runner becomes a daemon that long-polls with a runner token; reviews on every push with quiet window and interdiff; control plane posts. **(in progress)**
-3. **Multi-user + OSS release.** Official hosted instance, Codex harness, self-host docs (`docker compose`, App Manifest flow at `/setup`), public repo under MIT.
-4. **Always-on + polish.** Runner Docker image for a VPS, run history and budget view, re-review-now, reviewing pull requests you do not own.
+The plan lives as GitHub issues under milestones; each pull request closes an issue. The good first issues stay open for contributors.
+
+1. **Survive contact.** Runner alone from a laptop, then the control plane with GitHub sign-in, App webhooks, the pull request list, jobs, the daemon, reviews on every push with quiet window and interdiff, and the control plane posting. Indexed hot paths, a scheduled stale-job sweep, an idle wait for runners with nothing to review, and a size budget on the living review. **(shipped)**
+2. **Public.** Repository public under MIT, the hosted instance at hawkeye-review.vercel.app, a README for newcomers, not-found and error pages, the sign-up funnel. **(shipped)**
+3. **Robustness.** The wall clock bounds every step of a job, concurrent deliveries keep the newer head, the posting lock is proven against two real connections, a refused model falls back to the CLI default, a rate-limited runner backs off, and every control plane request times out. **(shipped)**
+4. **Review loop.** Addressed findings get their threads replied to and resolved, a review can start from scratch, titles are stored, the reviewing badge stands alone, the pull request page explains a short or missing post. Making a round faster waits for a labelled measurement set. **(shipped)**
+5. **Any pull request.** Point Hawkeye at a pull request you can see and get a review, posted as you where the App is not installed: the sandbox around the shell first (#160), then identity (#161), then the path itself (#162). Codex as a second harness shipped ahead of this. **(open)**
+6. **Scale.** Database work tracks pushes rather than connected runners: `LISTEN`/`NOTIFY` in the claim (#143), then the runner channel on a long-lived process (#144). Needed around a thousand connected runners. **(open)**
+
+Not yet in a milestone: a runner Docker image for a VPS, the App Manifest flow at `/setup` for self-hosters, and a budget view of turns and hours spent.
 
 ## Decisions
 
