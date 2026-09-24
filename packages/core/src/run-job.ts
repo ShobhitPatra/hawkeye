@@ -113,6 +113,6 @@ export async function runReviewJob(
 
 function toCommentableRecord(lines: Map<string, Set<number>>): Record<string, number[]> {
   return Object.fromEntries(
-    [...lines].map(([path, set]) => [path, [...set].sort((a, b) => a - b)]),
+    [...lines].map(([path, set]) => [path, [...set].toSorted((a, b) => a - b)]),
   );
 }
