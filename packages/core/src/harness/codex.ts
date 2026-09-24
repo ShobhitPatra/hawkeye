@@ -79,7 +79,11 @@ export function createCodexHarness(
           }
           if (parsed?.type === "error" && typeof parsed.message === "string")
             control.keep(parsed.message);
-          if (parsed?.type === "item.completed" && STEP_ITEMS.has(parsed.item?.type ?? "")) {
+          if (
+            parsed?.type === "item.completed" &&
+            STEP_ITEMS.has(parsed.item?.type ?? "") &&
+            !control.stopped
+          ) {
             turns += 1;
             input.onEvent({ type: "turn", turns });
             if (turns >= input.maxTurns) control.stop("max-turns");
