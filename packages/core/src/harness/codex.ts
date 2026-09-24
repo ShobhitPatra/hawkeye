@@ -1,12 +1,11 @@
-import { spawn as nodeSpawn } from "node:child_process";
 import { access, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { createInterface } from "node:readline";
+import { spawn as nodeSpawn } from "node:child_process";
 import { parseReviewResult } from "../contract/schema.js";
 import type { SpawnLike } from "./claude-code.js";
+import { runCliProcess } from "./cli-process.js";
 import type { HarnessResult, HarnessRunInput, HarnessSpec } from "./harness.js";
 
-const KILL_GRACE_MS = 5_000;
 const STEP_ITEMS = new Set(["agent_message", "command_execution", "file_change", "mcp_tool_call"]);
 
 const exists = (path: string) =>
@@ -44,99 +43,54 @@ export function createCodexHarness(
       const model = options.model ?? input.model;
       const prompt = await readFile(input.promptPath, "utf8");
       const lastMessagePath = join(dirname(input.resultPath), "last-message.txt");
-      const args = [
-        "exec",
-        "--json",
-        "--color",
-        "never",
-        "--skip-git-repo-check",
-        "--ephemeral",
-        "--sandbox",
-        "workspace-write",
-        "--add-dir",
-        dirname(input.resultPath),
-        "--cd",
-        input.cwd,
-        "--output-last-message",
-        lastMessagePath,
-        ...(model === undefined ? [] : ["--model", model]),
-        "-",
-      ];
-      const child = spawn(executable, args, {
-        cwd: input.cwd,
-        stdio: ["pipe", "pipe", "pipe"],
-        detached: true,
-      });
-
       let turns = 0;
-      let stopReason: "max-turns" | "timeout" | "superseded" | undefined;
-      const errorTail: string[] = [];
-      const keep = (line: string) => {
-        errorTail.push(line);
-        if (errorTail.length > 50) errorTail.shift();
-      };
-
-      child.stdin!.on("error", (error: Error) => {
-        const line = `stdin: ${error.message}`;
-        input.onEvent({ type: "stderr", line });
-        keep(line);
-      });
-      child.stdin!.end(prompt);
-
-      const killGroup = (signal: NodeJS.Signals) => {
-        if (child.pid === undefined) return;
-        try {
-          process.kill(-child.pid, signal);
-        } catch {
-          child.kill(signal);
-        }
-      };
-      const terminate = (reason: "max-turns" | "timeout" | "superseded") => {
-        if (stopReason) return;
-        stopReason = reason;
-        killGroup("SIGTERM");
-        setTimeout(() => killGroup("SIGKILL"), KILL_GRACE_MS).unref();
-      };
-      const timer = setTimeout(() => terminate("timeout"), input.wallClockMs);
-      const abort = () => terminate("superseded");
-      if (input.signal?.aborted) abort();
-      else input.signal?.addEventListener("abort", abort, { once: true });
-
-      createInterface({ input: child.stdout! }).on("line", (line) => {
-        input.onEvent({ type: "stdout", line });
-        let parsed: { type?: string; message?: unknown; item?: { type?: string } } | undefined;
-        try {
-          parsed = JSON.parse(line) as typeof parsed;
-        } catch {
-          return;
-        }
-        if (parsed?.type === "error" && typeof parsed.message === "string") keep(parsed.message);
-        if (
-          parsed?.type === "item.completed" &&
-          STEP_ITEMS.has(parsed.item?.type ?? "") &&
-          stopReason === undefined
-        ) {
-          turns += 1;
-          input.onEvent({ type: "turn", turns });
-          if (turns >= input.maxTurns) terminate("max-turns");
-        }
-      });
-      createInterface({ input: child.stderr! }).on("line", (line) => {
-        input.onEvent({ type: "stderr", line });
-        keep(line);
-      });
-
-      const exitCode = await new Promise<number | null>((resolve, reject) => {
-        child.on("error", reject);
-        child.on("close", (code) => resolve(code));
-      }).finally(() => {
-        clearTimeout(timer);
-        input.signal?.removeEventListener("abort", abort);
+      const { exitCode, stopReason, errorTail } = await runCliProcess({
+        spawn,
+        executable,
+        args: [
+          "exec",
+          "--json",
+          "--color",
+          "never",
+          "--skip-git-repo-check",
+          "--ephemeral",
+          "--sandbox",
+          "workspace-write",
+          "--add-dir",
+          dirname(input.resultPath),
+          "--cd",
+          input.cwd,
+          "--output-last-message",
+          lastMessagePath,
+          ...(model === undefined ? [] : ["--model", model]),
+          "-",
+        ],
+        cwd: input.cwd,
+        stdin: prompt,
+        wallClockMs: input.wallClockMs,
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+        onStdoutLine: (line, control) => {
+          input.onEvent({ type: "stdout", line });
+          let parsed: { type?: string; message?: unknown; item?: { type?: string } } | undefined;
+          try {
+            parsed = JSON.parse(line) as typeof parsed;
+          } catch {
+            return;
+          }
+          if (parsed?.type === "error" && typeof parsed.message === "string")
+            control.keep(parsed.message);
+          if (parsed?.type === "item.completed" && STEP_ITEMS.has(parsed.item?.type ?? "")) {
+            turns += 1;
+            input.onEvent({ type: "turn", turns });
+            if (turns >= input.maxTurns) control.stop("max-turns");
+          }
+        },
+        onStderrLine: (line) => input.onEvent({ type: "stderr", line }),
       });
 
       if (await exists(input.resultPath)) return { status: "ok", turns };
       if (await adoptLastMessage(lastMessagePath, input.resultPath)) return { status: "ok", turns };
-      if (stopReason) return { status: stopReason, turns };
+      if (stopReason) return { status: stopReason, turns: Math.min(turns, input.maxTurns) };
       return {
         status: "error",
         turns,
