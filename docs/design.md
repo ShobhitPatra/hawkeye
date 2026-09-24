@@ -4,7 +4,7 @@
 
 > The sharp-eyed one. `hawkeye[bot]` (currently `hawkeye-review[bot]`; the `hawkeye` slug is reserved for the hosted instance) looks over every PR you arm.
 
-Status: milestone 2 in progress; the CLI is published as [`hawkeye-review`](https://www.npmjs.com/package/hawkeye-review) on npm. This is the design document; the README is the front door.
+Status: milestones 1 to 4 shipped, 5 and 6 open; the CLI is published as [`hawkeye-review`](https://www.npmjs.com/package/hawkeye-review) on npm. This is the design document; the README is the front door.
 
 ## Contents
 
@@ -71,7 +71,7 @@ GitHub only lets an account comment on a PR if that account has access to the re
 | Where the PR lives | Posts as | Admin action needed |
 |---|---|---|
 | A repo with the Hawkeye App installed | The App — `hawkeye[bot]` on the official instance (currently `hawkeye-review[bot]`), `hawkeye-<handle>[bot]` on a self-hosted one | The App is installed once, by whoever admins the repo |
-| Any other PR you can see *(planned, milestone 4)* | **You**, the person who asked for the review | None |
+| Any other PR you can see *(planned, milestone 5)* | **You**, the person who asked for the review | None |
 
 **Resolution order:** an App installation exists on the repo → post as the bot; else → post as the requesting user. There is no third case and no machine user.
 
