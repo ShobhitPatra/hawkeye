@@ -1413,5 +1413,6 @@ html {
 }
 .hk-input[type="number"] {
   width: 8ch;
+  flex: none;
   font-variant-numeric: tabular-nums;
 }

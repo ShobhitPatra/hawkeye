@@ -137,7 +137,7 @@ export function RunnerForm({ settings }: { settings: RunnerSettings }) {
             step={1}
             defaultValue={settings.concurrency}
           />
-          <span className="hk-compact hk-muted">at once</span>
+          <span className="hk-compact hk-muted">reviews</span>
         </div>
         <p className="hk-help">
           How many reviews the runner runs at the same time, up to three. Each one spends your plan,
