@@ -87,7 +87,7 @@ export function watchClock(
     if (slept !== undefined)
       report({
         state: "waiting",
-        detail: `the machine was asleep for ${Math.round(slept / 60_000)} min; claiming again`,
+        detail: `the machine was asleep for ${Math.round(slept / 60_000)} min`,
       });
   }, intervalMs);
   clock.unref();

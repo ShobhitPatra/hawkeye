@@ -895,9 +895,7 @@ describe("watchClock", () => {
       expect(reported).toEqual([]);
       vi.setSystemTime(Date.now() + 5 * 60_000);
       vi.advanceTimersByTime(15_000);
-      expect(reported).toEqual([
-        { state: "waiting", detail: "the machine was asleep for 5 min; claiming again" },
-      ]);
+      expect(reported).toEqual([{ state: "waiting", detail: "the machine was asleep for 5 min" }]);
       stop();
     } finally {
       vi.useRealTimers();
