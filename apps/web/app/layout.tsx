@@ -1,7 +1,8 @@
+import type { Viewport } from "next";
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
-import { parseTheme, THEME_COOKIE, themeAttribute } from "@/theme";
+import { parseTheme, THEME_COLORS, THEME_COOKIE, themeAttribute } from "@/theme";
 import "../../../.claude/skills/hawkeye-design/stylesheet.css";
 
 const plexSans = IBM_Plex_Sans({
@@ -23,6 +24,13 @@ export const metadata = {
       { url: "/favicon.ico", sizes: "32x32" },
     ],
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: THEME_COLORS.light },
+    { media: "(prefers-color-scheme: dark)", color: THEME_COLORS.dark },
+  ],
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
