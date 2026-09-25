@@ -1346,9 +1346,6 @@ html {
     overflow-x: auto;
     scrollbar-width: none;
   }
-  .hk-topbar:not([data-sticky]) {
-    position: relative;
-  }
   .hk-menu {
     position: static;
   }
