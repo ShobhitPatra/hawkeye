@@ -25,7 +25,7 @@ export type RunnerRowData = {
 export function RunnerRow({ runner }: { runner: RunnerRowData }) {
   const [confirming, setConfirming] = useState(false);
   const [kept, setKept] = useState(false);
-  if (confirming)
+  if (confirming && runner.state !== "revoked")
     return (
       <tr>
         <td className="hk-mono">{runner.name}</td>

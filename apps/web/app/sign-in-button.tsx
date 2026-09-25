@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { authClient } from "@/auth-client";
 
 export function SignInButton({
@@ -13,6 +13,13 @@ export function SignInButton({
   const [transitioning, startTransition] = useTransition();
   const [leaving, setLeaving] = useState(false);
   const pending = transitioning || leaving;
+  useEffect(() => {
+    const restored = (event: PageTransitionEvent) => {
+      if (event.persisted) setLeaving(false);
+    };
+    window.addEventListener("pageshow", restored);
+    return () => window.removeEventListener("pageshow", restored);
+  }, []);
   return (
     <button
       type="button"
