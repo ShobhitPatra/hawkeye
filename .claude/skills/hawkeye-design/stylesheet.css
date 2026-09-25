@@ -449,6 +449,7 @@ html {
   float: left;
   width: 100%;
   padding: 0 0 var(--hk-space-1);
+  font-weight: var(--hk-weight-regular);
   color: var(--hk-fg-2);
 }
 .hk-menu-legal {
