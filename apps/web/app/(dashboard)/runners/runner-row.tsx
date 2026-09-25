@@ -35,7 +35,7 @@ export function RunnerRow({ runner }: { runner: RunnerRowData }) {
   const [kept, setKept] = useState(false);
   if (confirming && runner.state !== "revoked")
     return (
-      <tr className="hk-arrive">
+      <tr key="confirm" className="hk-arrive">
         <td className="hk-mono">{runner.name}</td>
         <td colSpan={3}>
           Revoke <span className="hk-mono">{runner.name}</span>? Its token stops working now and any

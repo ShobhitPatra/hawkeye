@@ -169,6 +169,7 @@ export function PullRequestView({
 
       {lastReview?.verdict && (
         <section
+          key={lastReview.verdict}
           className="hk-verdict hk-arrive"
           data-verdict={lastReview.verdict}
           aria-labelledby="verdict"
