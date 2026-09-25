@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState, useTransition } from "react";
 import { authClient } from "@/auth-client";
 
 export function SignInButton({
@@ -9,14 +10,31 @@ export function SignInButton({
   callbackURL?: string;
   variant?: "primary";
 }) {
+  const [transitioning, startTransition] = useTransition();
+  const [leaving, setLeaving] = useState(false);
+  const pending = transitioning || leaving;
+  useEffect(() => {
+    const restored = (event: PageTransitionEvent) => {
+      if (event.persisted) setLeaving(false);
+    };
+    window.addEventListener("pageshow", restored);
+    return () => window.removeEventListener("pageshow", restored);
+  }, []);
   return (
     <button
       type="button"
       className="hk-button"
       data-variant={variant}
-      onClick={() => authClient.signIn.social({ provider: "github", callbackURL })}
+      aria-disabled={pending}
+      onClick={() => {
+        if (pending) return;
+        startTransition(async () => {
+          const result = await authClient.signIn.social({ provider: "github", callbackURL });
+          if (!result.error) setLeaving(true);
+        });
+      }}
     >
-      Sign in with GitHub
+      {pending ? "Opening GitHub" : "Sign in with GitHub"}
     </button>
   );
 }

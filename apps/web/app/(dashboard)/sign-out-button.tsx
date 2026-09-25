@@ -1,20 +1,26 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useTransition } from "react";
 import { authClient } from "@/auth-client";
 
 export function SignOutButton() {
   const router = useRouter();
+  const [pending, startTransition] = useTransition();
   return (
     <button
       type="button"
-      onClick={async () => {
-        await authClient.signOut();
-        router.push("/");
-        router.refresh();
+      aria-disabled={pending}
+      onClick={() => {
+        if (pending) return;
+        startTransition(async () => {
+          await authClient.signOut();
+          router.push("/");
+          router.refresh();
+        });
       }}
     >
-      Sign out
+      {pending ? "Signing out" : "Sign out"}
     </button>
   );
 }

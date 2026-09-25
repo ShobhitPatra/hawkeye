@@ -1,7 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import { useFormStatus } from "react-dom";
 import { revokeRunnerAction } from "./actions";
+
+function RevokeSubmit() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      className="hk-button"
+      data-variant="primary"
+      aria-disabled={pending}
+      onClick={(event) => {
+        if (pending) event.preventDefault();
+      }}
+    >
+      {pending ? "Revoking" : "Revoke"}
+    </button>
+  );
+}
 
 export type RunnerRowData = {
   id: string;
@@ -14,7 +32,8 @@ export type RunnerRowData = {
 
 export function RunnerRow({ runner }: { runner: RunnerRowData }) {
   const [confirming, setConfirming] = useState(false);
-  if (confirming)
+  const [kept, setKept] = useState(false);
+  if (confirming && runner.state !== "revoked")
     return (
       <tr>
         <td className="hk-mono">{runner.name}</td>
@@ -25,12 +44,18 @@ export function RunnerRow({ runner }: { runner: RunnerRowData }) {
         <td className="hk-numeric">
           <form action={revokeRunnerAction} className="hk-actions">
             <input type="hidden" name="runnerId" value={runner.id} />
-            <button type="button" className="hk-button" onClick={() => setConfirming(false)}>
+            <button
+              type="button"
+              className="hk-button"
+              autoFocus
+              onClick={() => {
+                setConfirming(false);
+                setKept(true);
+              }}
+            >
               Keep
             </button>
-            <button type="submit" className="hk-button" data-variant="primary">
-              Revoke
-            </button>
+            <RevokeSubmit />
           </form>
         </td>
       </tr>
@@ -60,7 +85,12 @@ export function RunnerRow({ runner }: { runner: RunnerRowData }) {
       <td>{runner.created}</td>
       <td className="hk-numeric">
         {runner.state !== "revoked" && (
-          <button type="button" className="hk-button" onClick={() => setConfirming(true)}>
+          <button
+            type="button"
+            className="hk-button"
+            autoFocus={kept}
+            onClick={() => setConfirming(true)}
+          >
             Revoke
           </button>
         )}
