@@ -69,6 +69,7 @@
   --hk-duration: 160ms;
   --hk-duration-enter: 200ms;
   --hk-ease: cubic-bezier(0.2, 0, 0, 1);
+  --hk-ease-color: ease;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -304,7 +305,7 @@ html {
 .hk-nav a {
   color: var(--hk-fg-2);
   white-space: nowrap;
-  transition: color var(--hk-duration) var(--hk-ease);
+  transition: color var(--hk-duration) var(--hk-ease-color);
 }
 .hk-nav a:focus-visible,
 .hk-nav a[aria-current="page"] {
@@ -359,7 +360,7 @@ html {
   gap: var(--hk-space-1);
   align-items: center;
   color: var(--hk-fg-2);
-  transition: color var(--hk-duration) var(--hk-ease);
+  transition: color var(--hk-duration) var(--hk-ease-color);
 }
 .hk-menu > summary::-webkit-details-marker {
   display: none;
@@ -735,8 +736,8 @@ html {
   text-decoration: none;
   white-space: nowrap;
   transition:
-    background-color var(--hk-duration) var(--hk-ease),
-    opacity var(--hk-duration) var(--hk-ease),
+    background-color var(--hk-duration) var(--hk-ease-color),
+    opacity var(--hk-duration) var(--hk-ease-color),
     transform 120ms var(--hk-ease);
 }
 .hk-button[data-size="large"] {
@@ -800,7 +801,7 @@ html {
   padding: 0;
   cursor: pointer;
   transition:
-    color var(--hk-duration) var(--hk-ease),
+    color var(--hk-duration) var(--hk-ease-color),
     transform 120ms var(--hk-ease);
 }
 .hk-review-control:active:not([data-pending]) {
@@ -813,7 +814,7 @@ html {
   border-radius: 50%;
   border: 1.5px solid currentColor;
   flex: none;
-  transition: background-color var(--hk-duration) var(--hk-ease);
+  transition: background-color var(--hk-duration) var(--hk-ease-color);
 }
 .hk-review-control[data-on] {
   color: var(--hk-fg);
@@ -998,7 +999,7 @@ html {
   font: inherit;
   font-size: var(--hk-type-metadata);
   cursor: pointer;
-  transition: color var(--hk-duration) var(--hk-ease);
+  transition: color var(--hk-duration) var(--hk-ease-color);
 }
 .hk-copy:focus-visible,
 .hk-copy:active,
@@ -1249,7 +1250,7 @@ html {
 }
 .hk-footer a {
   text-decoration: none;
-  transition: color var(--hk-duration) var(--hk-ease);
+  transition: color var(--hk-duration) var(--hk-ease-color);
 }
 .hk-footer a:focus-visible {
   color: var(--hk-fg);
