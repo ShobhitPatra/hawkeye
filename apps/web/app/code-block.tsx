@@ -24,9 +24,9 @@ function CheckIcon() {
 
 const COPY_KEYS = /Mac|iPhone|iPad/.test(globalThis.navigator?.platform ?? "") ? "⌘C" : "Ctrl+C";
 
-export function CopyButton({ text }: { text: string }) {
+export function CodeBlock({ text }: { text: string }) {
   const [state, setState] = useState<"idle" | "copied" | "refused">("idle");
-  const button = useRef<HTMLButtonElement>(null);
+  const code = useRef<HTMLPreElement>(null);
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
   const settle = (next: "copied" | "refused") => {
@@ -37,29 +37,32 @@ export function CopyButton({ text }: { text: string }) {
   const outcome =
     state === "copied" ? "Copied" : state === "refused" ? `Press ${COPY_KEYS} to copy` : "";
   return (
-    <button
-      ref={button}
-      type="button"
-      className="hk-copy"
-      data-state={state}
-      aria-label="Copy"
-      title="Copy"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text);
-          settle("copied");
-        } catch {
-          const code = button.current?.previousElementSibling;
-          if (code) window.getSelection()?.selectAllChildren(code);
-          settle("refused");
-        }
-      }}
-    >
-      {state === "copied" ? <CheckIcon /> : <CopyIcon />}
-      {state === "refused" && <span>{COPY_KEYS}</span>}
-      <span role="status" className="hk-visually-hidden">
-        {outcome}
-      </span>
-    </button>
+    <div className="hk-code-row">
+      <pre className="hk-code" ref={code}>
+        {text}
+      </pre>
+      <button
+        type="button"
+        className="hk-copy"
+        data-state={state}
+        aria-label="Copy"
+        title="Copy"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(text);
+            settle("copied");
+          } catch {
+            if (code.current) window.getSelection()?.selectAllChildren(code.current);
+            settle("refused");
+          }
+        }}
+      >
+        {state === "copied" ? <CheckIcon /> : <CopyIcon />}
+        {state === "refused" && <span>{COPY_KEYS}</span>}
+        <span role="status" className="hk-visually-hidden">
+          {outcome}
+        </span>
+      </button>
+    </div>
   );
 }
