@@ -54,30 +54,6 @@
   gap: var(--hk-space-3);
 }
 
-.ld-rot {
-  display: inline-grid;
-  text-align: left;
-  vertical-align: baseline;
-}
-.ld-rot > span {
-  grid-area: 1/1;
-  transition:
-    opacity 200ms var(--hk-ease),
-    transform 320ms var(--hk-ease);
-}
-.ld-rot > span[aria-hidden="true"] {
-  opacity: 0;
-  transform: translateY(0.35em);
-  pointer-events: none;
-}
-.ld-rot > span[data-leaving] {
-  opacity: 0;
-  transform: translateY(-0.35em);
-  transition:
-    opacity 120ms var(--hk-ease),
-    transform 240ms var(--hk-ease);
-}
-
 .ld-flow {
   display: flex;
   gap: var(--hk-space-5);
@@ -546,7 +522,6 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ld-rot > span,
   .ld-term-line,
   .ld-flow span,
   .ld-flow i::after {

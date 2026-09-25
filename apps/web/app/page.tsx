@@ -5,7 +5,6 @@ import { localPath } from "@/local-path";
 import { getSession } from "@/session";
 import { CodeBlock } from "./code-block";
 import { LandingHero } from "./landing-hero";
-import { RotatingWord } from "./rotating-word";
 import { SignInButton } from "./sign-in-button";
 import { CONTRIBUTING_URL, REVIEWS_URL, SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
@@ -29,9 +28,7 @@ export default async function HomePage({
       <SiteHeader theme={theme} signedIn={false} {...signIn} />
       <main className="hk-page ld">
         <section className="ld-lead">
-          <h1 className="hk-headline">
-            Code review on your own <RotatingWord /> plan.
-          </h1>
+          <h1 className="hk-headline">Code review on your own Claude or Codex plan.</h1>
           <p className="hk-lede">
             Open a pull request. A runner on your machine reads every push with your own login and
             posts one verdict as <span className="hk-mono">hawkeye[bot]</span>. No token bill, no
