@@ -2,6 +2,7 @@ import { HAWKEYE_REPOSITORY_URL } from "@hawkeye/core";
 import type { Theme } from "@/theme";
 import { Mark } from "./mark";
 import { SignInButton } from "./sign-in-button";
+import { Menu } from "./menu";
 import { ThemeChoice } from "./theme-choice";
 import { ThemeIcon } from "./theme-icon";
 
@@ -18,18 +19,20 @@ export function SiteHeader({
     <header className="hk-topbar">
       <a className="hk-wordmark hk-lockup" href="/">
         <Mark />
-        hawkeye
+        <span className="hk-wordmark-text">hawkeye</span>
       </a>
       <div className="hk-topbar-end">
         <a href={HAWKEYE_REPOSITORY_URL}>Source</a>
-        <details className="hk-menu" data-icon>
-          <summary aria-label="Theme" title="Theme">
-            <ThemeIcon />
-          </summary>
-          <div className="hk-menu-panel">
-            <ThemeChoice theme={theme} />
-          </div>
-        </details>
+        <Menu
+          icon
+          summary={
+            <summary aria-label="Theme" title="Theme">
+              <ThemeIcon />
+            </summary>
+          }
+        >
+          <ThemeChoice theme={theme} />
+        </Menu>
         {signedIn ? (
           <a className="hk-button" href="/overview">
             Dashboard

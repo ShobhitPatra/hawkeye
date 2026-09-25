@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Mark } from "../mark";
 import { describeRunnerStatus, type RunnerStatus } from "@/runner-status";
 import type { Theme } from "@/theme";
+import { Menu } from "../menu";
 import { ThemeChoice } from "../theme-choice";
 import { LiveRefresh } from "./live-refresh";
 import { NavLinks } from "./nav-links";
@@ -21,7 +22,7 @@ export function TopBar({
     <header className="hk-topbar" data-sticky>
       <Link className="hk-wordmark hk-lockup" href="/overview">
         <Mark />
-        hawkeye
+        <span className="hk-wordmark-text">hawkeye</span>
       </Link>
       <NavLinks />
       <div className="hk-topbar-end">
@@ -31,26 +32,27 @@ export function TopBar({
             {describeRunnerStatus(runner)}
           </Link>
         )}
-        <details className="hk-menu">
-          <summary>
-            <span className="hk-account-name">{user.name}</span>
-            <span className="hk-account-initial">{initial}</span>
-          </summary>
-          <div className="hk-menu-panel">
-            <div className="hk-menu-who">
-              <b>{user.name}</b>
-              {user.email}
-            </div>
-            <ThemeChoice theme={theme} />
-            <a href="https://github.com/settings/installations">Manage installation on GitHub</a>
-            <SignOutButton />
-            <div className="hk-menu-legal">
-              <a href="/security">Security</a>
-              <a href="/privacy">Privacy</a>
-              <a href="/terms">Terms</a>
-            </div>
+        <Menu
+          summary={
+            <summary>
+              <span className="hk-account-name">{user.name}</span>
+              <span className="hk-account-initial">{initial}</span>
+            </summary>
+          }
+        >
+          <div className="hk-menu-who">
+            <b>{user.name}</b>
+            {user.email}
           </div>
-        </details>
+          <ThemeChoice theme={theme} />
+          <a href="https://github.com/settings/installations">Manage installation on GitHub</a>
+          <SignOutButton />
+          <div className="hk-menu-legal">
+            <a href="/security">Security</a>
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+          </div>
+        </Menu>
       </div>
     </header>
   );
