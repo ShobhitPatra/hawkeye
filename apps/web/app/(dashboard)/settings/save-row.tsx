@@ -24,7 +24,11 @@ export function SaveRow({
         {sentence && (
           <span
             key={sentence}
-            className={form.state.error && !form.dirty ? "hk-refusal hk-arrive" : "hk-arrive"}
+            className={
+              form.state.error && !form.dirty && !form.pending
+                ? "hk-refusal hk-arrive"
+                : "hk-arrive"
+            }
           >
             {sentence}
           </span>

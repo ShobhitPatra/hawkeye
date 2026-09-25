@@ -1356,8 +1356,6 @@ html {
   }
 }
 
-/* Arrival: content that replaces other content, on a refresh or a click, fades in; nothing exits with motion */
-
 span.hk-arrive {
   display: inline-block;
 }
