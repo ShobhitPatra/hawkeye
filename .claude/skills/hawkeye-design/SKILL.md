@@ -91,7 +91,7 @@ Stillness by default. Two named exceptions signal that work is in flight, and no
 - A list loading for the first time shows skeleton rows with a slow shimmer.
 - A word naming in-flight work (Reviewing, Cloning, Fetching, Running) keeps its place while a highlight sweeps it left to right (`.hk-status[data-state="running"]`). A thin progress line under the top bar (`.hk-progress`) may accompany a page-level fetch.
 
-Confirming an action is a state word changing, with at most a 160ms color transition. A pressed button scales to 0.98 for 120ms; hover styles apply only to a fine pointer. Reduced motion turns everything static. No pulsing dots, no spinners, no scroll reveals, no animated numbers.
+Confirming an action is a state word changing, with at most a 160ms color transition. Content that arrives, on first paint, on a refresh or after a click, fades in over 200ms with a 3px rise (`.hk-arrive`, keyed so a changed word is a new element); nothing exits with motion. A pressed button scales to 0.98 for 120ms; hover styles apply only to a fine pointer. Reduced motion turns everything static. No pulsing dots, no spinners, no scroll reveals, no animated numbers.
 
 ### Formats
 

@@ -19,7 +19,7 @@ export function ApproveLoginForm({
 
   if (state.runnerName)
     return (
-      <div className="hk-state">
+      <div className="hk-state hk-arrive">
         <p>
           Runner <span className="hk-mono">{state.runnerName}</span> connected.
         </p>

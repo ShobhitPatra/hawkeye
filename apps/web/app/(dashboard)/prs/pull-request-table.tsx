@@ -18,28 +18,34 @@ function StatusWord({
       return null;
     case "queued":
       return runnerOnline ? (
-        <span className="hk-status">Queued</span>
+        <span key="queued" className="hk-status hk-arrive">
+          Queued
+        </span>
       ) : (
-        <span className="hk-status" data-state="attention">
+        <span key="waiting" className="hk-status hk-arrive" data-state="attention">
           Waiting, runner offline
         </span>
       );
     case "reviewing":
       return (
-        <span className="hk-status" data-state="running">
+        <span key="reviewing" className="hk-status hk-arrive" data-state="running">
           In review
         </span>
       );
     case "failed":
       return (
-        <span className="hk-status" data-state="failed">
+        <span key="failed" className="hk-status hk-arrive" data-state="failed">
           Run failed
         </span>
       );
     case "reviewed": {
       const { verdict } = status.last;
       return (
-        <span className="hk-status" data-state={verdict === "blocked" ? "failed" : undefined}>
+        <span
+          key={verdict}
+          className="hk-status hk-arrive"
+          data-state={verdict === "blocked" ? "failed" : undefined}
+        >
           {verdictLabel(verdict)}
         </span>
       );
