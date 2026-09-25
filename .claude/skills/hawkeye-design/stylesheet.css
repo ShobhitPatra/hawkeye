@@ -1459,12 +1459,6 @@ html {
   flex: none;
   font-variant-numeric: tabular-nums;
 }
-.hk-table tbody th {
-  font-weight: var(--hk-weight-regular);
-  color: var(--hk-fg);
-  border-bottom-color: var(--hk-line);
-  vertical-align: baseline;
-}
 @media (max-width: 420px) {
   .hk-wordmark-text {
     position: absolute;
