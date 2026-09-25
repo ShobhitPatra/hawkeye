@@ -313,5 +313,18 @@ describe("field refusals", () => {
       ),
     ).toBe("maxTurns");
     expect(refusal(() => parseRunnerSettings(form({ harness: "vim" })))).toBe("harness");
+    const runner = {
+      harness: "claude-code",
+      maxTurns: "20",
+      wallClockMinutes: "5",
+      concurrency: "1",
+    };
+    expect(refusal(() => parseRunnerSettings(form({ ...runner, model: "gpt" })))).toBe("model");
+    expect(refusal(() => parseRunnerSettings(form({ ...runner, wallClockMinutes: "0" })))).toBe(
+      "wallClockMinutes",
+    );
+    expect(refusal(() => parseRunnerSettings(form({ ...runner, concurrency: "9" })))).toBe(
+      "concurrency",
+    );
   });
 });

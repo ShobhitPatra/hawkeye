@@ -6,12 +6,13 @@ import { requireSession } from "@/session";
 import {
   FieldError,
   parseReviewSettings,
+  type SettingsField,
   parseRunnerSettings,
   saveReviewSettings,
   saveRunnerSettings,
 } from "@/user-settings";
 
-export type SaveState = { saved?: true; error?: string; field?: string };
+export type SaveState = { saved?: true; error?: string; field?: SettingsField };
 
 function refused(error: unknown): SaveState {
   return error instanceof FieldError

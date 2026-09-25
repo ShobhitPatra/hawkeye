@@ -48,9 +48,11 @@ export async function saveReviewSettings(
     .onConflictDoUpdate({ target: userSettings.userId, set: settings });
 }
 
+export type SettingsField = keyof ReviewSettings | keyof RunnerSettings;
+
 export class FieldError extends Error {
   constructor(
-    readonly field: string,
+    readonly field: SettingsField,
     message: string,
   ) {
     super(message);
@@ -114,7 +116,7 @@ export async function saveRunnerSettings(
 
 function wholeNumber(
   formData: FormData,
-  name: string,
+  name: keyof RunnerSettings,
   label: string,
   range: { min: number; max: number },
 ): number {

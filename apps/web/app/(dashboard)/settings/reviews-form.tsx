@@ -1,6 +1,7 @@
 "use client";
 
 import { MAX_QUIET_WINDOW_SECONDS, type ReviewSettings } from "@/review-settings";
+import type { SettingsField } from "@/user-settings";
 import { useFormAction } from "../use-form-action";
 import { saveReviewSettingsAction } from "./actions";
 import { FieldRefusal } from "./field-refusal";
@@ -8,7 +9,7 @@ import { SaveRow } from "./save-row";
 
 export function ReviewsForm({ settings }: { settings: ReviewSettings }) {
   const form = useFormAction(saveReviewSettingsAction, {});
-  const refused = (field: string) =>
+  const refused = (field: SettingsField) =>
     form.state.field === field && !form.dirty ? form.state.error : undefined;
   return (
     <form onSubmit={form.onSubmit} onInput={form.onInput} className="hk-section" noValidate>

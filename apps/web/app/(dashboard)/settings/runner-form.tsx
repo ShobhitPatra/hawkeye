@@ -10,6 +10,7 @@ import {
   type RunnerSettings,
   WALL_CLOCK_MINUTES_RANGE,
 } from "@/review-settings";
+import type { SettingsField } from "@/user-settings";
 import { useFormAction } from "../use-form-action";
 import { saveRunnerSettingsAction } from "./actions";
 import { FieldRefusal } from "./field-refusal";
@@ -17,13 +18,17 @@ import { SaveRow } from "./save-row";
 
 export function RunnerForm({ settings }: { settings: RunnerSettings }) {
   const form = useFormAction(saveRunnerSettingsAction, {});
-  const refused = (field: string) =>
+  const refused = (field: SettingsField) =>
     form.state.field === field && !form.dirty ? form.state.error : undefined;
   const retired = settings.model !== null && !isModelChoice(settings.model);
   const [harness, setHarness] = useState(settings.harness);
   return (
     <form onSubmit={form.onSubmit} onInput={form.onInput} className="hk-section" noValidate>
-      <fieldset className="hk-choice" data-stack>
+      <fieldset
+        className="hk-choice"
+        data-stack
+        aria-describedby={refused("harness") && "harness-refusal"}
+      >
         <legend className="hk-compact">Harness</legend>
         {HARNESSES.map((choice) => (
           <label key={choice.value}>
@@ -32,6 +37,7 @@ export function RunnerForm({ settings }: { settings: RunnerSettings }) {
               name="harness"
               value={choice.value}
               defaultChecked={settings.harness === choice.value}
+              aria-invalid={refused("harness") !== undefined}
               onChange={() => setHarness(choice.value)}
             />
             {choice.label}
@@ -56,6 +62,7 @@ export function RunnerForm({ settings }: { settings: RunnerSettings }) {
         data-stack
         hidden={harness !== "claude-code"}
         disabled={harness !== "claude-code"}
+        aria-describedby={refused("model") && "model-refusal"}
       >
         <legend className="hk-compact">Model</legend>
         {MODELS.map((model) => (
@@ -65,12 +72,19 @@ export function RunnerForm({ settings }: { settings: RunnerSettings }) {
               name="model"
               value={model.value}
               defaultChecked={settings.model === model.value}
+              aria-invalid={refused("model") !== undefined}
             />
             {model.label}
           </label>
         ))}
         <label>
-          <input type="radio" name="model" value="" defaultChecked={settings.model === null} />
+          <input
+            type="radio"
+            name="model"
+            value=""
+            defaultChecked={settings.model === null}
+            aria-invalid={refused("model") !== undefined}
+          />
           The CLI's default
         </label>
       </fieldset>
