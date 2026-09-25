@@ -46,7 +46,7 @@ export function reviewingBadgeSvg(runnerName: string): string {
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="20" viewBox="0 0 ${width} 20" role="img" aria-label="${escapeXml(text)}">`,
     "<style>",
-    "@media (prefers-reduced-motion: no-preference) { .sweep { animation: sweep 1.8s linear infinite; } }",
+    ".sweep { transform: translateX(-48px); } @media (prefers-reduced-motion: no-preference) { .sweep { animation: sweep 1.8s linear infinite; } }",
     "@keyframes sweep { from { transform: translateX(-48px); } to { transform: translateX(100%); } }",
     "</style>",
     '<defs><clipPath id="c"><rect class="sweep" x="0" y="0" width="48" height="20"/></clipPath></defs>',
