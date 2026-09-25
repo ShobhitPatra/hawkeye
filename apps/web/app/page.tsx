@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { HAWKEYE_REPOSITORY_URL } from "@hawkeye/core";
 import { localPath } from "@/local-path";
 import { getSession } from "@/session";
-import { CopyButton } from "./copy-button";
+import { CodeBlock } from "./code-block";
 import { LandingHero } from "./landing-hero";
 import { RotatingWord } from "./rotating-word";
 import { SignInButton } from "./sign-in-button";
@@ -42,10 +42,7 @@ export default async function HomePage({
           </div>
           <div className="ld-try">
             <span>Or try one review with no account:</span>
-            <div className="hk-code-row">
-              <pre className="hk-code">{PREPARE_COMMAND}</pre>
-              <CopyButton text={PREPARE_COMMAND} />
-            </div>
+            <CodeBlock text={PREPARE_COMMAND} />
           </div>
         </section>
 

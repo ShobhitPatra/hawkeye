@@ -2,7 +2,7 @@ import { HAWKEYE_REPOSITORY_URL } from "@hawkeye/core";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { RunnerStatus } from "@/runner-status";
-import { CopyButton } from "../../copy-button";
+import { CodeBlock } from "../../code-block";
 import { RunnerSentence } from "../runner-sentence";
 
 export function ConnectView({
@@ -46,10 +46,7 @@ export function ConnectView({
         <li>
           <div className="hk-step-body">
             <p>Run this in a terminal on that machine.</p>
-            <div className="hk-code-row">
-              <pre className="hk-code">{login}</pre>
-              <CopyButton text={login} />
-            </div>
+            <CodeBlock text={login} />
           </div>
         </li>
         <li>
@@ -64,10 +61,7 @@ export function ConnectView({
               Start the runner. Leave it running; it polls for jobs and reviews your pull requests
               as they change.
             </p>
-            <div className="hk-code-row">
-              <pre className="hk-code">{start}</pre>
-              <CopyButton text={start} />
-            </div>
+            <CodeBlock text={start} />
           </div>
         </li>
       </ol>
