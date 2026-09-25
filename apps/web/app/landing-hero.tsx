@@ -1,7 +1,17 @@
 "use client";
 
 import { Fragment, useEffect, useRef } from "react";
-import { chunkEnds, HERO_ACTS, STREAM_TICK_MS } from "@/hero-replay";
+import {
+  chunkEnds,
+  HERO_ACTS,
+  REPLAY_VISIBLE_RATIO,
+  STREAM_CHUNK_CHARS,
+  STREAM_LEAD_BLOCKS,
+  STREAM_LEAD_CHUNK_CHARS,
+  STREAM_LEAD_TICK_MS,
+  STREAM_SETTLE_MS,
+  STREAM_TICK_MS,
+} from "@/hero-replay";
 import { LANDING_REVIEW } from "@/landing-review";
 import { Mark } from "./mark";
 
@@ -29,45 +39,37 @@ function ReplayIcon() {
 
 function ReviewingBadge() {
   const text = `Reviewing on ${review.runner}`;
+  const width = Math.ceil(text.length * 7.3) + 2;
   return (
     <svg
-      width="180"
+      width={width}
       height="20"
-      viewBox="0 0 180 20"
+      viewBox={`0 0 ${width} 20`}
       role="img"
       aria-label={text}
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
-        <linearGradient
-          id="ld-shimmer"
-          x1="0"
-          y1="0"
-          x2="1"
-          y2="0"
-          gradientUnits="objectBoundingBox"
-        >
-          <stop offset="0" stopColor="#8b877f" />
-          <stop offset="0.4" stopColor="#8b877f" />
-          <stop offset="0.5" stopColor="#c9c4bb" />
-          <stop offset="0.6" stopColor="#8b877f" />
-          <stop offset="1" stopColor="#8b877f" />
-          <animateTransform
-            attributeName="gradientTransform"
-            type="translate"
-            from="-1 0"
-            to="1 0"
-            dur="1.8s"
-            repeatCount="indefinite"
-          />
-        </linearGradient>
+        <clipPath id="ld-sweep">
+          <rect className="ld-sweep" x="0" y="0" width="48" height="20" />
+        </clipPath>
       </defs>
       <text
         x="0"
         y="14"
         fontFamily="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
         fontSize="12"
-        fill="url(#ld-shimmer)"
+        fill="#8b877f"
+      >
+        {text}
+      </text>
+      <text
+        x="0"
+        y="14"
+        fontFamily="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+        fontSize="12"
+        fill="#c9c4bb"
+        clipPath="url(#ld-sweep)"
       >
         {text}
       </text>
@@ -150,25 +152,28 @@ export function LandingHero() {
       restoreText();
     };
     const stream = () => {
-      let tick = 0;
-      blocks.forEach((block) => {
+      let elapsed = 0;
+      blocks.forEach((block, index) => {
+        const lead = index < STREAM_LEAD_BLOCKS;
+        const tickMs = lead ? STREAM_LEAD_TICK_MS : STREAM_TICK_MS;
+        const chunk = lead ? STREAM_LEAD_CHUNK_CHARS : STREAM_CHUNK_CHARS;
         const own = textNodes.filter(({ node }) => block.contains(node));
-        at(tick * STREAM_TICK_MS, () => block.setAttribute("data-in", ""));
+        at(elapsed, () => block.setAttribute("data-in", ""));
         for (const { node, full } of own)
-          for (const end of chunkEnds(full.length)) {
-            at(tick * STREAM_TICK_MS, () => {
+          for (const end of chunkEnds(full.length, chunk)) {
+            at(elapsed, () => {
               node.nodeValue = full.slice(0, end);
               body.scrollTop = body.scrollHeight;
             });
-            tick += 1;
+            elapsed += tickMs;
           }
-        if (own.length === 0) tick += 1;
+        if (own.length === 0) elapsed += tickMs;
       });
-      at(tick * STREAM_TICK_MS + 200, () => {
+      at(elapsed, () => {
         md.removeAttribute("data-streaming");
         restoreText();
-        body.scrollTop = 0;
       });
+      at(elapsed + STREAM_SETTLE_MS, () => body.scrollTo({ top: 0, behavior: "smooth" }));
       textNodes.forEach(({ node }) => (node.nodeValue = ""));
     };
     const play = () => {
@@ -182,9 +187,11 @@ export function LandingHero() {
       termLines.forEach((line) => line.removeAttribute("data-in"));
       blocks.forEach((block) => block.removeAttribute("data-in"));
       restoreText();
+      at(HERO_ACTS.chip, () => {
+        chip.hidden = false;
+      });
       at(HERO_ACTS.machine, () => {
         light(1);
-        chip.hidden = false;
         show("machine");
         review.terminal.forEach((line, index) =>
           at(line.delayMs, () => termLines[index]?.setAttribute("data-in", "")),
@@ -208,11 +215,24 @@ export function LandingHero() {
     };
     body.addEventListener("scroll", markEnd);
     const replay = hero.querySelector<HTMLButtonElement>("[data-replay]")!;
-    replay.addEventListener("click", play);
+    const onReplay = reduce ? finish : play;
+    replay.addEventListener("click", onReplay);
+    let observer: IntersectionObserver | undefined;
     if (reduce) finish();
-    else play();
+    else {
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (!entries.some((entry) => entry.intersectionRatio >= REPLAY_VISIBLE_RATIO)) return;
+          observer?.disconnect();
+          play();
+        },
+        { threshold: REPLAY_VISIBLE_RATIO },
+      );
+      observer.observe(hero);
+    }
     return () => {
-      replay.removeEventListener("click", play);
+      observer?.disconnect();
+      replay.removeEventListener("click", onReplay);
       body.removeEventListener("scroll", markEnd);
       clearTimers();
     };

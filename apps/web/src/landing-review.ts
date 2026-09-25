@@ -13,9 +13,9 @@ export const LANDING_REVIEW = {
       at: "05:57:46",
       state: "reviewing",
       detail: "~/.cache/hawkeye/runs/20260906-055740-ShobhitPatra-hawkeye-87",
-      delayMs: 400,
+      delayMs: 500,
     },
-    { at: "06:00:28", state: "posted", detail: "", delayMs: 2400 },
+    { at: "06:00:28", state: "posted", detail: "", delayMs: 2000 },
   ],
   posted: { verdict: "Blocked", findings: 4, mustFix: 1, turns: 6, duration: "2m 48s" },
   bodyHtml:
