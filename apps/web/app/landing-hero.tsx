@@ -261,7 +261,12 @@ export function LandingHero() {
         {ACTS.map((act, index) => (
           <Fragment key={act}>
             {index > 0 && <i />}
-            <span data-on={index === 0 ? "" : undefined}>{act}</span>
+            <span
+              data-on={index === 0 ? "" : undefined}
+              data-current={index === 0 ? "" : undefined}
+            >
+              {act}
+            </span>
           </Fragment>
         ))}
       </div>

@@ -735,7 +735,7 @@ html {
     transform 120ms var(--hk-ease);
 }
 .hk-button[data-size="large"] {
-  height: 40px;
+  min-height: 40px;
   padding: 0 var(--hk-space-4);
   font-size: var(--hk-type-body);
 }
