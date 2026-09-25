@@ -1406,3 +1406,13 @@ html {
     overscroll-behavior: contain;
   }
 }
+
+.hk-refusal {
+  color: var(--hk-fg);
+  font-weight: var(--hk-weight-medium);
+}
+.hk-input[type="number"] {
+  width: 8ch;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
