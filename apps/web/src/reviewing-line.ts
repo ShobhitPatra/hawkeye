@@ -41,15 +41,17 @@ function escapeXml(text: string): string {
 export function reviewingBadgeSvg(runnerName: string): string {
   const text = `Reviewing on ${runnerName}`;
   const width = Math.ceil(text.length * 7.3) + 2;
+  const font =
+    'font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12"';
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="20" viewBox="0 0 ${width} 20" role="img" aria-label="${escapeXml(text)}">`,
-    "<defs>",
-    '<linearGradient id="g" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">',
-    '<stop offset="0" stop-color="#8b877f"/><stop offset="0.4" stop-color="#8b877f"/><stop offset="0.5" stop-color="#c9c4bb"/><stop offset="0.6" stop-color="#8b877f"/><stop offset="1" stop-color="#8b877f"/>',
-    '<animateTransform attributeName="gradientTransform" type="translate" from="-1 0" to="1 0" dur="1.8s" repeatCount="indefinite"/>',
-    "</linearGradient>",
-    "</defs>",
-    `<text x="0" y="14" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="url(#g)">${escapeXml(text)}</text>`,
+    "<style>",
+    ".sweep { transform: translateX(-48px); } @media (prefers-reduced-motion: no-preference) { .sweep { animation: sweep 1.8s linear infinite; } }",
+    "@keyframes sweep { from { transform: translateX(-48px); } to { transform: translateX(100%); } }",
+    "</style>",
+    '<defs><clipPath id="c"><rect class="sweep" x="0" y="0" width="48" height="20"/></clipPath></defs>',
+    `<text x="0" y="14" ${font} fill="#8b877f">${escapeXml(text)}</text>`,
+    `<text x="0" y="14" ${font} fill="#c9c4bb" clip-path="url(#c)">${escapeXml(text)}</text>`,
     "</svg>",
   ].join("");
 }

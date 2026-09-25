@@ -8,7 +8,8 @@ describe("GET /status/reviewing", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     const svg = await response.text();
     expect(svg).toContain("Reviewing on laptop");
-    expect(svg).toContain("<animateTransform");
+    expect(svg).toContain("@keyframes sweep");
+    expect(svg).not.toContain("<animateTransform");
   });
   it("falls back to a generic name and caps the length", async () => {
     expect(await GET(new Request("https://hawkeye.test/status/reviewing")).text()).toContain(
