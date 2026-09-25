@@ -297,6 +297,7 @@ html {
 }
 .hk-nav a {
   color: var(--hk-fg-2);
+  white-space: nowrap;
   transition: color var(--hk-duration) var(--hk-ease);
 }
 .hk-nav a:focus-visible,
@@ -1341,8 +1342,16 @@ html {
   .hk-topbar .hk-status {
     display: none;
   }
+  .hk-menu {
+    position: static;
+  }
+  .hk-menu-panel {
+    right: var(--hk-space-4);
+  }
   .hk-nav {
     gap: var(--hk-space-3);
+    overflow-x: auto;
+    scrollbar-width: none;
   }
   .hk-headline {
     font-size: var(--hk-type-display);
@@ -1415,4 +1424,14 @@ html {
   width: 8ch;
   flex: none;
   font-variant-numeric: tabular-nums;
+}
+@media (max-width: 420px) {
+  .hk-wordmark-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
 }
