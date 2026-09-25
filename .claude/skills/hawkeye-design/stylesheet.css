@@ -944,15 +944,39 @@ html {
   color: var(--hk-fg);
 }
 .hk-code-row {
-  display: flex;
-  gap: var(--hk-space-2);
-  align-items: stretch;
+  position: relative;
 }
 .hk-code-row > .hk-code {
-  flex: 1;
+  padding-right: calc(var(--hk-space-4) + 32px);
 }
-.hk-code-row > .hk-button {
-  height: auto;
+.hk-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hk-space-1);
+  height: 28px;
+  min-width: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--hk-radius-control);
+  background: transparent;
+  color: var(--hk-fg-3);
+  font: inherit;
+  font-size: var(--hk-type-metadata);
+  cursor: pointer;
+  transition: color var(--hk-duration) var(--hk-ease);
+}
+.hk-copy:focus-visible,
+.hk-copy:active,
+.hk-copy[data-state="copied"] {
+  color: var(--hk-fg);
+}
+@media (hover: hover) and (pointer: fine) {
+  .hk-copy:hover {
+    color: var(--hk-fg);
+  }
 }
 .hk-form-row {
   display: flex;
@@ -1412,6 +1436,12 @@ html {
   }
   .hk-review-control {
     min-height: 44px;
+  }
+  .hk-copy {
+    top: 2px;
+    right: 2px;
+    height: 36px;
+    min-width: 36px;
   }
   .hk-table-wrap,
   .ld-term,
