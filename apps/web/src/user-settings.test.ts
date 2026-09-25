@@ -3,6 +3,7 @@ import type { Db } from "./db/client";
 import * as schema from "./db/schema";
 import { createTestDb } from "./test/pglite";
 import {
+  FieldError,
   parseReviewSettings,
   parseRunnerSettings,
   readReviewSettings,
@@ -287,5 +288,43 @@ describe("runner settings", () => {
         }),
       ),
     ).toThrow("Reviews at once must be between 1 and 3.");
+  });
+});
+
+function refusal(run: () => unknown) {
+  try {
+    run();
+  } catch (error) {
+    return error instanceof FieldError ? error.field : undefined;
+  }
+  return undefined;
+}
+
+describe("field refusals", () => {
+  it("names the field a refusal is about", () => {
+    expect(refusal(() => parseReviewSettings(form({ quietWindowSeconds: "601" })))).toBe(
+      "quietWindowSeconds",
+    );
+    expect(
+      refusal(() =>
+        parseRunnerSettings(
+          form({ harness: "claude-code", maxTurns: "0", wallClockMinutes: "5", concurrency: "1" }),
+        ),
+      ),
+    ).toBe("maxTurns");
+    expect(refusal(() => parseRunnerSettings(form({ harness: "vim" })))).toBe("harness");
+    const runner = {
+      harness: "claude-code",
+      maxTurns: "20",
+      wallClockMinutes: "5",
+      concurrency: "1",
+    };
+    expect(refusal(() => parseRunnerSettings(form({ ...runner, model: "gpt" })))).toBe("model");
+    expect(refusal(() => parseRunnerSettings(form({ ...runner, wallClockMinutes: "0" })))).toBe(
+      "wallClockMinutes",
+    );
+    expect(refusal(() => parseRunnerSettings(form({ ...runner, concurrency: "9" })))).toBe(
+      "concurrency",
+    );
   });
 });

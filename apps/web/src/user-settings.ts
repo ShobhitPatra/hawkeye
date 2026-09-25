@@ -48,14 +48,31 @@ export async function saveReviewSettings(
     .onConflictDoUpdate({ target: userSettings.userId, set: settings });
 }
 
+export type SettingsField = keyof ReviewSettings | keyof RunnerSettings;
+
+export class FieldError extends Error {
+  constructor(
+    readonly field: SettingsField,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 export function parseReviewSettings(formData: FormData): ReviewSettings {
   const raw = String(formData.get("quietWindowSeconds") ?? "").trim();
   if (!/^\d+$/.test(raw)) {
-    throw new Error("The wait after a push must be a whole number of seconds.");
+    throw new FieldError(
+      "quietWindowSeconds",
+      "The wait after a push must be a whole number of seconds.",
+    );
   }
   const quietWindowSeconds = Number(raw);
   if (quietWindowSeconds > MAX_QUIET_WINDOW_SECONDS) {
-    throw new Error(`The wait after a push can be at most ${MAX_QUIET_WINDOW_SECONDS} seconds.`);
+    throw new FieldError(
+      "quietWindowSeconds",
+      `The wait after a push can be at most ${MAX_QUIET_WINDOW_SECONDS} seconds.`,
+    );
   }
   return {
     autoReview: formData.get("autoReview") === "on",
@@ -99,25 +116,26 @@ export async function saveRunnerSettings(
 
 function wholeNumber(
   formData: FormData,
-  name: string,
+  name: keyof RunnerSettings,
   label: string,
   range: { min: number; max: number },
 ): number {
   const raw = String(formData.get(name) ?? "").trim();
-  if (!/^\d+$/.test(raw)) throw new Error(`${label} must be a whole number.`);
+  if (!/^\d+$/.test(raw)) throw new FieldError(name, `${label} must be a whole number.`);
   const value = Number(raw);
   if (value < range.min || value > range.max) {
-    throw new Error(`${label} must be between ${range.min} and ${range.max}.`);
+    throw new FieldError(name, `${label} must be between ${range.min} and ${range.max}.`);
   }
   return value;
 }
 
 export function parseRunnerSettings(formData: FormData): RunnerSettings {
   const harness = String(formData.get("harness") ?? "");
-  if (!isHarnessChoice(harness)) throw new Error("That harness is not in the list.");
+  if (!isHarnessChoice(harness))
+    throw new FieldError("harness", "That harness is not in the list.");
   const rawModel = String(formData.get("model") ?? "");
   if (harness === "claude-code" && rawModel !== "" && !isModelChoice(rawModel)) {
-    throw new Error("That model is not in the list.");
+    throw new FieldError("model", "That model is not in the list.");
   }
   return {
     harness,
