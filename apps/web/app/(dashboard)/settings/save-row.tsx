@@ -14,7 +14,9 @@ export function SaveRow({
     ? "Saving"
     : form.dirty
       ? ""
-      : (form.state.error ?? (form.state.saved ? saved : ""));
+      : form.state.field !== undefined
+        ? "Not saved"
+        : (form.state.error ?? (form.state.saved ? saved : ""));
   return (
     <div className="hk-action-row">
       <button type="submit" className="hk-button" data-variant="primary" disabled={form.pending}>
