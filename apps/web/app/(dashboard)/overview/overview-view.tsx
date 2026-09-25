@@ -30,7 +30,7 @@ async function ReviewTitle({
   titles: Promise<RecentReview[]>;
 }) {
   const titled = (await titles).find((candidate) => candidate.armedPrId === review.armedPrId);
-  if (titled?.title === undefined) return null;
+  if (titled?.title === undefined) return `${review.owner}/${review.repo} #${review.number}`;
   return <>{titled.title}</>;
 }
 
