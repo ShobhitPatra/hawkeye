@@ -1346,10 +1346,15 @@ html {
     overflow-x: auto;
     scrollbar-width: none;
   }
-  .hk-topbar[data-sticky] .hk-menu-panel {
-    position: fixed;
+  .hk-topbar:not([data-sticky]) {
+    position: relative;
+  }
+  .hk-menu {
+    position: static;
+  }
+  .hk-menu-panel {
     right: var(--hk-space-4);
-    top: calc(var(--hk-topbar-height) + var(--hk-space-2));
+    top: calc(100% + var(--hk-space-2));
   }
   .hk-nav {
     gap: var(--hk-space-3);
