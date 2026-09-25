@@ -22,6 +22,8 @@ function CheckIcon() {
   );
 }
 
+const COPY_KEYS = /Mac|iPhone|iPad/.test(globalThis.navigator?.platform ?? "") ? "⌘C" : "Ctrl+C";
+
 export function CopyButton({ text }: { text: string }) {
   const [state, setState] = useState<"idle" | "copied" | "refused">("idle");
   const timer = useRef<number | undefined>(undefined);
@@ -32,7 +34,7 @@ export function CopyButton({ text }: { text: string }) {
     timer.current = window.setTimeout(() => setState("idle"), 2000);
   };
   const label =
-    state === "copied" ? "Copied" : state === "refused" ? "Press Ctrl+C to copy" : "Copy";
+    state === "copied" ? "Copied" : state === "refused" ? `Press ${COPY_KEYS} to copy` : "Copy";
   return (
     <button
       type="button"
@@ -52,7 +54,7 @@ export function CopyButton({ text }: { text: string }) {
       }}
     >
       {state === "copied" ? <CheckIcon /> : <CopyIcon />}
-      {state === "refused" && <span>Ctrl+C</span>}
+      {state === "refused" && <span>{COPY_KEYS}</span>}
       <span role="status" className="hk-visually-hidden">
         {state === "idle" ? "" : label}
       </span>

@@ -961,7 +961,7 @@ html {
   padding: 0 6px;
   border: 0;
   border-radius: var(--hk-radius-control);
-  background: transparent;
+  background: var(--hk-bg-2);
   color: var(--hk-fg-3);
   font: inherit;
   font-size: var(--hk-type-metadata);
