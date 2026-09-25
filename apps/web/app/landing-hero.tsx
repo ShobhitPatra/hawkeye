@@ -228,7 +228,7 @@ export function LandingHero() {
         },
         { threshold: REPLAY_VISIBLE_RATIO },
       );
-      observer.observe(hero);
+      observer.observe(hero.querySelector(".ld-stage")!);
     }
     return () => {
       observer?.disconnect();

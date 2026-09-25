@@ -13,6 +13,7 @@ export function RotatingWord() {
   useEffect(() => {
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     let shown = 0;
+    let current = 0;
     let settle: number | undefined;
     const timer = window.setInterval(() => {
       shown += 1;
@@ -20,10 +21,9 @@ export function RotatingWord() {
         window.clearInterval(timer);
         return;
       }
-      setIndex((current) => {
-        setLeaving(current);
-        return (current + 1) % WORDS.length;
-      });
+      setLeaving(current);
+      current = (current + 1) % WORDS.length;
+      setIndex(current);
       window.clearTimeout(settle);
       settle = window.setTimeout(() => setLeaving(undefined), LEAVE_MS);
     }, ROTATION_MS);
