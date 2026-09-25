@@ -445,7 +445,7 @@ html {
   border-bottom: 1px solid var(--hk-line);
   margin-bottom: var(--hk-space-1);
 }
-.hk-menu-theme legend {
+.hk-choice.hk-menu-theme > legend {
   float: left;
   width: 100%;
   padding: 0 0 var(--hk-space-1);
