@@ -1351,7 +1351,6 @@ html {
   }
   .hk-menu-panel {
     right: var(--hk-space-4);
-    top: calc(100% + var(--hk-space-2));
   }
   .hk-nav {
     gap: var(--hk-space-3);
