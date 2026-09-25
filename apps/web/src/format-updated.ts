@@ -4,17 +4,17 @@ const UNITS = [
   { unit: "minute", ms: 60 * 1000 },
 ] as const;
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 const relativeTime = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-const absoluteDate = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  timeZone: "UTC",
-});
+
+function absoluteDate(date: Date): string {
+  return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+}
 
 export function formatUpdated(updatedAt: string, now: number): string {
   const elapsed = new Date(updatedAt).getTime() - now;
-  if (Math.abs(elapsed) >= DAY_MS) return absoluteDate.format(new Date(updatedAt));
+  if (Math.abs(elapsed) >= DAY_MS) return absoluteDate(new Date(updatedAt));
   for (const { unit, ms } of UNITS) {
     if (Math.abs(elapsed) >= ms) return relativeTime.format(Math.trunc(elapsed / ms), unit);
   }

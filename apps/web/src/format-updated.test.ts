@@ -12,6 +12,7 @@ describe("formatUpdated", () => {
   it("turns absolute after a day", () => {
     expect(formatUpdated(ago(24 * 60 * 60 * 1000), now)).toBe("22 Aug 2026");
     expect(formatUpdated(ago(45 * 24 * 60 * 60 * 1000), now)).toBe("9 Jul 2026");
+    expect(formatUpdated("2026-09-25T00:00:00Z", now)).toBe("25 Sep 2026");
   });
   it("falls back to seconds and handles future times", () => {
     expect(formatUpdated(ago(20 * 1000), now)).toBe("20 seconds ago");
