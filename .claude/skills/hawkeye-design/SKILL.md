@@ -136,7 +136,7 @@ Settings are a column of sections, each a heading, one sentence, and the control
 
 ### Runners and connect
 
-Runners are a table like any list: name, state word, last heartbeat, created. Revoke is a plain button in the row, never red; the confirmation is a sentence. A token shown once sits in a code block with a copy button beside it and one sentence saying it will not be shown again. The connect page is a numbered sequence, because it is one: run the command, type the code, approve. Its lede has a second paragraph at the same quiet size that says what connecting grants: a review runs a coding agent on that machine, as the user, over code they did not write; the editing and web tools are removed and the shell stays; it links the README's "What the runner can reach". A sentence, never a callout. The command is a code block with a copy button. A pending approval names the runner and when it asked, and tells the user to approve only their own machine.
+Runners are a table like any list: name, state word, last heartbeat, created. Revoke is a plain button in the row, never red; the confirmation is a sentence. A token shown once sits in a code block with the copy icon in its corner and one sentence saying it will not be shown again. The connect page is a numbered sequence, because it is one: run the command, type the code, approve. Its lede has a second paragraph at the same quiet size that says what connecting grants: a review runs a coding agent on that machine, as the user, over code they did not write; the editing and web tools are removed and the shell stays; it links the README's "What the runner can reach". A sentence, never a callout. The command is a code block with the copy icon in its corner. A pending approval names the runner and when it asked, and tells the user to approve only their own machine.
 
 ### The review comment
 
@@ -186,7 +186,7 @@ Margin column: `hk-margin`, `hk-entry[data-severity]`, `hk-gutter`, `hk-severity
 
 Controls: `hk-button[data-variant="primary"]`, `hk-review` with `hk-review-control[data-on][data-pending]`, `hk-review-word`, `hk-review-next`, `hk-input`, `hk-textarea`, `hk-choice` (`data-stack` for a column), `hk-field`, `hk-field-wide`, `hk-form-row`, `hk-action-row`, `hk-help`, `hk-link` (on an `<a>` inside `hk-root` only: forces the underline back inside any context that removes it, the top bar, navigation, crumbs, tables and the menu; a bare link in running text already underlines).
 
-Code and sections: `hk-code`, `hk-code-row`, `hk-section`, `hk-steps` (an `<ol>` whose items carry `hk-step-body`).
+Code and sections: `hk-code`, `hk-code-row` (a positioned wrapper whose `hk-copy` icon button sits inside the block's top right corner, showing a check for two seconds after copying), `hk-section`, `hk-steps` (an `<ol>` whose items carry `hk-step-body`).
 
 Status words: `hk-status[data-state="attention" | "failed" | "running"]`.
 
