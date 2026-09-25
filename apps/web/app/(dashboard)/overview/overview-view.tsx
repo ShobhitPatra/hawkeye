@@ -31,7 +31,7 @@ async function ReviewTitle({
 }) {
   const titled = (await titles).find((candidate) => candidate.armedPrId === review.armedPrId);
   if (titled?.title === undefined) return `${review.owner}/${review.repo} #${review.number}`;
-  return <>{titled.title}</>;
+  return <span className="hk-arrive">{titled.title}</span>;
 }
 
 export function RecentReviews({

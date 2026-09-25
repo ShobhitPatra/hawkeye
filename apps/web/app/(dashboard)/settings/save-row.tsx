@@ -20,11 +20,15 @@ export function SaveRow({
       <button type="submit" className="hk-button" data-variant="primary" disabled={form.pending}>
         Save
       </button>
-      <span
-        role="status"
-        className={form.state.error && !form.dirty && !form.pending ? "hk-refusal" : undefined}
-      >
-        {sentence}
+      <span role="status">
+        {sentence && (
+          <span
+            key={sentence}
+            className={form.state.error && !form.dirty ? "hk-refusal hk-arrive" : "hk-arrive"}
+          >
+            {sentence}
+          </span>
+        )}
       </span>
     </div>
   );

@@ -114,7 +114,7 @@ export function PullRequestView({
       </div>
 
       {!latest && (
-        <div className="hk-state">
+        <div className="hk-state hk-arrive">
           <p>No review yet.</p>
           <p>
             {arm.armed
@@ -125,7 +125,7 @@ export function PullRequestView({
       )}
 
       {latest?.status === "running" && (
-        <div className="hk-state">
+        <div className="hk-state hk-arrive">
           <p>
             <span className="hk-status" data-state="running">
               In review
@@ -137,7 +137,7 @@ export function PullRequestView({
       )}
 
       {latest && latest.status !== "running" && latest.status !== "ok" && (
-        <div className="hk-state">
+        <div className="hk-state hk-arrive">
           <p>
             <span className="hk-status" data-state="failed">
               Run failed
@@ -150,7 +150,7 @@ export function PullRequestView({
       )}
 
       {latest?.status === "ok" && note && (
-        <div className="hk-state">
+        <div className="hk-state hk-arrive">
           <p>
             <span className="hk-status" data-state="attention">
               {note.kind === "short-form" ? "Posted short" : "Not posted"}
@@ -168,7 +168,11 @@ export function PullRequestView({
       )}
 
       {lastReview?.verdict && (
-        <section className="hk-verdict" data-verdict={lastReview.verdict} aria-labelledby="verdict">
+        <section
+          className="hk-verdict hk-arrive"
+          data-verdict={lastReview.verdict}
+          aria-labelledby="verdict"
+        >
           <h2 className="hk-verdict-word" id="verdict">
             {verdictLabel(lastReview.verdict)}
           </h2>

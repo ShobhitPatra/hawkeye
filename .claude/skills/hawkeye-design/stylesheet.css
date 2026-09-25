@@ -67,6 +67,7 @@
   --hk-icon-stroke: 1.5;
 
   --hk-duration: 160ms;
+  --hk-duration-enter: 200ms;
   --hk-ease: cubic-bezier(0.2, 0, 0, 1);
 }
 
@@ -1352,6 +1353,20 @@ html {
   }
   to {
     transform: translateX(100%);
+  }
+}
+
+/* Arrival: content that replaces other content, on a refresh or a click, fades in; nothing exits with motion */
+
+.hk-arrive {
+  transition:
+    opacity var(--hk-duration-enter) var(--hk-ease),
+    transform var(--hk-duration-enter) var(--hk-ease);
+}
+@starting-style {
+  .hk-arrive {
+    opacity: 0;
+    transform: translateY(3px);
   }
 }
 
