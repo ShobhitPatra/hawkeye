@@ -1,7 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { useFormStatus } from "react-dom";
 import { revokeRunnerAction } from "./actions";
+
+function RevokeSubmit() {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" className="hk-button" data-variant="primary" disabled={pending}>
+      {pending ? "Revoking" : "Revoke"}
+    </button>
+  );
+}
 
 export type RunnerRowData = {
   id: string;
@@ -25,12 +35,15 @@ export function RunnerRow({ runner }: { runner: RunnerRowData }) {
         <td className="hk-numeric">
           <form action={revokeRunnerAction} className="hk-actions">
             <input type="hidden" name="runnerId" value={runner.id} />
-            <button type="button" className="hk-button" onClick={() => setConfirming(false)}>
+            <button
+              type="button"
+              className="hk-button"
+              autoFocus
+              onClick={() => setConfirming(false)}
+            >
               Keep
             </button>
-            <button type="submit" className="hk-button" data-variant="primary">
-              Revoke
-            </button>
+            <RevokeSubmit />
           </form>
         </td>
       </tr>

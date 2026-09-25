@@ -1,5 +1,6 @@
 "use client";
 
+import { useTransition } from "react";
 import { authClient } from "@/auth-client";
 
 export function SignInButton({
@@ -9,14 +10,21 @@ export function SignInButton({
   callbackURL?: string;
   variant?: "primary";
 }) {
+  const [pending, startTransition] = useTransition();
   return (
     <button
       type="button"
       className="hk-button"
       data-variant={variant}
-      onClick={() => authClient.signIn.social({ provider: "github", callbackURL })}
+      aria-disabled={pending}
+      onClick={() => {
+        if (pending) return;
+        startTransition(async () => {
+          await authClient.signIn.social({ provider: "github", callbackURL });
+        });
+      }}
     >
-      Sign in with GitHub
+      {pending ? "Opening GitHub" : "Sign in with GitHub"}
     </button>
   );
 }
