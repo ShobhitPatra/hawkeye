@@ -71,13 +71,15 @@ export function PullRequestTable({
           <tr>
             <th scope="col">Pull request</th>
             <th scope="col">Status</th>
-            <th scope="col" className="hk-numeric">
+            <th scope="col" className="hk-numeric" data-secondary>
               Round
             </th>
             <th scope="col" className="hk-numeric">
               Findings
             </th>
-            <th scope="col">Reviewed</th>
+            <th scope="col" data-secondary>
+              Reviewed
+            </th>
             <th scope="col">
               <span className="hk-visually-hidden">Review control</span>
             </th>
@@ -106,9 +108,13 @@ export function PullRequestTable({
                   </div>
                 </td>
                 <td>{status && <StatusWord status={status} runnerOnline={runnerOnline} />}</td>
-                <td className="hk-numeric">{last?.rounds ?? ""}</td>
+                <td className="hk-numeric" data-secondary>
+                  {last?.rounds ?? ""}
+                </td>
                 <td className="hk-numeric">{last?.openFindings ?? ""}</td>
-                <td>{last ? formatUpdated(last.reviewedAt.toISOString(), now) : ""}</td>
+                <td data-secondary>
+                  {last ? formatUpdated(last.reviewedAt.toISOString(), now) : ""}
+                </td>
                 <td>
                   <ReviewControl
                     reference={pullRequest}

@@ -2,7 +2,13 @@ export function TableSkeleton({
   columns,
   rows = 5,
 }: {
-  columns: { label: string; numeric?: boolean; width: string; stacked?: boolean }[];
+  columns: {
+    label: string;
+    numeric?: boolean;
+    width: string;
+    stacked?: boolean;
+    secondary?: boolean;
+  }[];
   rows?: number;
 }) {
   return (
@@ -15,6 +21,7 @@ export function TableSkeleton({
                 key={column.label}
                 scope="col"
                 className={column.numeric ? "hk-numeric" : undefined}
+                data-secondary={column.secondary ? "" : undefined}
               >
                 {column.label}
               </th>
@@ -25,7 +32,11 @@ export function TableSkeleton({
           {Array.from({ length: rows }, (_, row) => (
             <tr key={row}>
               {columns.map((column) => (
-                <td key={column.label} className={column.numeric ? "hk-numeric" : undefined}>
+                <td
+                  key={column.label}
+                  className={column.numeric ? "hk-numeric" : undefined}
+                  data-secondary={column.secondary ? "" : undefined}
+                >
                   <span className="hk-skeleton-bar" style={{ width: column.width }} />
                   {column.stacked && (
                     <span className="hk-skeleton-bar" data-thin style={{ width: "40%" }} />

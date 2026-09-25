@@ -13,9 +13,9 @@ export default function Loading() {
         columns={[
           { label: "Pull request", width: "72%", stacked: true },
           { label: "Status", width: "60%" },
-          { label: "Round", numeric: true, width: "2ch" },
+          { label: "Round", numeric: true, width: "2ch", secondary: true },
           { label: "Findings", numeric: true, width: "2ch" },
-          { label: "Reviewed", width: "9ch" },
+          { label: "Reviewed", width: "9ch", secondary: true },
           { label: "", width: "8ch" },
         ]}
       />

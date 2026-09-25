@@ -1436,6 +1436,9 @@ span.hk-arrive {
   .hk-topbar .hk-status {
     display: none;
   }
+  .hk-table [data-secondary] {
+    display: none;
+  }
   .hk-menu {
     position: static;
   }
