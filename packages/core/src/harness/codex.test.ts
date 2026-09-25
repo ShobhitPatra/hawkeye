@@ -116,7 +116,7 @@ describe("codex harness", () => {
   it("stops at the turn limit", async () => {
     const s = await scratch();
     const exe = await fakeCodex(
-      `cat > /dev/null; for i in 1 2 3; do echo '{"type":"item.completed","item":{"type":"agent_message"}}'; done; sleep 5`,
+      `cat > /dev/null; line='{"type":"item.completed","item":{"type":"agent_message"}}'; printf '%s\\n%s\\n%s\\n' "$line" "$line" "$line"; sleep 5`,
     );
     const turns: number[] = [];
     let stdoutLines = 0;
@@ -131,7 +131,7 @@ describe("codex harness", () => {
     );
     expect(outcome).toEqual({ status: "max-turns", turns: 2 });
     expect(turns).toEqual([1, 2]);
-    expect(stdoutLines).toBeGreaterThanOrEqual(2);
+    expect(stdoutLines).toBe(3);
   });
 
   it("names a missing codex binary", async () => {
