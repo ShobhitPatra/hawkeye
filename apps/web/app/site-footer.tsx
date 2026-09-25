@@ -1,12 +1,14 @@
 import { HAWKEYE_REPOSITORY_URL } from "@hawkeye/core";
+import type { Theme } from "@/theme";
 import { Mark } from "./mark";
+import { ThemeChoice } from "./theme-choice";
 
 export const REVIEWS_URL = `${HAWKEYE_REPOSITORY_URL}/pulls?q=is%3Apr`;
 export const CONTRIBUTING_URL = `${HAWKEYE_REPOSITORY_URL}/blob/main/CONTRIBUTING.md`;
 export const LICENSE_URL = `${HAWKEYE_REPOSITORY_URL}/blob/main/LICENSE`;
 export const NPM_URL = "https://www.npmjs.com/package/hawkeye-review";
 
-export function SiteFooter() {
+export function SiteFooter({ theme }: { theme: Theme }) {
   return (
     <footer className="hk-footer">
       <span className="hk-mono hk-lockup">
@@ -19,6 +21,7 @@ export function SiteFooter() {
       <a href="/privacy">Privacy</a>
       <a href="/terms">Terms</a>
       <a href={NPM_URL}>npm: hawkeye-review</a>
+      <ThemeChoice theme={theme} variant="footer" />
     </footer>
   );
 }

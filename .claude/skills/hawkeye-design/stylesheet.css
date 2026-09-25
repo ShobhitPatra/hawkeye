@@ -380,17 +380,6 @@ html {
 .hk-menu > summary:focus-visible {
   color: var(--hk-fg);
 }
-.hk-menu[data-icon] > summary {
-  padding: var(--hk-space-1);
-}
-.hk-menu[data-icon] > summary::after {
-  display: none;
-}
-.hk-menu[data-icon] > summary svg {
-  width: var(--hk-icon-size);
-  height: var(--hk-icon-size);
-  display: block;
-}
 .hk-menu-panel {
   position: absolute;
   right: 0;
@@ -1273,6 +1262,36 @@ html {
   .hk-footer a:hover {
     color: var(--hk-fg);
   }
+  .hk-footer-theme label:hover {
+    color: var(--hk-fg);
+  }
+}
+.hk-footer-theme {
+  margin-left: auto;
+  border: 0;
+  padding: 0;
+  gap: var(--hk-space-3);
+  font-size: inherit;
+  line-height: inherit;
+}
+.hk-footer-theme label {
+  gap: 0;
+  transition: color var(--hk-duration) var(--hk-ease-color);
+}
+.hk-footer-theme input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.hk-footer-theme label:has(input:checked) {
+  color: var(--hk-fg);
+}
+.hk-footer-theme label:has(input:focus-visible) {
+  outline: 2px solid var(--hk-focus);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 /* Surfaces, earned rarely */
