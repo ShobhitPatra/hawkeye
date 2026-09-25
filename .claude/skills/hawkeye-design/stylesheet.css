@@ -480,6 +480,8 @@ html {
   gap: var(--hk-space-3);
 }
 .hk-progress {
+  opacity: 0;
+  animation: hk-appear 1ms linear 300ms forwards;
   position: absolute;
   left: 0;
   right: 0;
@@ -497,6 +499,11 @@ html {
   width: 30%;
   background: var(--hk-fg);
   animation: hk-progress 1.8s linear infinite;
+}
+@keyframes hk-appear {
+  to {
+    opacity: 1;
+  }
 }
 @keyframes hk-progress {
   from {
@@ -839,6 +846,10 @@ html {
   content: "";
   position: absolute;
   inset: -8px -6px;
+}
+.hk-review-control[data-pending] > .hk-status {
+  opacity: 0;
+  animation: hk-appear 1ms linear 300ms forwards;
 }
 .hk-review-control[data-pending] {
   cursor: progress;
