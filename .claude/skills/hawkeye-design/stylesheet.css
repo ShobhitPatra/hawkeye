@@ -763,9 +763,11 @@ html {
   gap: var(--hk-space-1);
 }
 .hk-review-control {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: 10px auto;
+  column-gap: var(--hk-space-2);
   align-items: center;
-  gap: var(--hk-space-2);
+  position: relative;
   font: inherit;
   font-size: var(--hk-type-compact);
   line-height: var(--hk-leading-compact);
@@ -774,9 +776,15 @@ html {
   border: 0;
   padding: 0;
   cursor: pointer;
-  transition: color var(--hk-duration) var(--hk-ease);
+  transition:
+    color var(--hk-duration) var(--hk-ease),
+    transform 120ms var(--hk-ease);
+}
+.hk-review-control:active:not([data-pending]) {
+  transform: scale(0.98);
 }
 .hk-review-control i {
+  grid-area: 1 / 1;
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -794,25 +802,38 @@ html {
 .hk-review-control:focus-visible {
   color: var(--hk-fg);
 }
-.hk-review-next {
-  display: none;
+.hk-review-word,
+.hk-review-next,
+.hk-review-control > .hk-status {
+  grid-area: 1 / 2;
+  white-space: nowrap;
 }
-.hk-review-control:not([data-pending]):focus-visible .hk-review-word {
-  display: none;
+.hk-review-next,
+.hk-review-control[data-pending] .hk-review-word,
+.hk-review-control:not([data-pending]) > .hk-status {
+  visibility: hidden;
 }
-.hk-review-control:not([data-pending]):focus-visible .hk-review-next {
-  display: inline;
+.hk-review-control:not([data-pending], [data-settled]):focus-visible .hk-review-word {
+  visibility: hidden;
+}
+.hk-review-control:not([data-pending], [data-settled]):focus-visible .hk-review-next {
+  visibility: visible;
 }
 @media (hover: hover) and (pointer: fine) {
   .hk-review-control:hover {
     color: var(--hk-fg);
   }
-  .hk-review-control:not([data-pending]):hover .hk-review-word {
-    display: none;
+  .hk-review-control:not([data-pending], [data-settled]):hover .hk-review-word {
+    visibility: hidden;
   }
-  .hk-review-control:not([data-pending]):hover .hk-review-next {
-    display: inline;
+  .hk-review-control:not([data-pending], [data-settled]):hover .hk-review-next {
+    visibility: visible;
   }
+}
+.hk-review-control::before {
+  content: "";
+  position: absolute;
+  inset: -8px -6px;
 }
 .hk-review-control[data-pending] {
   cursor: progress;
