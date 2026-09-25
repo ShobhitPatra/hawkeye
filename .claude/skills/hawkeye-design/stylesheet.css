@@ -421,6 +421,10 @@ html {
   border: 0;
   cursor: pointer;
 }
+.hk-menu-panel button[aria-disabled="true"] {
+  color: var(--hk-fg-3);
+  cursor: progress;
+}
 .hk-menu-theme {
   border: 0;
   margin: 0;

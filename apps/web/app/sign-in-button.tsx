@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { authClient } from "@/auth-client";
 
 export function SignInButton({
@@ -10,7 +10,9 @@ export function SignInButton({
   callbackURL?: string;
   variant?: "primary";
 }) {
-  const [pending, startTransition] = useTransition();
+  const [transitioning, startTransition] = useTransition();
+  const [leaving, setLeaving] = useState(false);
+  const pending = transitioning || leaving;
   return (
     <button
       type="button"
@@ -20,7 +22,8 @@ export function SignInButton({
       onClick={() => {
         if (pending) return;
         startTransition(async () => {
-          await authClient.signIn.social({ provider: "github", callbackURL });
+          const result = await authClient.signIn.social({ provider: "github", callbackURL });
+          if (!result.error) setLeaving(true);
         });
       }}
     >

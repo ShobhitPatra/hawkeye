@@ -24,6 +24,7 @@ export type RunnerRowData = {
 
 export function RunnerRow({ runner }: { runner: RunnerRowData }) {
   const [confirming, setConfirming] = useState(false);
+  const [kept, setKept] = useState(false);
   if (confirming)
     return (
       <tr>
@@ -39,7 +40,10 @@ export function RunnerRow({ runner }: { runner: RunnerRowData }) {
               type="button"
               className="hk-button"
               autoFocus
-              onClick={() => setConfirming(false)}
+              onClick={() => {
+                setConfirming(false);
+                setKept(true);
+              }}
             >
               Keep
             </button>
@@ -73,7 +77,12 @@ export function RunnerRow({ runner }: { runner: RunnerRowData }) {
       <td>{runner.created}</td>
       <td className="hk-numeric">
         {runner.state !== "revoked" && (
-          <button type="button" className="hk-button" onClick={() => setConfirming(true)}>
+          <button
+            type="button"
+            className="hk-button"
+            autoFocus={kept}
+            onClick={() => setConfirming(true)}
+          >
             Revoke
           </button>
         )}
