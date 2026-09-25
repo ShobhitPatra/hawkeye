@@ -29,12 +29,10 @@ export const metadata = {
 export async function generateViewport(): Promise<Viewport> {
   const chosen = themeAttribute(parseTheme((await cookies()).get(THEME_COOKIE)?.value));
   return {
-    themeColor: chosen
-      ? THEME_COLORS[chosen]
-      : [
-          { media: "(prefers-color-scheme: light)", color: THEME_COLORS.light },
-          { media: "(prefers-color-scheme: dark)", color: THEME_COLORS.dark },
-        ],
+    themeColor: [
+      { media: "(prefers-color-scheme: light)", color: THEME_COLORS[chosen ?? "light"] },
+      { media: "(prefers-color-scheme: dark)", color: THEME_COLORS[chosen ?? "dark"] },
+    ],
   };
 }
 
