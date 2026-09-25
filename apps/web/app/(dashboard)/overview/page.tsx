@@ -1,10 +1,9 @@
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
-import { loadOverview, type RecentReview } from "@/overview";
+import { loadOverview } from "@/overview";
 import { fillTitles } from "@/pull-request-titles";
 import { requestRunnerStatus } from "@/request-runner-status";
 import { requireSession } from "@/session";
-import { Suspense } from "react";
 import { OverviewView, RecentReviews } from "./overview-view";
 
 export default async function OverviewPage() {
@@ -20,31 +19,12 @@ export default async function OverviewPage() {
       runner={runner}
       now={now}
       recent={
-        <Suspense fallback={<RecentReviewsLoading count={overview.recent.length} />}>
-          <RecentReviewsWithTitles recent={overview.recent} now={now} />
-        </Suspense>
+        <RecentReviews
+          recent={overview.recent}
+          titles={fillTitles(getDb(), createGitHubAppClient({ fetch }), overview.recent)}
+          now={now}
+        />
       }
     />
-  );
-}
-
-async function RecentReviewsWithTitles({ recent, now }: { recent: RecentReview[]; now: Date }) {
-  const titled = await fillTitles(getDb(), createGitHubAppClient({ fetch }), recent);
-  return <RecentReviews recent={titled} now={now} />;
-}
-
-function RecentReviewsLoading({ count }: { count: number }) {
-  if (count === 0) return null;
-  return (
-    <section className="hk-section" aria-labelledby="recent">
-      <h2 className="hk-heading" id="recent">
-        Recent reviews
-      </h2>
-      <div className="hk-skeleton" data-rows aria-hidden="true">
-        {Array.from({ length: Math.min(count, 5) }, (_, index) => (
-          <span key={index} />
-        ))}
-      </div>
-    </section>
   );
 }

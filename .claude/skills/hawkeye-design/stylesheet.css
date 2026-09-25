@@ -1313,7 +1313,8 @@ html {
   flex-direction: column;
   gap: var(--hk-space-3);
 }
-.hk-skeleton > span {
+.hk-skeleton > span,
+.hk-skeleton-bar {
   display: block;
   height: 10px;
   border-radius: 3px;
@@ -1327,7 +1328,18 @@ html {
 .hk-skeleton[data-rows] > span:nth-child(even) {
   width: 62%;
 }
-.hk-skeleton > span::after {
+.hk-skeleton-bar {
+  margin-block: 5px;
+}
+.hk-skeleton-bar[data-thin] {
+  height: 8px;
+  margin-block: 3px 4px;
+}
+.hk-table[data-skeleton] td.hk-numeric > .hk-skeleton-bar {
+  margin-left: auto;
+}
+.hk-skeleton > span::after,
+.hk-skeleton-bar::after {
   content: "";
   position: absolute;
   inset: 0;
