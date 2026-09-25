@@ -264,7 +264,7 @@ html {
   width: 1px;
   height: 1px;
   overflow: hidden;
-  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 
@@ -321,6 +321,9 @@ html {
   .hk-nav a:hover,
   .hk-topbar-end a:hover {
     color: var(--hk-fg);
+  }
+  .hk-topbar-end a.hk-status[data-state="attention"]:hover {
+    color: var(--hk-warn);
   }
 }
 .hk-topbar-end a.hk-button {
@@ -582,6 +585,7 @@ html {
   gap: var(--hk-space-1) var(--hk-space-4);
   font-size: var(--hk-type-compact);
   line-height: var(--hk-leading-compact);
+  font-variant-numeric: tabular-nums;
   color: var(--hk-fg-2);
 }
 .hk-meta b {
@@ -603,6 +607,7 @@ html {
   font-size: var(--hk-type-heading);
   line-height: var(--hk-leading-heading);
   font-weight: var(--hk-weight-semibold);
+  letter-spacing: -0.01em;
 }
 .hk-verdict[data-verdict="blocked"] .hk-verdict-word {
   color: var(--hk-must);
@@ -897,7 +902,8 @@ html {
   gap: var(--hk-space-1);
   max-width: 40ch;
 }
-.hk-field > label {
+.hk-field > label,
+.hk-choice > legend {
   font-size: var(--hk-type-compact);
   line-height: var(--hk-leading-compact);
   font-weight: var(--hk-weight-medium);
@@ -1150,6 +1156,7 @@ html {
   align-items: center;
   justify-content: flex-end;
   font-size: var(--hk-type-metadata);
+  line-height: var(--hk-leading-metadata);
   color: var(--hk-fg-3);
 }
 .hk-heat-key > i {
@@ -1278,6 +1285,14 @@ html {
   display: flex;
   gap: var(--hk-space-2);
   align-items: center;
+}
+.hk-disclosure summary:focus-visible {
+  color: var(--hk-fg);
+}
+@media (hover: hover) and (pointer: fine) {
+  .hk-disclosure summary:hover {
+    color: var(--hk-fg);
+  }
 }
 .hk-disclosure summary::-webkit-details-marker {
   display: none;
@@ -1535,7 +1550,7 @@ span.hk-arrive {
     width: 1px;
     height: 1px;
     overflow: hidden;
-    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
     white-space: nowrap;
   }
 }
