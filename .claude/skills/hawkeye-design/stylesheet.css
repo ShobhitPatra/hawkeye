@@ -1343,6 +1343,15 @@ html {
     display: none;
   }
   .hk-nav {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .hk-topbar[data-sticky] .hk-menu-panel {
+    position: fixed;
+    right: var(--hk-space-4);
+    top: calc(var(--hk-topbar-height) + var(--hk-space-2));
+  }
+  .hk-nav {
     gap: var(--hk-space-3);
   }
   .hk-headline {
@@ -1417,19 +1426,13 @@ html {
   flex: none;
   font-variant-numeric: tabular-nums;
 }
-@media (max-width: 760px) {
-  .hk-nav {
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .hk-menu-panel {
-    position: fixed;
-    right: var(--hk-space-4);
-    top: calc(var(--hk-topbar-height) + var(--hk-space-2));
-  }
-}
 @media (max-width: 420px) {
   .hk-wordmark-text {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 }
