@@ -14,7 +14,7 @@
   --hk-bg-3: #e4e1da;
   --hk-fg: #1b1a17;
   --hk-fg-2: #5c5954;
-  --hk-fg-3: #8b877f;
+  --hk-fg-3: #746f68;
   --hk-line: rgba(27, 26, 23, 0.12);
   --hk-line-2: rgba(27, 26, 23, 0.26);
   --hk-must: #b3261e;
@@ -77,7 +77,7 @@
     --hk-bg-3: #262421;
     --hk-fg: #ebe8e2;
     --hk-fg-2: #a49f96;
-    --hk-fg-3: #6f6a62;
+    --hk-fg-3: #8a847b;
     --hk-line: rgba(235, 232, 226, 0.12);
     --hk-line-2: rgba(235, 232, 226, 0.26);
     --hk-must: #f0645b;
@@ -97,7 +97,7 @@
   --hk-bg-3: #262421;
   --hk-fg: #ebe8e2;
   --hk-fg-2: #a49f96;
-  --hk-fg-3: #6f6a62;
+  --hk-fg-3: #8a847b;
   --hk-line: rgba(235, 232, 226, 0.12);
   --hk-line-2: rgba(235, 232, 226, 0.26);
   --hk-must: #f0645b;
@@ -116,7 +116,23 @@
   line-height: var(--hk-leading-body);
   -webkit-font-smoothing: antialiased;
   margin: 0;
-  min-height: 100vh;
+  min-height: 100svh;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+.hk-root button,
+.hk-root a,
+.hk-root summary,
+.hk-root [role="button"],
+.hk-root label {
+  touch-action: manipulation;
+}
+.hk-root button,
+.hk-root summary,
+.hk-root [role="button"] {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 .hk-root *,
 .hk-root *::before,
@@ -217,11 +233,9 @@ html {
 }
 .hk-label,
 .hk-steps > li::before {
-  font-size: 11px;
-  line-height: 16px;
+  font-size: var(--hk-type-metadata);
+  line-height: var(--hk-leading-metadata);
   font-weight: var(--hk-weight-semibold);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: var(--hk-fg-3);
 }
 .hk-mono {
@@ -285,7 +299,6 @@ html {
   color: var(--hk-fg-2);
   transition: color var(--hk-duration) var(--hk-ease);
 }
-.hk-nav a:hover,
 .hk-nav a:focus-visible,
 .hk-nav a[aria-current="page"] {
   color: var(--hk-fg);
@@ -293,9 +306,14 @@ html {
 .hk-topbar-end a {
   color: var(--hk-fg-2);
 }
-.hk-topbar-end a:hover,
 .hk-topbar-end a:focus-visible {
   color: var(--hk-fg);
+}
+@media (hover: hover) and (pointer: fine) {
+  .hk-nav a:hover,
+  .hk-topbar-end a:hover {
+    color: var(--hk-fg);
+  }
 }
 .hk-topbar-end a.hk-button {
   color: var(--hk-fg);
@@ -347,8 +365,8 @@ html {
   border-bottom: 1.5px solid currentColor;
   transform: translateY(-2px) rotate(45deg);
 }
-.hk-menu > summary:hover,
-.hk-menu[open] > summary {
+.hk-menu[open] > summary,
+.hk-menu > summary:focus-visible {
   color: var(--hk-fg);
 }
 .hk-menu[data-icon] > summary {
@@ -380,9 +398,18 @@ html {
   display: block;
   padding: var(--hk-space-1) var(--hk-space-4);
 }
-.hk-menu-panel a:hover,
-.hk-menu-panel button:hover {
-  background: var(--hk-bg-2);
+.hk-menu-panel a:active,
+.hk-menu-panel button:active {
+  background: var(--hk-bg-3);
+}
+@media (hover: hover) and (pointer: fine) {
+  .hk-menu > summary:hover {
+    color: var(--hk-fg);
+  }
+  .hk-menu-panel a:hover,
+  .hk-menu-panel button:hover {
+    background: var(--hk-bg-2);
+  }
 }
 .hk-menu-panel button {
   width: 100%;
@@ -424,9 +451,11 @@ html {
   padding: 0;
   color: var(--hk-fg-3);
 }
-.hk-menu-panel .hk-menu-legal a:hover {
-  color: var(--hk-fg);
-  background: none;
+@media (hover: hover) and (pointer: fine) {
+  .hk-menu-panel .hk-menu-legal a:hover {
+    color: var(--hk-fg);
+    background: none;
+  }
 }
 .hk-menu-who {
   color: var(--hk-fg-2);
@@ -462,7 +491,7 @@ html {
   height: 100%;
   width: 30%;
   background: var(--hk-fg);
-  animation: hk-progress 1.6s var(--hk-ease) infinite;
+  animation: hk-progress 1.8s linear infinite;
 }
 @keyframes hk-progress {
   from {
@@ -498,8 +527,8 @@ html {
   color: var(--hk-fg-2);
   flex-wrap: wrap;
 }
-.hk-crumb a:hover,
-.hk-crumb a:focus-visible {
+.hk-crumb a:focus-visible,
+.hk-crumb a:hover {
   color: var(--hk-fg);
 }
 .hk-crumb-sep {
@@ -683,22 +712,39 @@ html {
   cursor: pointer;
   text-decoration: none;
   white-space: nowrap;
-  transition: background-color var(--hk-duration) var(--hk-ease);
-}
-.hk-button:hover {
-  background: var(--hk-bg-2);
+  transition:
+    background-color var(--hk-duration) var(--hk-ease),
+    opacity var(--hk-duration) var(--hk-ease),
+    transform 120ms var(--hk-ease);
 }
 .hk-button[data-variant="primary"] {
   background: var(--hk-fg);
   color: var(--hk-on-fg);
   border-color: var(--hk-fg);
 }
-.hk-button[data-variant="primary"]:hover {
-  opacity: 0.9;
+@media (hover: hover) and (pointer: fine) {
+  .hk-button:hover:not(:disabled, [aria-disabled="true"]) {
+    background: var(--hk-bg-2);
+  }
+  .hk-button[data-variant="primary"]:hover:not(:disabled, [aria-disabled="true"]) {
+    background: var(--hk-fg);
+    opacity: 0.9;
+  }
 }
-.hk-button:disabled {
+.hk-button:active:not(:disabled, [aria-disabled="true"]) {
+  background: var(--hk-bg-3);
+  transform: scale(0.98);
+}
+.hk-button[data-variant="primary"]:active:not(:disabled, [aria-disabled="true"]) {
+  background: var(--hk-fg);
+  opacity: 0.8;
+}
+.hk-button:is(:disabled, [aria-disabled="true"]) {
   opacity: 0.5;
   cursor: default;
+}
+.hk-button[aria-disabled="true"] {
+  cursor: progress;
 }
 .hk-button svg {
   width: var(--hk-icon-size);
@@ -1195,7 +1241,7 @@ html {
   position: absolute;
   inset: 0;
   background: linear-gradient(90deg, transparent, var(--hk-bg-2), transparent);
-  animation: hk-skeleton 1.4s infinite;
+  animation: hk-skeleton 1.8s linear infinite;
 }
 @keyframes hk-skeleton {
   from {
@@ -1207,7 +1253,9 @@ html {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hk-root * {
+  .hk-root *,
+  .hk-root *::before,
+  .hk-root *::after {
     transition: none !important;
     animation: none !important;
   }
@@ -1279,5 +1327,35 @@ html {
   }
   .hk-title-row > .hk-title {
     flex-basis: 100%;
+  }
+}
+
+@media (pointer: coarse) {
+  .hk-input,
+  .hk-textarea {
+    font-size: 16px;
+  }
+  .hk-button,
+  .hk-input {
+    height: 44px;
+  }
+  .hk-nav a {
+    padding-block: var(--hk-space-3);
+  }
+  .hk-menu > summary {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+  }
+  .hk-menu-panel > * {
+    min-height: 44px;
+  }
+  .hk-review-control {
+    min-height: 44px;
+  }
+  .hk-table-wrap,
+  .ld-term,
+  .ld-scroll {
+    overscroll-behavior: contain;
   }
 }
