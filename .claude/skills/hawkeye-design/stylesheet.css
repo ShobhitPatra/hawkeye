@@ -1342,10 +1342,6 @@ html {
   .hk-topbar .hk-status {
     display: none;
   }
-  .hk-nav {
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
   .hk-menu {
     position: static;
   }
@@ -1354,6 +1350,8 @@ html {
   }
   .hk-nav {
     gap: var(--hk-space-3);
+    overflow-x: auto;
+    scrollbar-width: none;
   }
   .hk-headline {
     font-size: var(--hk-type-display);
