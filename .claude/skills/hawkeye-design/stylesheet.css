@@ -135,6 +135,11 @@
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
+html[data-theme-switching] .hk-root *,
+html[data-theme-switching] .hk-root *::before,
+html[data-theme-switching] .hk-root *::after {
+  transition: none !important;
+}
 .hk-root *,
 .hk-root *::before,
 .hk-root *::after {

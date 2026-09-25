@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { type Theme, THEME_COOKIE, THEMES, themeAttribute } from "@/theme";
+import { type Theme, THEME_COLORS, THEME_COOKIE, THEMES, themeAttribute } from "@/theme";
 
 const LABELS: Record<Theme, string> = { light: "Light", dark: "Dark", system: "System" };
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
@@ -11,8 +11,15 @@ export function ThemeChoice({ theme }: { theme: Theme }) {
   const choose = (next: Theme) => {
     setCurrent(next);
     const attribute = themeAttribute(next);
-    if (attribute) document.documentElement.dataset.theme = attribute;
-    else delete document.documentElement.dataset.theme;
+    const root = document.documentElement;
+    root.dataset.themeSwitching = "";
+    if (attribute) root.dataset.theme = attribute;
+    else delete root.dataset.theme;
+    requestAnimationFrame(() => requestAnimationFrame(() => delete root.dataset.themeSwitching));
+    document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((meta) => {
+      const scheme = meta.media.includes("dark") ? "dark" : "light";
+      meta.content = THEME_COLORS[attribute ?? scheme];
+    });
     const secure = location.protocol === "https:" ? "; secure" : "";
     document.cookie = `${THEME_COOKIE}=${next}; path=/; max-age=${COOKIE_MAX_AGE_SECONDS}; samesite=lax${secure}`;
   };
