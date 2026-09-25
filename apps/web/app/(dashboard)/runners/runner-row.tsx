@@ -7,7 +7,15 @@ import { revokeRunnerAction } from "./actions";
 function RevokeSubmit() {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" className="hk-button" data-variant="primary" disabled={pending}>
+    <button
+      type="submit"
+      className="hk-button"
+      data-variant="primary"
+      aria-disabled={pending}
+      onClick={(event) => {
+        if (pending) event.preventDefault();
+      }}
+    >
       {pending ? "Revoking" : "Revoke"}
     </button>
   );
