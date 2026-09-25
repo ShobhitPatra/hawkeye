@@ -26,12 +26,17 @@ export const metadata = {
   },
 };
 
-export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: THEME_COLORS.light },
-    { media: "(prefers-color-scheme: dark)", color: THEME_COLORS.dark },
-  ],
-};
+export async function generateViewport(): Promise<Viewport> {
+  const chosen = themeAttribute(parseTheme((await cookies()).get(THEME_COOKIE)?.value));
+  return {
+    themeColor: chosen
+      ? THEME_COLORS[chosen]
+      : [
+          { media: "(prefers-color-scheme: light)", color: THEME_COLORS.light },
+          { media: "(prefers-color-scheme: dark)", color: THEME_COLORS.dark },
+        ],
+  };
+}
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
