@@ -1,16 +1,14 @@
 "use client";
 
-import { useActionState } from "react";
 import { MAX_QUIET_WINDOW_SECONDS, type ReviewSettings } from "@/review-settings";
-import { type SaveState, saveReviewSettingsAction } from "./actions";
+import { useFormAction } from "../use-form-action";
+import { saveReviewSettingsAction } from "./actions";
+import { SaveRow } from "./save-row";
 
 export function ReviewsForm({ settings }: { settings: ReviewSettings }) {
-  const [state, formAction, pending] = useActionState<SaveState, FormData>(
-    saveReviewSettingsAction,
-    {},
-  );
+  const form = useFormAction(saveReviewSettingsAction, {});
   return (
-    <form action={formAction} className="hk-section">
+    <form onSubmit={form.onSubmit} onInput={form.onInput} className="hk-section" noValidate>
       <div className="hk-choice" data-stack>
         <label>
           <input type="checkbox" name="autoReview" defaultChecked={settings.autoReview} />
@@ -42,15 +40,7 @@ export function ReviewsForm({ settings }: { settings: ReviewSettings }) {
           0 reviews each push at once. A wait lets a burst of pushes become one review.
         </p>
       </div>
-      <div className="hk-action-row">
-        <button type="submit" className="hk-button" data-variant="primary" disabled={pending}>
-          Save
-        </button>
-        <span>
-          {state.error ??
-            (state.saved ? "Saved. Applies from the next pull request event." : undefined)}
-        </span>
-      </div>
+      <SaveRow form={form} saved="Saved. Applies from the next pull request event." />
     </form>
   );
 }

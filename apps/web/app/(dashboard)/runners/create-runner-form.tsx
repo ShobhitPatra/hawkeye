@@ -1,24 +1,25 @@
 "use client";
 
-import { useActionState } from "react";
-import { type CreateRunnerState, createRunnerAction } from "./actions";
+import { useFormAction } from "../use-form-action";
+import { createRunnerAction } from "./actions";
 import { TokenShown } from "./token-shown";
 
 export function CreateRunnerForm({ controlPlaneUrl }: { controlPlaneUrl: string }) {
-  const [state, formAction, pending] = useActionState<CreateRunnerState, FormData>(
-    createRunnerAction,
-    {},
-  );
+  const { state, pending, onSubmit } = useFormAction(createRunnerAction, {});
 
   if (state.token) return <TokenShown token={state.token} controlPlaneUrl={controlPlaneUrl} />;
   return (
     <div className="hk-section">
-      <form action={formAction} className="hk-form-row">
+      <form onSubmit={onSubmit} className="hk-form-row">
         <input
           className="hk-input"
           name="name"
           placeholder="Runner name, for example vps-hetzner"
           aria-label="Runner name"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="done"
         />
         <button type="submit" className="hk-button" disabled={pending}>
           Create

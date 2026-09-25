@@ -1,18 +1,21 @@
 "use client";
 
-import { useActionState } from "react";
-import { type ApproveRunnerLoginState, approveRunnerLoginAction } from "./actions";
+import { useFormAction } from "../use-form-action";
+import { approveRunnerLoginAction } from "./actions";
 
 export type LoginCodeState =
   | { state: "pending"; runnerName: string; requested: string }
   | { state: "approved"; runnerName: string }
   | { state: "expired" };
 
-export function ApproveLoginForm({ code }: { code?: LoginCodeState }) {
-  const [state, formAction, pending] = useActionState<ApproveRunnerLoginState, FormData>(
-    approveRunnerLoginAction,
-    {},
-  );
+export function ApproveLoginForm({
+  code,
+  prefill = "",
+}: {
+  code?: LoginCodeState;
+  prefill?: string;
+}) {
+  const { state, pending, onSubmit } = useFormAction(approveRunnerLoginAction, {});
 
   if (state.runnerName)
     return (
@@ -26,13 +29,19 @@ export function ApproveLoginForm({ code }: { code?: LoginCodeState }) {
 
   return (
     <>
-      <form action={formAction} className="hk-form-row">
+      <form onSubmit={onSubmit} className="hk-form-row">
         <input
           className="hk-input hk-mono"
           name="code"
           placeholder="XXXX-XXXX"
           aria-label="Login code"
           autoComplete="off"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="go"
+          defaultValue={prefill}
+          autoFocus={prefill === ""}
         />
         <button type="submit" className="hk-button" data-variant="primary" disabled={pending}>
           Approve

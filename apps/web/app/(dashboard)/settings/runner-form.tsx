@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import {
   CONCURRENCY_RANGE,
   HARNESSES,
@@ -10,17 +10,16 @@ import {
   type RunnerSettings,
   WALL_CLOCK_MINUTES_RANGE,
 } from "@/review-settings";
-import { type SaveState, saveRunnerSettingsAction } from "./actions";
+import { useFormAction } from "../use-form-action";
+import { saveRunnerSettingsAction } from "./actions";
+import { SaveRow } from "./save-row";
 
 export function RunnerForm({ settings }: { settings: RunnerSettings }) {
-  const [state, formAction, pending] = useActionState<SaveState, FormData>(
-    saveRunnerSettingsAction,
-    {},
-  );
+  const form = useFormAction(saveRunnerSettingsAction, {});
   const retired = settings.model !== null && !isModelChoice(settings.model);
   const [harness, setHarness] = useState(settings.harness);
   return (
-    <form action={formAction} className="hk-section">
+    <form onSubmit={form.onSubmit} onInput={form.onInput} className="hk-section" noValidate>
       <fieldset className="hk-choice" data-stack>
         <legend className="hk-compact">Harness</legend>
         {HARNESSES.map((choice) => (
@@ -85,65 +84,67 @@ export function RunnerForm({ settings }: { settings: RunnerSettings }) {
       )}
       <div className="hk-field">
         <label htmlFor="max-turns">Turns per review</label>
-        <input
-          className="hk-input"
-          id="max-turns"
-          name="maxTurns"
-          type="number"
-          inputMode="numeric"
-          required
-          min={MAX_TURNS_RANGE.min}
-          max={MAX_TURNS_RANGE.max}
-          step={1}
-          defaultValue={settings.maxTurns}
-        />
+        <div className="hk-form-row">
+          <input
+            className="hk-input"
+            id="max-turns"
+            name="maxTurns"
+            type="number"
+            inputMode="numeric"
+            required
+            min={MAX_TURNS_RANGE.min}
+            max={MAX_TURNS_RANGE.max}
+            step={1}
+            defaultValue={settings.maxTurns}
+          />
+          <span className="hk-compact hk-muted">turns</span>
+        </div>
         <p className="hk-help">
           A review that reaches this many turns stops and reports max turns.
         </p>
       </div>
       <div className="hk-field">
         <label htmlFor="wall-clock">Minutes per review</label>
-        <input
-          className="hk-input"
-          id="wall-clock"
-          name="wallClockMinutes"
-          type="number"
-          inputMode="numeric"
-          required
-          min={WALL_CLOCK_MINUTES_RANGE.min}
-          max={WALL_CLOCK_MINUTES_RANGE.max}
-          step={1}
-          defaultValue={settings.wallClockMinutes}
-        />
+        <div className="hk-form-row">
+          <input
+            className="hk-input"
+            id="wall-clock"
+            name="wallClockMinutes"
+            type="number"
+            inputMode="numeric"
+            required
+            min={WALL_CLOCK_MINUTES_RANGE.min}
+            max={WALL_CLOCK_MINUTES_RANGE.max}
+            step={1}
+            defaultValue={settings.wallClockMinutes}
+          />
+          <span className="hk-compact hk-muted">minutes</span>
+        </div>
         <p className="hk-help">A review that runs longer stops and reports a timeout.</p>
       </div>
       <div className="hk-field">
         <label htmlFor="concurrency">Reviews at once</label>
-        <input
-          className="hk-input"
-          id="concurrency"
-          name="concurrency"
-          type="number"
-          inputMode="numeric"
-          required
-          min={CONCURRENCY_RANGE.min}
-          max={CONCURRENCY_RANGE.max}
-          step={1}
-          defaultValue={settings.concurrency}
-        />
+        <div className="hk-form-row">
+          <input
+            className="hk-input"
+            id="concurrency"
+            name="concurrency"
+            type="number"
+            inputMode="numeric"
+            required
+            min={CONCURRENCY_RANGE.min}
+            max={CONCURRENCY_RANGE.max}
+            step={1}
+            defaultValue={settings.concurrency}
+          />
+          <span className="hk-compact hk-muted">at once</span>
+        </div>
         <p className="hk-help">
           How many reviews the runner runs at the same time, up to three. Each one spends your plan,
           so more at once reaches its limits sooner.
         </p>
       </div>
-      <div className="hk-action-row">
-        <button type="submit" className="hk-button" data-variant="primary" disabled={pending}>
-          Save
-        </button>
-        <span>
-          {state.error ?? (state.saved ? "Saved. Applies from the next claim." : undefined)}
-        </span>
-      </div>
+      <SaveRow form={form} saved="Saved. Applies from the next claim." />
     </form>
   );
 }
