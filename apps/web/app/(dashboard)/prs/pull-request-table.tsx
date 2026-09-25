@@ -95,6 +95,7 @@ export function PullRequestTable({
                     <span className="hk-metadata">
                       {pullRequest.owner}/{pullRequest.repo}{" "}
                       <span className="hk-mono">#{pullRequest.number}</span>
+                      {!isArmed && " · on GitHub"}
                     </span>
                   </div>
                 </td>
