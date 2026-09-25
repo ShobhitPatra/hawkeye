@@ -821,9 +821,16 @@ html {
   white-space: nowrap;
 }
 .hk-review-next,
-.hk-review-control[data-pending] .hk-review-word,
 .hk-review-control:not([data-pending]) > .hk-status {
   visibility: hidden;
+}
+.hk-review-control[data-pending] .hk-review-word {
+  animation: hk-vanish 1ms linear 300ms forwards;
+}
+@keyframes hk-vanish {
+  to {
+    visibility: hidden;
+  }
 }
 .hk-review-control:not([data-pending], [data-settled]):focus-visible .hk-review-word {
   visibility: hidden;
@@ -1349,6 +1356,9 @@ html {
   .hk-progress,
   .hk-review-control[data-pending] > .hk-status {
     opacity: 1;
+  }
+  .hk-review-control[data-pending] .hk-review-word {
+    visibility: hidden;
   }
   .hk-progress::after {
     width: 100%;
