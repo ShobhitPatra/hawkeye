@@ -13,21 +13,25 @@
 }
 .ld-try {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--hk-space-3) var(--hk-space-4);
-  align-items: center;
+  flex-direction: column;
+  gap: var(--hk-space-2);
   font-size: var(--hk-type-compact);
   line-height: var(--hk-leading-compact);
   color: var(--hk-fg-2);
 }
-.ld-try code {
-  font-family: var(--hk-font-mono);
-  color: var(--hk-fg);
-  background: var(--hk-bg-2);
-  border: 1px solid var(--hk-line);
-  border-radius: var(--hk-radius-control);
-  padding: 2px 8px;
-  white-space: nowrap;
+.ld-try .hk-code-row {
+  max-width: 44ch;
+}
+.ld-try .hk-code {
+  padding-block: var(--hk-space-1);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow-x: hidden;
+}
+.ld-try .hk-copy {
+  top: 0;
+  right: 2px;
+  height: 26px;
 }
 .ld-cap {
   font-size: var(--hk-type-compact);
@@ -83,13 +87,29 @@
   transition: color var(--hk-duration) var(--hk-ease);
 }
 .ld-flow span[data-on] {
+  color: var(--hk-fg-2);
+}
+.ld-flow span[data-current] {
   color: var(--hk-fg);
 }
 .ld-flow i {
   flex: none;
+  position: relative;
   width: 24px;
   height: 1px;
   background: var(--hk-line-2);
+}
+.ld-flow i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--hk-fg-2);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.ld-flow i[data-fill]::after {
+  transform: scaleX(1);
+  transition: transform var(--ld-fill, 0ms) linear;
 }
 
 .ld-stage {
@@ -526,7 +546,8 @@
 @media (prefers-reduced-motion: reduce) {
   .ld-rot > span,
   .ld-term-line,
-  .ld-flow span {
+  .ld-flow span,
+  .ld-flow i::after {
     transition: none;
   }
 }

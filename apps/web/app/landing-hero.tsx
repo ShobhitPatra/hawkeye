@@ -16,6 +16,7 @@ import { LANDING_REVIEW } from "@/landing-review";
 import { Mark } from "./mark";
 
 const ACTS = ["Open a pull request", "The review runs on your machine", "The review is posted"];
+const CONNECTOR_FILL_MS = [HERO_ACTS.machine, HERO_ACTS.posted - HERO_ACTS.machine];
 const review = LANDING_REVIEW;
 
 function ReplayIcon() {
@@ -106,6 +107,7 @@ export function LandingHero() {
     if (!hero) return;
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const flow = Array.from(hero.querySelectorAll<HTMLElement>("[data-flow] span"));
+    const connectors = Array.from(hero.querySelectorAll<HTMLElement>("[data-flow] i"));
     const acts = Array.from(hero.querySelectorAll<HTMLElement>("[data-act]"));
     const wait = hero.querySelector<HTMLElement>("[data-wait]")!;
     const md = hero.querySelector<HTMLElement>("[data-md]")!;
@@ -129,11 +131,19 @@ export function LandingHero() {
       timers.push(window.setTimeout(fn, ms));
     };
     const clearTimers = () => timers.splice(0).forEach(clearTimeout);
-    const light = (upTo: number) =>
+    const light = (upTo: number) => {
       flow.forEach((el, index) => {
         if (index <= upTo) el.setAttribute("data-on", "");
         else el.removeAttribute("data-on");
+        if (index === upTo) el.setAttribute("data-current", "");
+        else el.removeAttribute("data-current");
       });
+      connectors.forEach((el, index) => {
+        el.style.setProperty("--ld-fill", index === upTo ? `${CONNECTOR_FILL_MS[index]}ms` : "0ms");
+        if (index <= upTo) el.setAttribute("data-fill", "");
+        else el.removeAttribute("data-fill");
+      });
+    };
     const show = (name: string) =>
       acts.forEach((act) => {
         if (act.dataset.act === name) act.setAttribute("data-on", "");

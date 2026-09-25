@@ -734,6 +734,11 @@ html {
     opacity var(--hk-duration) var(--hk-ease),
     transform 120ms var(--hk-ease);
 }
+.hk-button[data-size="large"] {
+  height: 40px;
+  padding: 0 var(--hk-space-4);
+  font-size: var(--hk-type-body);
+}
 .hk-button[data-variant="primary"] {
   background: var(--hk-fg);
   color: var(--hk-on-fg);
