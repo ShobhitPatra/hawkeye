@@ -1,4 +1,4 @@
-import { CopyButton } from "../copy-button";
+import { CopyButton } from "../../copy-button";
 
 export function TokenShown({ token, controlPlaneUrl }: { token: string; controlPlaneUrl: string }) {
   const command = `npx hawkeye-review runner login --url ${controlPlaneUrl} --token ${token}`;

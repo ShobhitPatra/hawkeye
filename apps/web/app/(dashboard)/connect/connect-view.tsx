@@ -2,7 +2,7 @@ import { HAWKEYE_REPOSITORY_URL } from "@hawkeye/core";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { RunnerStatus } from "@/runner-status";
-import { CopyButton } from "../copy-button";
+import { CopyButton } from "../../copy-button";
 import { RunnerSentence } from "../runner-sentence";
 
 export function ConnectView({

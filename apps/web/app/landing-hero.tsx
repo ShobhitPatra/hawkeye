@@ -188,6 +188,10 @@ export function LandingHero() {
     };
     const play = () => {
       clearTimers();
+      connectors.forEach((el) => {
+        el.removeAttribute("data-fill");
+        void el.offsetWidth;
+      });
       light(0);
       show("pull-request");
       chip.hidden = true;

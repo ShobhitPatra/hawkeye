@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { HAWKEYE_REPOSITORY_URL } from "@hawkeye/core";
 import { localPath } from "@/local-path";
 import { getSession } from "@/session";
-import { CopyButton } from "./(dashboard)/copy-button";
+import { CopyButton } from "./copy-button";
 import { LandingHero } from "./landing-hero";
 import { RotatingWord } from "./rotating-word";
 import { SignInButton } from "./sign-in-button";
