@@ -26,6 +26,7 @@ const COPY_KEYS = /Mac|iPhone|iPad/.test(globalThis.navigator?.platform ?? "") ?
 
 export function CopyButton({ text }: { text: string }) {
   const [state, setState] = useState<"idle" | "copied" | "refused">("idle");
+  const button = useRef<HTMLButtonElement>(null);
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
   const settle = (next: "copied" | "refused") => {
@@ -33,21 +34,22 @@ export function CopyButton({ text }: { text: string }) {
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setState("idle"), 2000);
   };
-  const label =
-    state === "copied" ? "Copied" : state === "refused" ? `Press ${COPY_KEYS} to copy` : "Copy";
+  const outcome =
+    state === "copied" ? "Copied" : state === "refused" ? `Press ${COPY_KEYS} to copy` : "";
   return (
     <button
+      ref={button}
       type="button"
       className="hk-copy"
       data-state={state}
-      aria-label={label}
-      title={label}
-      onClick={async (event) => {
+      aria-label="Copy"
+      title="Copy"
+      onClick={async () => {
         try {
           await navigator.clipboard.writeText(text);
           settle("copied");
         } catch {
-          const code = event.currentTarget.previousElementSibling;
+          const code = button.current?.previousElementSibling;
           if (code) window.getSelection()?.selectAllChildren(code);
           settle("refused");
         }
@@ -56,7 +58,7 @@ export function CopyButton({ text }: { text: string }) {
       {state === "copied" ? <CheckIcon /> : <CopyIcon />}
       {state === "refused" && <span>{COPY_KEYS}</span>}
       <span role="status" className="hk-visually-hidden">
-        {state === "idle" ? "" : label}
+        {outcome}
       </span>
     </button>
   );
