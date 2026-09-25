@@ -196,7 +196,7 @@ Tables: `hk-table-header`, `hk-table-wrap`, `hk-table`, `hk-numeric`, `hk-cell-s
 
 Surfaces and states: `hk-surface`, `hk-disclosure`, `hk-rule`, `hk-state`, `hk-skeleton[data-rows]`.
 
-Tokens page CSS may read: `--hk-bg`, `--hk-bg-2`, `--hk-bg-3`, `--hk-fg`, `--hk-fg-2`, `--hk-fg-3`, `--hk-line`, `--hk-line-2`, `--hk-must`, `--hk-must-bg`, `--hk-warn`, `--hk-warn-bg`, `--hk-focus`, `--hk-on-fg`, `--hk-space-1` to `--hk-space-8`, `--hk-radius-control`, `--hk-radius-surface`, the `--hk-type-*`, `--hk-leading-*` and `--hk-weight-*` families, `--hk-measure`, `--hk-page-width`, `--hk-topbar-height`, `--hk-gutter-width`, `--hk-icon-size`, `--hk-icon-stroke`, `--hk-duration`, `--hk-ease`.
+Tokens page CSS may read: `--hk-bg`, `--hk-bg-2`, `--hk-bg-3`, `--hk-fg`, `--hk-fg-2`, `--hk-fg-3`, `--hk-line`, `--hk-line-2`, `--hk-must`, `--hk-must-bg`, `--hk-warn`, `--hk-warn-bg`, `--hk-focus`, `--hk-on-fg`, `--hk-space-1` to `--hk-space-8`, `--hk-radius-control`, `--hk-radius-surface`, the `--hk-type-*`, `--hk-leading-*` and `--hk-weight-*` families, `--hk-measure`, `--hk-page-width`, `--hk-topbar-height`, `--hk-gutter-width`, `--hk-icon-size`, `--hk-icon-stroke`, `--hk-duration`, `--hk-duration-enter`, `--hk-ease` (for motion), `--hk-ease-color` (for colour, background and opacity changes).
 
 ## Never
 
