@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { type MouseEvent, useRef, useState, useTransition } from "react";
 import type { PullRequestReference } from "@hawkeye/core";
 import { reviewControlWords } from "@/review-control-words";
 import { armAction, disarmAction } from "./actions";
@@ -16,12 +16,15 @@ export function ReviewControl({
 }) {
   const [expected, setExpected] = useState<{ from: boolean; to: boolean } | undefined>(undefined);
   const [failed, setFailed] = useState<string | undefined>(undefined);
+  const [settled, setSettled] = useState(false);
+  const hovered = useRef(false);
   const [pending, startTransition] = useTransition();
   if (expected !== undefined && reviewing !== expected.from) setExpected(undefined);
   const shown = expected?.to ?? reviewing;
   const words = reviewControlWords({ reviewing: shown, pending });
-  const toggle = () => {
+  const toggle = (event: MouseEvent<HTMLButtonElement>) => {
     if (pending) return;
+    const control = event.currentTarget;
     const next = !shown;
     setExpected({ from: reviewing, to: next });
     setFailed(undefined);
@@ -33,6 +36,7 @@ export function ReviewControl({
       form.set("installationId", installationId);
       try {
         await (next ? armAction : disarmAction)(form);
+        if (hovered.current || control.matches(":focus-visible")) setSettled(true);
       } catch {
         setFailed(next ? "Could not start. Try again." : "Could not pause. Try again.");
         setExpected(undefined);
@@ -46,21 +50,30 @@ export function ReviewControl({
         className="hk-review-control"
         data-on={shown ? "" : undefined}
         data-pending={pending ? "" : undefined}
+        data-settled={settled ? "" : undefined}
         aria-pressed={shown}
         aria-disabled={pending}
+        aria-label={`${words.word}: reviews for ${reference.owner}/${reference.repo} #${reference.number}`}
         onClick={toggle}
+        onPointerEnter={() => {
+          hovered.current = true;
+        }}
+        onPointerLeave={() => {
+          hovered.current = false;
+          setSettled(false);
+        }}
+        onBlur={() => setSettled(false)}
       >
         <i />
-        {words.pending ? (
-          <span className="hk-status" data-state="running">
-            {words.word}
-          </span>
-        ) : (
-          <>
-            <span className="hk-review-word">{words.word}</span>
-            <span className="hk-review-next">{words.next}</span>
-          </>
-        )}
+        <span className="hk-review-word" aria-hidden="true">
+          {pending ? "" : words.word}
+        </span>
+        <span className="hk-review-next" aria-hidden="true">
+          {pending ? "" : words.next}
+        </span>
+        <span className="hk-status" data-state="running" aria-hidden="true">
+          {pending ? words.word : ""}
+        </span>
       </button>
       {failed && <span className="hk-metadata">{failed}</span>}
     </span>
