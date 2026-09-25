@@ -66,7 +66,7 @@ export function ReviewControl({
       >
         <i />
         <span className="hk-review-word" aria-hidden="true">
-          {pending ? "" : words.word}
+          {words.word}
         </span>
         <span className="hk-review-next" aria-hidden="true">
           {pending ? "" : words.next}
