@@ -3,15 +3,7 @@
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef } from "react";
 
-export function Menu({
-  summary,
-  children,
-  icon,
-}: {
-  summary: ReactNode;
-  children: ReactNode;
-  icon?: boolean;
-}) {
+export function Menu({ summary, children }: { summary: ReactNode; children: ReactNode }) {
   const details = useRef<HTMLDetailsElement>(null);
   const pathname = usePathname();
   useEffect(() => {
@@ -39,7 +31,7 @@ export function Menu({
     };
   }, []);
   return (
-    <details className="hk-menu" data-icon={icon ? "" : undefined} ref={details}>
+    <details className="hk-menu" ref={details}>
       {summary}
       <div className="hk-menu-panel">{children}</div>
     </details>

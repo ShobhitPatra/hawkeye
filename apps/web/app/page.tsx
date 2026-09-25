@@ -25,7 +25,7 @@ export default async function HomePage({
   const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
   return (
     <>
-      <SiteHeader theme={theme} signedIn={false} {...signIn} />
+      <SiteHeader signedIn={false} {...signIn} />
       <main className="hk-page ld">
         <section className="ld-lead">
           <h1 className="hk-headline">Code review on your own Claude or Codex plan.</h1>
@@ -139,7 +139,7 @@ export default async function HomePage({
           </div>
         </section>
 
-        <SiteFooter />
+        <SiteFooter theme={theme} />
       </main>
     </>
   );

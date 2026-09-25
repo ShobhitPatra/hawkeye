@@ -6,7 +6,7 @@ import { type Theme, THEME_COLORS, THEME_COOKIE, THEMES, themeAttribute } from "
 const LABELS: Record<Theme, string> = { light: "Light", dark: "Dark", system: "System" };
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
-export function ThemeChoice({ theme }: { theme: Theme }) {
+export function ThemeChoice({ theme, variant }: { theme: Theme; variant?: "footer" }) {
   const [current, setCurrent] = useState(theme);
   const choose = (next: Theme) => {
     setCurrent(next);
@@ -24,8 +24,10 @@ export function ThemeChoice({ theme }: { theme: Theme }) {
     document.cookie = `${THEME_COOKIE}=${next}; path=/; max-age=${COOKIE_MAX_AGE_SECONDS}; samesite=lax${secure}`;
   };
   return (
-    <fieldset className="hk-choice hk-menu-theme">
-      <legend>Theme</legend>
+    <fieldset
+      className={variant === "footer" ? "hk-choice hk-footer-theme" : "hk-choice hk-menu-theme"}
+    >
+      <legend className={variant === "footer" ? "hk-visually-hidden" : undefined}>Theme</legend>
       {THEMES.map((option) => (
         <label key={option}>
           <input
