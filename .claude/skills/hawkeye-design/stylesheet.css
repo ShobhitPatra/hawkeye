@@ -849,7 +849,9 @@ html {
 }
 .hk-review-control[data-pending] > .hk-status {
   opacity: 0;
-  animation: hk-appear 1ms linear 300ms forwards;
+  animation:
+    hk-appear 1ms linear 300ms forwards,
+    hk-shimmer 1.8s linear infinite;
 }
 .hk-review-control[data-pending] {
   cursor: progress;
@@ -1343,6 +1345,10 @@ html {
   .hk-status[data-state="running"] {
     background: none;
     -webkit-text-fill-color: currentColor;
+  }
+  .hk-progress,
+  .hk-review-control[data-pending] > .hk-status {
+    opacity: 1;
   }
   .hk-progress::after {
     width: 100%;
