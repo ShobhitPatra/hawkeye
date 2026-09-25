@@ -1348,6 +1348,8 @@ html {
     justify-content: center;
   }
   .hk-menu-panel > * {
+    display: flex;
+    align-items: center;
     min-height: 44px;
   }
   .hk-review-control {
