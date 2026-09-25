@@ -51,9 +51,10 @@ export function ReviewControl({
         data-settled={settled ? "" : undefined}
         aria-pressed={shown}
         aria-disabled={pending}
-        aria-label={`Reviews for ${reference.owner}/${reference.repo} #${reference.number}`}
+        aria-label={`${words.word}: reviews for ${reference.owner}/${reference.repo} #${reference.number}`}
         onClick={toggle}
         onPointerLeave={() => setSettled(false)}
+        onBlur={() => setSettled(false)}
       >
         <i />
         <span className="hk-review-word" aria-hidden="true">
