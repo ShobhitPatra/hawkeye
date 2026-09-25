@@ -150,7 +150,7 @@ export function PullRequestView({
       )}
 
       {latest?.status === "ok" && note && (
-        <div className="hk-state hk-arrive">
+        <div key={note.kind} className="hk-state hk-arrive">
           <p>
             <span className="hk-status" data-state="attention">
               {note.kind === "short-form" ? "Posted short" : "Not posted"}
