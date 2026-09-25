@@ -215,9 +215,12 @@ export function LandingHero() {
     };
     body.addEventListener("scroll", markEnd);
     const replay = hero.querySelector<HTMLButtonElement>("[data-replay]")!;
-    const onReplay = reduce ? finish : play;
-    replay.addEventListener("click", onReplay);
     let observer: IntersectionObserver | undefined;
+    const onReplay = () => {
+      observer?.disconnect();
+      (reduce ? finish : play)();
+    };
+    replay.addEventListener("click", onReplay);
     if (reduce) finish();
     else {
       observer = new IntersectionObserver(
