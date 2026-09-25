@@ -31,7 +31,7 @@ import { type ProgressLine, shortenHome, type TerminalStyle } from "./terminal.j
 import { createControlPlaneClient } from "./runner/client.js";
 import { deviceLogin } from "./runner/device-login.js";
 import { assertControlPlaneUrl, loadRunnerConfig, writeRunnerConfig } from "./runner/config.js";
-import { runRunnerLoop } from "./runner/loop.js";
+import { runRunnerLoop, watchClock } from "./runner/loop.js";
 
 const CONFIG_PATH = join(homedir(), ".config", "hawkeye", "config.json");
 const RUNNER_CONFIG_PATH = join(homedir(), ".config", "hawkeye", "runner.json");
@@ -275,6 +275,7 @@ export function createProgram(io: {
         process.once("SIGINT", onSignal);
         process.once("SIGTERM", onSignal);
         terminal.report({ state: "polling", detail: config.controlPlaneUrl });
+        const stopClock = watchClock(terminal.report);
         try {
           await runRunnerLoop(
             {
@@ -300,6 +301,7 @@ export function createProgram(io: {
             { once: options.once },
           );
         } finally {
+          stopClock();
           process.off("SIGINT", onSignal);
           process.off("SIGTERM", onSignal);
         }

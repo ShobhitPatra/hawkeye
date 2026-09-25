@@ -19,6 +19,8 @@ export const ONCE_CLAIM_ATTEMPTS = 3;
 export const DEFAULT_CONCURRENCY = 1;
 export const PLAN_LIMIT_PAUSE_MS = 60_000;
 export const PLAN_LIMIT_PAUSE_CAP_MS = 16 * 60_000;
+export const CLOCK_CHECK_INTERVAL_MS = 15_000;
+export const SLEEP_GAP_MS = 60_000;
 
 export type JobOutcome = {
   delivery: "delivered" | "dropped" | "undelivered";
@@ -67,6 +69,29 @@ function sleepFor(milliseconds: number, signal?: AbortSignal): Promise<void> {
     }
     signal?.addEventListener("abort", done, { once: true });
   });
+}
+
+export function sleptFor(lastTick: number, now: number, intervalMs: number): number | undefined {
+  return now - lastTick - intervalMs > SLEEP_GAP_MS ? now - lastTick : undefined;
+}
+
+export function watchClock(
+  report: RunnerLoopDependencies["report"],
+  intervalMs = CLOCK_CHECK_INTERVAL_MS,
+): () => void {
+  let lastTick = Date.now();
+  const clock = setInterval(() => {
+    const now = Date.now();
+    const slept = sleptFor(lastTick, now, intervalMs);
+    lastTick = now;
+    if (slept !== undefined)
+      report({
+        state: "waiting",
+        detail: `the machine was asleep for ${Math.round(slept / 60_000)} min; claiming again`,
+      });
+  }, intervalMs);
+  clock.unref();
+  return () => clearInterval(clock);
 }
 
 function isAbort(error: unknown): boolean {

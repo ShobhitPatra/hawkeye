@@ -6,7 +6,14 @@ import type { AddressInfo } from "node:net";
 import type { ClaimedJob, HarnessResult, HarnessSpec } from "@hawkeye/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createControlPlaneClient } from "./client.js";
-import { type RunnerEvent, runRunnerLoop, type RunnerLoopDependencies } from "./loop.js";
+import {
+  type RunnerEvent,
+  runRunnerLoop,
+  type RunnerLoopDependencies,
+  SLEEP_GAP_MS,
+  sleptFor,
+  watchClock,
+} from "./loop.js";
 
 const LENSES = ["intent", "behavior", "blast_radius", "verification", "fit", "hygiene"];
 const review = {
@@ -865,5 +872,35 @@ describe("runRunnerLoop", () => {
     await runRunnerLoop(d);
     expect(calls).toBe(3);
     expect(sleeps).toEqual([250, 250, 250]);
+  });
+});
+
+describe("sleptFor", () => {
+  it("reports a tick that lands far later than scheduled and ignores ordinary jitter", () => {
+    const interval = 15_000;
+    expect(sleptFor(0, interval + 2_000, interval)).toBeUndefined();
+    expect(sleptFor(0, interval + SLEEP_GAP_MS, interval)).toBeUndefined();
+    expect(sleptFor(0, interval + SLEEP_GAP_MS + 1, interval)).toBe(interval + SLEEP_GAP_MS + 1);
+    expect(sleptFor(1_000, 1_000 + 5 * 60_000, interval)).toBe(5 * 60_000);
+  });
+});
+
+describe("watchClock", () => {
+  it("says how long the machine slept when a tick lands late", () => {
+    vi.useFakeTimers();
+    try {
+      const reported: RunnerEvent[] = [];
+      const stop = watchClock((event) => reported.push(event), 15_000);
+      vi.advanceTimersByTime(15_000);
+      expect(reported).toEqual([]);
+      vi.setSystemTime(Date.now() + 5 * 60_000);
+      vi.advanceTimersByTime(15_000);
+      expect(reported).toEqual([
+        { state: "waiting", detail: "the machine was asleep for 5 min; claiming again" },
+      ]);
+      stop();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
