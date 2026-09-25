@@ -95,7 +95,7 @@ Confirming an action is a state word changing, with at most a 160ms color transi
 
 ### Formats
 
-- Times: relative under 24 hours ("4 min ago"), then an absolute date ("28 Aug 2026").
+- Times: relative under 24 hours ("4 min ago"), then an absolute date ("28 Aug 2026") taken in UTC, so the server and the browser render the same string; near midnight it can differ from the viewer's local date by a day.
 - Durations: `6m 12s`, mono, tabular figures.
 - Heads: 7 characters, mono. Pull requests: `#2519`, mono. Turns: plain integer, right-aligned.
 - Paths: mono; when they must truncate, from the left so the filename survives (`.hk-path`).
