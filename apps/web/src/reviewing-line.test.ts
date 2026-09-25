@@ -57,7 +57,9 @@ describe("reviewing block", () => {
 
   it("renders an animated badge that escapes the runner name", () => {
     const svg = reviewingBadgeSvg('la<p>top"');
-    expect(svg).toContain("<animateTransform");
+    expect(svg).toContain("prefers-reduced-motion: no-preference");
+    expect(svg).toContain("@keyframes sweep");
+    expect(svg).not.toContain("<animateTransform");
     expect(svg).toContain("Reviewing on la&#60;p&#62;top&#34;");
     expect(svg).not.toContain("<p>");
   });
