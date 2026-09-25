@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { type ReactNode, Suspense } from "react";
 import { formatUpdated } from "@/format-updated";
 import { dayKey, type Overview, type RecentReview, type Totals, yearDays } from "@/overview";
 import { verdictLabel } from "@/run-format";
@@ -22,7 +22,27 @@ function level(count: number): number {
   return 4;
 }
 
-export function RecentReviews({ recent, now }: { recent: RecentReview[]; now: Date }) {
+async function ReviewTitle({
+  review,
+  titles,
+}: {
+  review: RecentReview;
+  titles: Promise<RecentReview[]>;
+}) {
+  const titled = (await titles).find((candidate) => candidate.armedPrId === review.armedPrId);
+  if (titled?.title === undefined) return null;
+  return <>{titled.title}</>;
+}
+
+export function RecentReviews({
+  recent,
+  titles,
+  now,
+}: {
+  recent: RecentReview[];
+  titles: Promise<RecentReview[]>;
+  now: Date;
+}) {
   if (recent.length === 0) return null;
   return (
     <section className="hk-section" aria-labelledby="recent">
@@ -49,7 +69,11 @@ export function RecentReviews({ recent, now }: { recent: RecentReview[]; now: Da
                 <td>
                   <div className="hk-cell-stack">
                     <Link href={`/prs/${review.owner}/${review.repo}/${review.number}`}>
-                      {review.title ?? `${review.owner}/${review.repo} #${review.number}`}
+                      {review.title ?? (
+                        <Suspense fallback={`${review.owner}/${review.repo} #${review.number}`}>
+                          <ReviewTitle review={review} titles={titles} />
+                        </Suspense>
+                      )}
                     </Link>
                     <span className="hk-metadata">
                       {review.owner}/{review.repo} <span className="hk-mono">#{review.number}</span>
