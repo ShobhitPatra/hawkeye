@@ -1225,6 +1225,12 @@ html {
 .hk-table td.hk-numeric {
   text-align: right;
 }
+.hk-table tbody th {
+  font-weight: var(--hk-weight-regular);
+  color: var(--hk-fg);
+  border-bottom-color: var(--hk-line);
+  vertical-align: baseline;
+}
 .hk-table a:focus-visible {
   color: var(--hk-fg-2);
 }
