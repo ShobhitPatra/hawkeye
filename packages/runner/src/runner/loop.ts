@@ -119,6 +119,7 @@ async function reportFor(
   deps: RunnerLoopDependencies,
   runDirectory: string,
   signal: AbortSignal,
+  inFlight: Set<Promise<void>>,
 ): Promise<RunResultReport> {
   const { job, pullRequest } = claimed;
   const contractOverride = deps.contractOverride ?? claimed.settings.promptOverride;
@@ -150,11 +151,13 @@ async function reportFor(
       readRepositoryRules: deps.readRepositoryRules,
       log: (line) => deps.log(line, runDirectory),
       onTurn: () => {
-        deps.client
+        const sent = deps.client
           .sendEvents(job.runId, [{ type: "turn", at: new Date().toISOString() }])
           .catch((error: Error) =>
             deps.report({ state: "waiting", detail: `turn event not sent: ${error.message}` }),
-          );
+          )
+          .finally(() => inFlight.delete(sent));
+        inFlight.add(sent);
       },
     },
   );
@@ -286,16 +289,18 @@ export async function runJob(
   }, deps.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS);
   let report: RunResultReport;
   let runDirectory: string | undefined;
+  const inFlight = new Set<Promise<void>>();
   try {
     runDirectory = await deps.createRunDirectory(pullRequest);
     deps.report({ state: "reviewing", runDirectory });
-    report = await reportFor(claimed, deps, runDirectory, control.signal);
+    report = await reportFor(claimed, deps, runDirectory, control.signal, inFlight);
   } catch (error) {
     report = { status: "error", turns: 0, error: (error as Error).message };
   } finally {
     clearInterval(heartbeat);
     options.superseded?.removeEventListener("abort", supersede);
   }
+  await Promise.all(inFlight);
   const durationMs = Date.now() - startedAt;
   if (report.status !== "ok" && report.status !== "superseded")
     deps.report({

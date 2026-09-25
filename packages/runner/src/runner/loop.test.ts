@@ -194,6 +194,25 @@ describe("runRunnerLoop", () => {
     expect(harnessInput.wallClockMs).toBeLessThanOrEqual(60_000);
     expect(harnessInput.wallClockMs).toBeGreaterThan(59_000);
   });
+  it("delivers the result only after every turn event has been answered", async () => {
+    const answered: string[] = [];
+    const plane = await fakeControlPlane((received, response) => {
+      if (received.url.endsWith("/events")) {
+        setTimeout(() => {
+          answered.push("events");
+          json(response, 200, { ok: true });
+        }, 150);
+        return;
+      }
+      if (received.url.endsWith("/result")) answered.push("result");
+      scripted([claimedJob])(received, response);
+    });
+    servers.push(plane.server);
+    const d = await deps(plane.baseUrl);
+    await runRunnerLoop(d, { once: true });
+    expect(answered).toEqual(["events", "result"]);
+    expect(d.reported.filter((event) => event.state === "waiting")).toEqual([]);
+  });
   it("runs up to the job's concurrency at once and numbers the slots", async () => {
     const second: ClaimedJob = {
       ...claimedJob,
