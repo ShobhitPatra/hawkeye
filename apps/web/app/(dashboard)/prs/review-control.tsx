@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import type { PullRequestReference } from "@hawkeye/core";
 import { reviewControlWords } from "@/review-control-words";
 import { armAction, disarmAction } from "./actions";
@@ -17,6 +17,7 @@ export function ReviewControl({
   const [expected, setExpected] = useState<{ from: boolean; to: boolean } | undefined>(undefined);
   const [failed, setFailed] = useState<string | undefined>(undefined);
   const [settled, setSettled] = useState(false);
+  const hovered = useRef(false);
   const [pending, startTransition] = useTransition();
   if (expected !== undefined && reviewing !== expected.from) setExpected(undefined);
   const shown = expected?.to ?? reviewing;
@@ -34,7 +35,7 @@ export function ReviewControl({
       form.set("installationId", installationId);
       try {
         await (next ? armAction : disarmAction)(form);
-        setSettled(true);
+        if (hovered.current) setSettled(true);
       } catch {
         setFailed(next ? "Could not start. Try again." : "Could not pause. Try again.");
         setExpected(undefined);
@@ -53,7 +54,13 @@ export function ReviewControl({
         aria-disabled={pending}
         aria-label={`${words.word}: reviews for ${reference.owner}/${reference.repo} #${reference.number}`}
         onClick={toggle}
-        onPointerLeave={() => setSettled(false)}
+        onPointerEnter={() => {
+          hovered.current = true;
+        }}
+        onPointerLeave={() => {
+          hovered.current = false;
+          setSettled(false);
+        }}
         onBlur={() => setSettled(false)}
       >
         <i />
