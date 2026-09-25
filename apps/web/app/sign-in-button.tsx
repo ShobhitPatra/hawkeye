@@ -6,9 +6,11 @@ import { authClient } from "@/auth-client";
 export function SignInButton({
   callbackURL = "/overview",
   variant,
+  size,
 }: {
   callbackURL?: string;
   variant?: "primary";
+  size?: "large";
 }) {
   const [transitioning, startTransition] = useTransition();
   const [leaving, setLeaving] = useState(false);
@@ -25,6 +27,7 @@ export function SignInButton({
       type="button"
       className="hk-button"
       data-variant={variant}
+      data-size={size}
       aria-disabled={pending}
       onClick={() => {
         if (pending) return;

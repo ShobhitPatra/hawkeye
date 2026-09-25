@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { HAWKEYE_REPOSITORY_URL } from "@hawkeye/core";
 import { localPath } from "@/local-path";
 import { getSession } from "@/session";
+import { CopyButton } from "./copy-button";
 import { LandingHero } from "./landing-hero";
 import { RotatingWord } from "./rotating-word";
 import { SignInButton } from "./sign-in-button";
@@ -10,6 +11,8 @@ import { CONTRIBUTING_URL, REVIEWS_URL, SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
 import { parseTheme, THEME_COOKIE } from "@/theme";
 import "./landing.css";
+
+const PREPARE_COMMAND = "npx hawkeye-review prepare <pr-url>";
 
 export default async function HomePage({
   searchParams,
@@ -35,11 +38,14 @@ export default async function HomePage({
             credentials in the cloud, and silence where the code is fine.
           </p>
           <div className="hk-actions">
-            <SignInButton {...signIn} variant="primary" />
+            <SignInButton {...signIn} variant="primary" size="large" />
           </div>
           <div className="ld-try">
             <span>Or try one review with no account:</span>
-            <code>npx hawkeye-review prepare &lt;pr-url&gt;</code>
+            <div className="hk-code-row">
+              <pre className="hk-code">{PREPARE_COMMAND}</pre>
+              <CopyButton text={PREPARE_COMMAND} />
+            </div>
           </div>
         </section>
 
