@@ -2,9 +2,10 @@ import { notFound } from "next/navigation";
 import { parsePullRequestParams } from "@/arm-input";
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
+import { assertAuthoredBy, assertPullRequestInInstallation } from "@/arm-guard";
 import { installationForOwner } from "@/installations";
 import { findArmedPullRequest, listFindingsForPullRequest, listRunsForPullRequest } from "@/runs";
-import { fillTitles, pullRequestTitles, titleKey } from "@/pull-request-titles";
+import { fillTitles } from "@/pull-request-titles";
 import { requireSession } from "@/session";
 import { PullRequestView } from "./pull-request-view";
 
@@ -22,9 +23,11 @@ export default async function PullRequestPage({
   }
   const db = getDb();
   const coordinates = { ...reference, userId: session.user.id };
-  const arm = await findArmedPullRequest(db, coordinates);
-  const installationId =
-    arm?.installationId ?? (await installationForOwner(db, session.user.id, reference.owner));
+  const [arm, liveInstallationId] = await Promise.all([
+    findArmedPullRequest(db, coordinates),
+    installationForOwner(db, session.user.id, reference.owner),
+  ]);
+  const installationId = liveInstallationId ?? arm?.installationId;
   if (installationId === undefined) notFound();
   const github = createGitHubAppClient({ fetch });
 
@@ -40,9 +43,7 @@ export default async function PullRequestPage({
             ...(arm.title === undefined ? {} : { title: arm.title }),
           },
         ]).then(([titled]) => titled?.title)
-      : pullRequestTitles(github, [{ ...reference, installationId }]).then((titles) =>
-          titles.get(titleKey(reference)),
-        ),
+      : ownPullRequestTitle(github, installationId, reference, session.user.githubLogin),
   ]);
 
   return (
@@ -56,4 +57,19 @@ export default async function PullRequestPage({
       now={Date.now()}
     />
   );
+}
+
+async function ownPullRequestTitle(
+  github: ReturnType<typeof createGitHubAppClient>,
+  installationId: string,
+  reference: ReturnType<typeof parsePullRequestParams>,
+  login: string | null | undefined,
+): Promise<string> {
+  const { pullRequest } = await assertPullRequestInInstallation(github, installationId, reference);
+  try {
+    assertAuthoredBy(pullRequest, login);
+  } catch {
+    notFound();
+  }
+  return pullRequest.title;
 }

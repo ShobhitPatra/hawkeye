@@ -24,3 +24,14 @@ export async function assertPullRequestInInstallation(
     throw error;
   }
 }
+
+export function assertAuthoredBy(
+  pullRequest: PullRequestDetails,
+  login: string | null | undefined,
+): void {
+  if (!login || pullRequest.author.toLowerCase() !== login.toLowerCase()) {
+    throw new Error(
+      `pull request #${pullRequest.number} was opened by ${pullRequest.author}, not by the signed-in user`,
+    );
+  }
+}
