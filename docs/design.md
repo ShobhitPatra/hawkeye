@@ -399,7 +399,7 @@ A push to an armed PR (`synchronize` and `ready_for_review`) queues a job for th
 
 `/runners` manages runner tokens: create one (the `hk_…` token is shown once, only its hash is stored), see when each runner was last seen, revoke one.
 
-`/connect` is the other way. Under its title it says what connecting grants (a coding agent runs on that machine, as the user, over code they did not write; editing and web tools removed, the shell kept) and links the README's "What the runner can reach". It shows the login command, a form to type and approve the code that command prints (the link the CLI prints carries the code so the page can describe the pending login, but the code is typed, never prefilled), and whether a runner is online (a non-revoked runner seen within 90 s) or offline with the number of queued jobs waiting.
+`/connect` is the other way. Under its title it says what connecting grants (a coding agent runs on that machine, as the user, over code they did not write; editing and web tools removed, the shell kept) and links the README's "What the runner can reach". It shows the login command, a form to type and approve the code that command prints (the link the CLI prints carries the code so the page can describe the pending login, but the code is typed, never prefilled, so a link someone else sends cannot approve their runner in one click), and whether a runner is online (a non-revoked runner seen within 90 s) or offline with the number of queued jobs waiting.
 
 Behind it is a device-code flow with two unauthenticated endpoints:
 
