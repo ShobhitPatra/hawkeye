@@ -128,22 +128,25 @@ export async function requeueStaleJobs(
   const cutoff = new Date(
     input.now.getTime() - (input.staleAfterSeconds ?? DEFAULT_STALE_AFTER_SECONDS) * 1000,
   );
-  const swept = await requeueStaleJobsStatement(db, cutoff, input.userId);
-  if (swept.length === 0) return { swept: 0, failed: [] };
-
-  const ended = await db
-    .update(run)
-    .set({ status: "error", error: "heartbeat lost", endedAt: input.now })
-    .where(
-      and(
-        inArray(
-          run.jobId,
-          swept.map((row) => row.id),
+  const { swept, ended } = await db.transaction(async (tx) => {
+    const requeued = await requeueStaleJobsStatement(tx, cutoff, input.userId);
+    if (requeued.length === 0) return { swept: requeued, ended: [] };
+    const abandoned = await tx
+      .update(run)
+      .set({ status: "error", error: "heartbeat lost", endedAt: input.now })
+      .where(
+        and(
+          inArray(
+            run.jobId,
+            requeued.map((row) => row.id),
+          ),
+          eq(run.status, "running"),
         ),
-        eq(run.status, "running"),
-      ),
-    )
-    .returning({ id: run.id, jobId: run.jobId, placeholderReviewId: run.placeholderReviewId });
+      )
+      .returning({ id: run.id, jobId: run.jobId, placeholderReviewId: run.placeholderReviewId });
+    return { swept: requeued, ended: abandoned };
+  });
+  if (swept.length === 0) return { swept: 0, failed: [] };
 
   const failedIds = new Set(swept.filter((row) => row.state === "failed").map((row) => row.id));
   const endedFailed = ended.filter((row) => failedIds.has(row.jobId));
