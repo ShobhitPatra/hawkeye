@@ -13,6 +13,7 @@ import {
 import { and, desc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { sweepStaleJobs } from "./sweep";
+import { modelFor } from "./review-settings";
 import type { Db } from "./db/client";
 import {
   DEFAULT_CONCURRENCY,
@@ -89,13 +90,18 @@ function sleepFor(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+function modelSetting(row: { harness: string; model: string | null } | undefined) {
+  const model = row ? modelFor(row.harness, row.model) : undefined;
+  return model === undefined ? {} : { model };
+}
+
 async function settingsFor(db: Db, userId: string): Promise<ClaimedJob["settings"]> {
   const [row] = await db.select().from(userSettings).where(eq(userSettings.userId, userId));
   return {
     maxTurns: row?.maxTurns ?? DEFAULT_MAX_TURNS,
     wallClockMinutes: row?.wallClockMinutes ?? DEFAULT_WALL_CLOCK_MINUTES,
     ...(row?.promptOverride ? { promptOverride: row.promptOverride } : {}),
-    ...(row?.model && row.harness === "claude-code" ? { model: row.model } : {}),
+    ...modelSetting(row),
     harness: row?.harness ?? DEFAULT_HARNESS,
     concurrency: row?.concurrency ?? DEFAULT_CONCURRENCY,
   };
