@@ -124,8 +124,8 @@ export default async function HomePage({
             <div>
               <p className="hk-claim">Hosted for you, in preview.</p>
               <p className="hk-detail">
-                hawkeye-review.vercel.app runs the same code you can read on GitHub. Sign in with
-                GitHub, install the App, and it is yours.
+                hawkeye.reviews runs the same code you can read on GitHub. Sign in with GitHub,
+                install the App, and it is yours.
               </p>
             </div>
             <div>

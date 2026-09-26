@@ -12,7 +12,7 @@ Hawkeye is a code reviewer that belongs to you, not to a repository. Open a pull
 - **Why it is different:** every other AI reviewer is bought per seat and wired into a repository by an admin. This one runs on your subscription, on your hardware. Your plan credential and your repository never reach a server of ours; only the findings do.
 - **What it needs today:** a Claude Code or Codex login on the machine that runs the reviews.
 
-[Sign in with GitHub](https://hawkeye-review.vercel.app) to review every push, or try one review with no account:
+[Sign in with GitHub](https://hawkeye.reviews) to review every push, or try one review with no account:
 
 ```sh
 npx hawkeye-review prepare https://github.com/owner/repo/pull/123
@@ -20,7 +20,7 @@ npx hawkeye-review prepare https://github.com/owner/repo/pull/123
 
 ## A real review
 
-The first round on this repository's own [pull request #87](https://github.com/ShobhitPatra/hawkeye/pull/87) is a review the bot posted: a verdict, one line per finding with the file and line, the lenses behind a disclosure, and the round in the footer. The [landing page](https://hawkeye-review.vercel.app) replays it from open to posted.
+The first round on this repository's own [pull request #87](https://github.com/ShobhitPatra/hawkeye/pull/87) is a review the bot posted: a verdict, one line per finding with the file and line, the lenses behind a disclosure, and the round in the footer. The [landing page](https://hawkeye.reviews) replays it from open to posted.
 
 ## What happens when you open a pull request
 
@@ -47,12 +47,12 @@ Run the runner on a machine, or under a user, whose files you are willing to hav
 
 You need a machine with Node 22 or newer, git 2.31 or newer, and [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) installed and signed in (run `claude` once and check it answers). Nothing else is installed; `npx` fetches the runner each time.
 
-1. **Sign in** with GitHub at [hawkeye-review.vercel.app](https://hawkeye-review.vercel.app).
+1. **Sign in** with GitHub at [hawkeye.reviews](https://hawkeye.reviews).
 2. **Install the GitHub App** on a repository you admin: open [github.com/apps/hawkeye-review](https://github.com/apps/hawkeye-review), choose Install, and pick the repositories. The App is how the review gets posted: it reads the repository, its issues and its pull requests, and writes review comments and commit statuses. Signing in also shares the email address on your GitHub account.
 3. **Connect a runner** on that machine:
 
    ```sh
-   npx hawkeye-review runner login --url https://hawkeye-review.vercel.app
+   npx hawkeye-review runner login --url https://hawkeye.reviews
    ```
 
    It prints a code and a link. Open the link, type the code, approve it. The terminal then says it is connected and where it saved its token.
