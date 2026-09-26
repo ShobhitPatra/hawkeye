@@ -98,6 +98,25 @@ describe("loadContractOverride", () => {
   });
 });
 
+describe("runner login", () => {
+  it("takes --url itself rather than leaving it to the runner command", async () => {
+    vi.stubEnv("HAWKEYE_CONTROL_PLANE_URL", "from-env");
+    const stderr = vi.fn();
+    const exitCode = process.exitCode;
+    await createProgram({ stdout: vi.fn(), stderr }).parseAsync([
+      "node",
+      "hawkeye",
+      "runner",
+      "login",
+      "--url",
+      "from-flag",
+    ]);
+    expect(stderr).toHaveBeenCalledWith('--url must be an http(s) URL, got "from-flag"');
+    process.exitCode = exitCode;
+    vi.unstubAllEnvs();
+  });
+});
+
 describe("review", () => {
   it("rejects --full without --dry-run before touching anything", async () => {
     const stderr = vi.fn();
