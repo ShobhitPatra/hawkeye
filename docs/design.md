@@ -75,7 +75,7 @@ GitHub only lets an account comment on a PR if that account has access to the re
 
 **Resolution order:** an App installation exists on the repo → post as the bot; else → post as the requesting user. There is no third case and no machine user.
 
-Only the first row exists today: every trigger is an App webhook, the clone token is an installation token, and the control plane posts with one. The second row needs all three replaced, and its credential is undecided — see [open question 3](#open-questions).
+Only the first row exists today: every trigger is an App webhook, the clone token is an installation token, and the control plane posts with one. The second row needs all three replaced, and its credential is undecided — see [open question 2](#open-questions).
 
 Posting as the user is what makes a review possible on a repo nobody will install an App on — your employer's monorepo, a public project you contribute to but do not maintain. It works because Hawkeye only ever posts `COMMENT`: GitHub's code review limits restrict *approving* and *requesting changes* to accounts with explicit access, while commenting stays open to anyone who can see the pull request.
 
@@ -490,9 +490,8 @@ Not yet in a milestone: a runner Docker image for a VPS, the App Manifest flow a
 
 ## Open questions
 
-1. **Name collision.** "Hawkeye" is a common product name (and a Marvel character); fine for OSS. Register the `hawkeye` GitHub App slug and the `hawkeye-review` handle now.
-2. **The harness trust boundary.** The review runs `bypassPermissions` with Bash over a checkout of code the user did not write, with their own environment and filesystem in reach. Reviewing pull requests you do not own widens that from code you trust to code anyone can send you, so the boundary has to be closed before that ships.
-3. **Posting as the user.** Sign-in uses the App's OAuth client, and a GitHub App user token reaches only repositories the App is installed on, so it cannot post on the repositories this identity exists for. The second identity needs another credential (an OAuth App grant, or a fine-grained token the user supplies), a trigger that is not a webhook (polling the user's open pull requests, or review-now from the dashboard), and a clone path that uses it. Undecided; nothing is built on the second row until it is.
+1. **The harness trust boundary.** The review runs `bypassPermissions` with Bash over a checkout of code the user did not write, with their own environment and filesystem in reach. Reviewing pull requests you do not own widens that from code you trust to code anyone can send you, so the boundary has to be closed before that ships.
+2. **Posting as the user.** Sign-in uses the App's OAuth client, and a GitHub App user token reaches only repositories the App is installed on, so it cannot post on the repositories this identity exists for. The second identity needs another credential (an OAuth App grant, or a fine-grained token the user supplies), a trigger that is not a webhook (polling the user's open pull requests, or review-now from the dashboard), and a clone path that uses it. Undecided; nothing is built on the second row until it is.
 
 ## Name
 
