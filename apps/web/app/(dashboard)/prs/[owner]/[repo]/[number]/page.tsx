@@ -65,11 +65,17 @@ async function ownPullRequestTitle(
   reference: ReturnType<typeof parsePullRequestParams>,
   login: string | null | undefined,
 ): Promise<string> {
-  const { pullRequest } = await assertPullRequestInInstallation(github, installationId, reference);
+  let title: string;
   try {
+    const { pullRequest } = await assertPullRequestInInstallation(
+      github,
+      installationId,
+      reference,
+    );
     assertAuthoredBy(pullRequest, login);
+    title = pullRequest.title;
   } catch {
     notFound();
   }
-  return pullRequest.title;
+  return title;
 }
