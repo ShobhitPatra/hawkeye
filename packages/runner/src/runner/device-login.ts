@@ -23,6 +23,13 @@ function text(value: unknown, field: string): string {
   return value;
 }
 
+function link(value: unknown, field: string): string {
+  const url = URL.parse(text(value, field));
+  if (url === null || (url.protocol !== "http:" && url.protocol !== "https:"))
+    throw new Error(`invalid login response: ${field}`);
+  return url.href;
+}
+
 function seconds(value: unknown, field: string): number {
   if (
     !Number.isInteger(value) ||
@@ -49,7 +56,7 @@ export async function deviceLogin(input: DeviceLoginInput): Promise<string> {
     );
   const code = text(payload.code, "code");
   const deviceSecret = text(payload.deviceSecret, "deviceSecret");
-  const verifyUrl = text(payload.verifyUrl, "verifyUrl");
+  const verifyUrl = link(payload.verifyUrl, "verifyUrl");
   const intervalSeconds = seconds(payload.intervalSeconds, "intervalSeconds");
 
   const expiresAt = typeof payload.expiresAt === "string" ? Date.parse(payload.expiresAt) : NaN;

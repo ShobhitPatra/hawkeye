@@ -78,6 +78,18 @@ describe("deviceLogin", () => {
     expect(opened).toEqual([started.verifyUrl]);
     expect(logged[0]).toBe("Not connected. Type this code in the browser that just opened:");
   });
+  it("refuses a link that is not http(s) before opening or printing it", async () => {
+    for (const verifyUrl of ["file:///etc/passwd", "vscode://open", "--help", "not a url"]) {
+      const openBrowser = vi.fn(async () => true);
+      const { logged, promise } = login(
+        [Response.json({ ...started, verifyUrl }, { status: 201 })],
+        { openBrowser },
+      );
+      await expect(promise).rejects.toThrow("invalid login response: verifyUrl");
+      expect(openBrowser).not.toHaveBeenCalled();
+      expect(logged).toEqual([]);
+    }
+  });
   it("points at the link when the browser did not open", async () => {
     const { logged, promise } = login(
       [
