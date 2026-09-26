@@ -204,7 +204,7 @@ describe("sweep on GitHub", () => {
 });
 
 describe("claimJob", () => {
-  it("does not sweep: another user's stale claim is left for the schedule", async () => {
+  it("leaves another user's stale claim for the schedule", async () => {
     await db.insert(schema.user).values({ id: "user-2", name: "hubot", email: "h@example.com" });
     await seedArmedPullRequest(db, {
       armedPrId: "armed-2",

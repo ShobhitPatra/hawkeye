@@ -86,6 +86,7 @@ export type StaleSweep = { swept: number; failed: FailedStaleJob[] };
 export function requeueStaleJobsStatement(
   db: Db,
   cutoff: Date,
+  userId?: string,
 ): Statement<{ id: string; state: Job["state"] }> {
   return db
     .update(job)
@@ -105,33 +106,47 @@ export function requeueStaleJobsStatement(
       claimedAt: null,
       heartbeatAt: null,
     })
-    .where(and(eq(job.state, "claimed"), sql`${job.heartbeatAt} < ${cutoff}`))
+    .where(
+      and(
+        eq(job.state, "claimed"),
+        sql`${job.heartbeatAt} < ${cutoff}`,
+        userId === undefined
+          ? undefined
+          : inArray(
+              job.armedPrId,
+              db.select({ id: armedPr.id }).from(armedPr).where(eq(armedPr.userId, userId)),
+            ),
+      ),
+    )
     .returning({ id: job.id, state: job.state });
 }
 
 export async function requeueStaleJobs(
   db: Db,
-  input: { now: Date; staleAfterSeconds?: number },
+  input: { now: Date; staleAfterSeconds?: number; userId?: string },
 ): Promise<StaleSweep> {
   const cutoff = new Date(
     input.now.getTime() - (input.staleAfterSeconds ?? DEFAULT_STALE_AFTER_SECONDS) * 1000,
   );
-  const swept = await requeueStaleJobsStatement(db, cutoff);
-  if (swept.length === 0) return { swept: 0, failed: [] };
-
-  const ended = await db
-    .update(run)
-    .set({ status: "error", error: "heartbeat lost", endedAt: input.now })
-    .where(
-      and(
-        inArray(
-          run.jobId,
-          swept.map((row) => row.id),
+  const { swept, ended } = await db.transaction(async (tx) => {
+    const requeued = await requeueStaleJobsStatement(tx, cutoff, input.userId);
+    if (requeued.length === 0) return { swept: requeued, ended: [] };
+    const abandoned = await tx
+      .update(run)
+      .set({ status: "error", error: "heartbeat lost", endedAt: input.now })
+      .where(
+        and(
+          inArray(
+            run.jobId,
+            requeued.map((row) => row.id),
+          ),
+          eq(run.status, "running"),
         ),
-        eq(run.status, "running"),
-      ),
-    )
-    .returning({ id: run.id, jobId: run.jobId, placeholderReviewId: run.placeholderReviewId });
+      )
+      .returning({ id: run.id, jobId: run.jobId, placeholderReviewId: run.placeholderReviewId });
+    return { swept: requeued, ended: abandoned };
+  });
+  if (swept.length === 0) return { swept: 0, failed: [] };
 
   const failedIds = new Set(swept.filter((row) => row.state === "failed").map((row) => row.id));
   const endedFailed = ended.filter((row) => failedIds.has(row.jobId));

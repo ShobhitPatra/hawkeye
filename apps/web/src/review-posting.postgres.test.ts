@@ -1,15 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { join } from "node:path";
 import type { GitHubClient, ReviewResult } from "@hawkeye/core";
 import { eq, inArray } from "drizzle-orm";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { createDb, type Db } from "./db/client";
+import { createDb } from "./db/client";
 import * as schema from "./db/schema";
 import { createRun } from "./job-queue";
 import { postReviewForRun } from "./review-posting";
 import { createRunnerToken } from "./runner-tokens";
 import { queueJob } from "./test/pglite";
+import { gate, holdingCommit, migrateOnce } from "./test/postgres";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -55,26 +54,6 @@ function createGitHub(): GitHubClient {
   };
 }
 
-function gate() {
-  let open!: () => void;
-  const opened = new Promise<void>((resolve) => {
-    open = resolve;
-  });
-  return { open, opened };
-}
-
-function holdingCommit(db: Db, hold: { entered: () => void; released: Promise<void> }): Db {
-  return Object.assign(Object.create(db) as Db, {
-    transaction: ((work: (tx: Db) => Promise<unknown>) =>
-      db.transaction(async (tx) => {
-        const outcome = await work(tx);
-        hold.entered();
-        await hold.released;
-        return outcome;
-      })) as Db["transaction"],
-  });
-}
-
 const suffix = randomUUID();
 const armedPr = {
   id: `armed-${suffix}`,
@@ -92,7 +71,7 @@ describe.skipIf(!databaseUrl)("the posting lock against two Postgres connections
   beforeAll(async () => {
     first = createDb(databaseUrl!);
     second = createDb(databaseUrl!);
-    await migrate(first, { migrationsFolder: join(import.meta.dirname, "..", "drizzle") });
+    await migrateOnce(first);
   });
 
   afterAll(async () => {
