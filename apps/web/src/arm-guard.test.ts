@@ -1,6 +1,10 @@
 import { GitHubRequestError, type GitHubClient } from "@hawkeye/core";
 import { describe, expect, it, vi } from "vitest";
-import { assertAuthoredBy, assertPullRequestInInstallation } from "./arm-guard";
+import {
+  assertAuthoredBy,
+  assertPullRequestInInstallation,
+  PullRequestRefusedError,
+} from "./arm-guard";
 
 function unsupported() {
   return vi.fn(() => {
@@ -80,6 +84,6 @@ describe("assertAuthoredBy", () => {
     expect(() => assertAuthoredBy(pullRequest, "alice")).toThrow(
       "pull request #7 was opened by Octocat, not by the signed-in user",
     );
-    expect(() => assertAuthoredBy(pullRequest, undefined)).toThrow("not by the signed-in user");
+    expect(() => assertAuthoredBy(pullRequest, undefined)).toThrow(PullRequestRefusedError);
   });
 });

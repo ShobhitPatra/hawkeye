@@ -2,7 +2,11 @@ import { notFound } from "next/navigation";
 import { parsePullRequestParams } from "@/arm-input";
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
-import { assertAuthoredBy, assertPullRequestInInstallation } from "@/arm-guard";
+import {
+  assertAuthoredBy,
+  assertPullRequestInInstallation,
+  PullRequestRefusedError,
+} from "@/arm-guard";
 import { installationForOwner } from "@/installations";
 import { findArmedPullRequest, listFindingsForPullRequest, listRunsForPullRequest } from "@/runs";
 import { fillTitles } from "@/pull-request-titles";
@@ -74,8 +78,9 @@ async function ownPullRequestTitle(
     );
     assertAuthoredBy(pullRequest, login);
     title = pullRequest.title;
-  } catch {
-    notFound();
+  } catch (error) {
+    if (error instanceof PullRequestRefusedError) notFound();
+    throw error;
   }
   return title;
 }

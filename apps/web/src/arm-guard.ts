@@ -5,6 +5,8 @@ import {
   type PullRequestReference,
 } from "@hawkeye/core";
 
+export class PullRequestRefusedError extends Error {}
+
 export async function assertPullRequestInInstallation(
   github: GitHubClient,
   installationId: string,
@@ -16,7 +18,7 @@ export async function assertPullRequestInInstallation(
     return { token, pullRequest };
   } catch (error) {
     if (error instanceof GitHubRequestError && error.status === 404) {
-      throw new Error(
+      throw new PullRequestRefusedError(
         `pull request ${reference.owner}/${reference.repo}#${reference.number} is not reachable through installation ${installationId}`,
         { cause: error },
       );
@@ -30,7 +32,7 @@ export function assertAuthoredBy(
   login: string | null | undefined,
 ): void {
   if (!login || pullRequest.author.toLowerCase() !== login.toLowerCase()) {
-    throw new Error(
+    throw new PullRequestRefusedError(
       `pull request #${pullRequest.number} was opened by ${pullRequest.author}, not by the signed-in user`,
     );
   }
