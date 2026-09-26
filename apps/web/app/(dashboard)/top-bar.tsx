@@ -22,7 +22,7 @@ export function TopBar({
     <header className="hk-topbar" data-sticky>
       <Link className="hk-wordmark hk-lockup" href="/overview">
         <Mark />
-        <span className="hk-wordmark-text">hawkeye</span>
+        <span className="hk-visually-hidden">hawkeye</span>
       </Link>
       <NavLinks />
       <div className="hk-topbar-end">
