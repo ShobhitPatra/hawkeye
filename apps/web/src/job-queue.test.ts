@@ -189,6 +189,10 @@ describe("the queue's indexes", () => {
     const sweepPlan = await plan(sweep);
     expect(sweepPlan).not.toContain("Seq Scan on job");
     expect(sweepPlan).toContain("job_stale");
+    const ownSweep = requeueStaleJobsStatement(db, new Date(Date.now() - 5 * 60_000), "seed-u5");
+    const ownSweepPlan = await plan(ownSweep);
+    expect(ownSweepPlan).not.toContain("Seq Scan on job");
+    expect(ownSweepPlan).toContain("job_stale");
   });
 });
 
@@ -306,6 +310,24 @@ describe("requeueStaleJobs", () => {
     const rows = await db.select().from(schema.job);
     expect(rows.find((row) => row.id === one.id)?.state).toBe("queued");
     expect(rows.find((row) => row.id === two.id)?.state).toBe("queued");
+  });
+
+  it("puts back only the named user's stale claims when scoped to one", async () => {
+    await db
+      .insert(schema.runner)
+      .values({ id: "runner-3", userId: "user-2", name: "desk", tokenHash: "hash-3" });
+    const mine = await enqueue("armed-1", minutesBefore(10));
+    await claim();
+    const theirs = await enqueue("armed-3", minutesBefore(10));
+    await claim("runner-3", "user-2");
+    await heartbeatJob(db, { jobId: mine.id, runnerId: "runner-1", now: minutesBefore(6) });
+    await heartbeatJob(db, { jobId: theirs.id, runnerId: "runner-3", now: minutesBefore(6) });
+
+    expect((await requeueStaleJobs(db, { now, userId: "user-1" })).swept).toBe(1);
+
+    const rows = await db.select().from(schema.job);
+    expect(rows.find((row) => row.id === mine.id)?.state).toBe("queued");
+    expect(rows.find((row) => row.id === theirs.id)?.state).toBe("claimed");
   });
 
   it("honours a custom staleness window", async () => {

@@ -12,6 +12,7 @@ import {
 } from "@hawkeye/core";
 import { and, desc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { sweepStaleJobs } from "./sweep";
 import type { Db } from "./db/client";
 import {
   DEFAULT_CONCURRENCY,
@@ -174,6 +175,7 @@ export async function claimJob(request: Request, deps: ClaimDeps): Promise<Respo
     totalMs: DEFAULT_CLAIM_POLL_TOTAL_MS,
   };
   const deadline = now().getTime() + totalMs;
+  await sweepStaleJobs(deps, { now: now(), userId: runner.userId });
 
   for (;;) {
     const claimed = await claimNextJob(deps.db, {

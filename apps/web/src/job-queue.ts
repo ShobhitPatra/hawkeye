@@ -86,6 +86,7 @@ export type StaleSweep = { swept: number; failed: FailedStaleJob[] };
 export function requeueStaleJobsStatement(
   db: Db,
   cutoff: Date,
+  userId?: string,
 ): Statement<{ id: string; state: Job["state"] }> {
   return db
     .update(job)
@@ -105,18 +106,29 @@ export function requeueStaleJobsStatement(
       claimedAt: null,
       heartbeatAt: null,
     })
-    .where(and(eq(job.state, "claimed"), sql`${job.heartbeatAt} < ${cutoff}`))
+    .where(
+      and(
+        eq(job.state, "claimed"),
+        sql`${job.heartbeatAt} < ${cutoff}`,
+        userId === undefined
+          ? undefined
+          : inArray(
+              job.armedPrId,
+              db.select({ id: armedPr.id }).from(armedPr).where(eq(armedPr.userId, userId)),
+            ),
+      ),
+    )
     .returning({ id: job.id, state: job.state });
 }
 
 export async function requeueStaleJobs(
   db: Db,
-  input: { now: Date; staleAfterSeconds?: number },
+  input: { now: Date; staleAfterSeconds?: number; userId?: string },
 ): Promise<StaleSweep> {
   const cutoff = new Date(
     input.now.getTime() - (input.staleAfterSeconds ?? DEFAULT_STALE_AFTER_SECONDS) * 1000,
   );
-  const swept = await requeueStaleJobsStatement(db, cutoff);
+  const swept = await requeueStaleJobsStatement(db, cutoff, input.userId);
   if (swept.length === 0) return { swept: 0, failed: [] };
 
   const ended = await db

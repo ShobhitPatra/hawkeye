@@ -10,7 +10,6 @@ import type { Db } from "./db/client";
 import * as schema from "./db/schema";
 import { claimJob, heartbeat, recordEvents, recordResult } from "./runner-api";
 import { createRunnerToken } from "./runner-tokens";
-import { sweep } from "./sweep";
 import { createTestDb, seedArmedPullRequest, queueJob } from "./test/pglite";
 
 const now = new Date("2026-01-01T12:00:00.000Z");
@@ -596,7 +595,7 @@ describe("claimJob", () => {
     ]);
   });
 
-  it("leaves a stale claim alone until the scheduled sweep requeues it, then claims it", async () => {
+  it("puts the user's own stale claim back and claims it in the same call", async () => {
     const queued = await enqueue();
     await db
       .update(schema.job)
@@ -608,21 +607,54 @@ describe("claimJob", () => {
       })
       .where(eq(schema.job.id, queued.id));
 
-    const before = await claimJob(request("/api/runner/jobs"), claimDeps());
-    expect(before.status).toBe(204);
+    const response = await claimJob(request("/api/runner/jobs"), claimDeps());
 
-    const swept = await sweep(
-      new Request("https://hawkeye.test/api/internal/sweep", {
-        method: "POST",
-        headers: { authorization: "Bearer s3cret" },
-      }),
-      { db, github, secret: "s3cret", now: () => now },
+    expect(response.status).toBe(200);
+    expect((await response.json()).job.id).toBe(queued.id);
+  });
+
+  it("leaves a claim alone while its heartbeat is fresh", async () => {
+    const queued = await enqueue();
+    await claimJob(request("/api/runner/jobs"), claimDeps());
+    const other = await createRunnerToken(db, { userId: "user-1", name: "desktop" });
+
+    const response = await claimJob(
+      request("/api/runner/jobs", { bearer: other.token }),
+      claimDeps(),
     );
-    expect(await swept.json()).toEqual({ ok: true, swept: 1 });
 
-    const after = await claimJob(request("/api/runner/jobs"), claimDeps());
-    expect(after.status).toBe(200);
-    expect((await after.json()).job.id).toBe(queued.id);
+    expect(response.status).toBe(204);
+    const [row] = await db.select().from(schema.job).where(eq(schema.job.id, queued.id));
+    expect(row).toMatchObject({ state: "claimed", claimedByRunnerId: runnerId });
+  });
+
+  it("fails the user's stale claim a newer push overtook, closes it on GitHub, and claims the newer head", async () => {
+    const stale = await enqueue();
+    await claimJob(request("/api/runner/jobs"), claimDeps());
+    await db
+      .update(schema.job)
+      .set({ heartbeatAt: new Date(now.getTime() - 3_600_000) })
+      .where(eq(schema.job.id, stale.id));
+    await queueJob(db, {
+      headCurrentAt: new Date(),
+      armedPrId: "armed-1",
+      headSha: "c".repeat(40),
+      baseSha: "b".repeat(40),
+      notBefore: new Date(now.getTime() - 60_000),
+    });
+
+    const response = await claimJob(request("/api/runner/jobs"), claimDeps());
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).job.headSha).toBe("c".repeat(40));
+    const [row] = await db.select().from(schema.job).where(eq(schema.job.id, stale.id));
+    expect(row?.state).toBe("failed");
+    expect(github.createCommitStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      "a".repeat(40),
+      { state: "success", description: "Review did not complete", context: "hawkeye" },
+      "ghs_token",
+    );
   });
 });
 
@@ -1613,13 +1645,6 @@ describe("recordResult", () => {
       .set({ heartbeatAt: new Date(now.getTime() - 3_600_000) })
       .where(eq(schema.job.id, queued.id));
 
-    await sweep(
-      new Request("https://hawkeye.test/api/internal/sweep", {
-        method: "POST",
-        headers: { authorization: "Bearer s3cret" },
-      }),
-      { db, github, secret: "s3cret", now: () => now },
-    );
     const other = await createRunnerToken(db, { userId: "user-1", name: "desktop" });
     const second = await claimJob(
       request("/api/runner/jobs", { bearer: other.token }),

@@ -6,12 +6,15 @@ import { type FailedStaleJob, newerRunIsLive, requeueStaleJobs } from "./job-que
 import { livingReviewFor } from "./review-posting";
 import { clearReviewing, NOT_COMPLETED_BODY } from "./reviewing-line";
 
-export type SweepDeps = {
+export type StaleSweepDeps = {
   db: Db;
   github: GitHubClient;
+  log?: (line: string) => void;
+};
+
+export type SweepDeps = StaleSweepDeps & {
   secret: string | undefined;
   now?: () => Date;
-  log?: (line: string) => void;
 };
 
 function authorized(request: Request, secret: string | undefined): boolean {
@@ -26,14 +29,20 @@ export async function sweep(request: Request, deps: SweepDeps): Promise<Response
     if (!deps.secret) deps.log?.("sweep refused: CRON_SECRET is not set, so no caller can sweep");
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
-  const { swept, failed } = await requeueStaleJobs(deps.db, {
-    now: (deps.now ?? (() => new Date()))(),
-  });
-  for (const job of failed) await closeOnGitHub(deps, job);
+  const swept = await sweepStaleJobs(deps, { now: (deps.now ?? (() => new Date()))() });
   return Response.json({ ok: true, swept }, { status: 200 });
 }
 
-async function closeOnGitHub(deps: SweepDeps, failed: FailedStaleJob): Promise<void> {
+export async function sweepStaleJobs(
+  deps: StaleSweepDeps,
+  input: { now: Date; userId?: string },
+): Promise<number> {
+  const { swept, failed } = await requeueStaleJobs(deps.db, input);
+  for (const job of failed) await closeOnGitHub(deps, job);
+  return swept;
+}
+
+async function closeOnGitHub(deps: StaleSweepDeps, failed: FailedStaleJob): Promise<void> {
   const { owner, repo, number } = failed.armedPr;
   const reference = { owner, repo, number };
   try {
