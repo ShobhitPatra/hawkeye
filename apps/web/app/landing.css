@@ -28,12 +28,10 @@
   overflow-wrap: anywhere;
   overflow-x: hidden;
 }
-@media (pointer: fine) {
-  .ld-try .hk-copy {
-    top: 0;
-    right: 2px;
-    height: 26px;
-  }
+.ld-try .hk-copy {
+  top: 1px;
+  right: 1px;
+  height: calc(var(--hk-leading-compact) + 2 * var(--hk-space-1));
 }
 .ld-cap {
   font-size: var(--hk-type-compact);

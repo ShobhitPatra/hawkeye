@@ -186,7 +186,7 @@ Margin column: `hk-margin`, `hk-entry[data-severity]`, `hk-gutter`, `hk-severity
 
 Controls: `hk-button[data-variant="primary"]`, `hk-review` (a button with its refusal sentence beneath), `hk-input`, `hk-textarea`, `hk-choice` (`data-stack` for a column; on a `<fieldset>` its legend sits above the options; nested in another `hk-choice`, a group whose legend reads as a label, and groups side by side sit 24px apart and 16px when they wrap), `hk-field`, `hk-field-wide`, `hk-form-row`, `hk-action-row`, `hk-help`, `hk-link` (on an `<a>` inside `hk-root` only: forces the underline back inside any context that removes it, the top bar, navigation, crumbs, tables and the menu; a bare link in running text already underlines).
 
-Code and sections: `hk-code`, `hk-code-row` (a positioned wrapper whose `hk-copy` icon button sits inside the block's top right corner, showing a check for two seconds after copying), `hk-section`, `hk-steps` (an `<ol>` whose items carry `hk-step-body`).
+Code and sections: `hk-code`, `hk-code-row` (a positioned wrapper whose `hk-copy` icon button sits inside the block's top right corner, centred on its first line, showing a check for two seconds after copying), `hk-section`, `hk-steps` (an `<ol>` whose items carry `hk-step-body`).
 
 Status words: `hk-status[data-state="attention" | "failed" | "running"]`.
 
