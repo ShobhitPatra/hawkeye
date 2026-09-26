@@ -2,7 +2,12 @@ import { mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { loadRunnerConfig, writeRunnerConfig } from "./config.js";
+import {
+  HOSTED_CONTROL_PLANE_URL,
+  loadRunnerConfig,
+  resolveConnection,
+  writeRunnerConfig,
+} from "./config.js";
 
 const file = JSON.stringify({ controlPlaneUrl: "https://hawkeye.example", token: "hk_1" });
 const missing = async () => {
@@ -31,19 +36,17 @@ describe("loadRunnerConfig", () => {
     });
     expect(c).toEqual({ controlPlaneUrl: "http://localhost:3000", token: "hk_2" });
   });
-  it("names the missing field and the login command", async () => {
+  it("has no token without one in the file or env, and falls back to the hosted address", async () => {
     await expect(
       loadRunnerConfig({ env: {}, configPath: "/none", readFile: missing }),
-    ).rejects.toThrow(
-      /Not connected\. Run npx hawkeye-review runner login --url <control plane url> first, or set HAWKEYE_CONTROL_PLANE_URL\./,
-    );
+    ).resolves.toEqual({ controlPlaneUrl: HOSTED_CONTROL_PLANE_URL, token: undefined });
     await expect(
       loadRunnerConfig({
         env: {},
         configPath: "/c.json",
         readFile: async () => JSON.stringify({ controlPlaneUrl: "https://x", token: "" }),
       }),
-    ).rejects.toThrow(/Not connected\..*HAWKEYE_RUNNER_TOKEN\./);
+    ).resolves.toEqual({ controlPlaneUrl: "https://x", token: undefined });
   });
   it("rejects non-string values in the config file", async () => {
     await expect(
@@ -80,6 +83,45 @@ describe("loadRunnerConfig", () => {
         },
       }),
     ).rejects.toThrow("Cannot read runner config /c.json: EACCES");
+  });
+});
+
+describe("resolveConnection", () => {
+  const saved = { controlPlaneUrl: "https://hawkeye.example", token: "hk_1" };
+  const unsaved = { controlPlaneUrl: HOSTED_CONTROL_PLANE_URL, token: undefined };
+
+  it("uses the saved connection, with or without a --url naming the same address", () => {
+    expect(resolveConnection({ saved, url: undefined, interactive: false })).toEqual({
+      connected: saved,
+    });
+    expect(
+      resolveConnection({ saved, url: "https://hawkeye.example/", interactive: false }),
+    ).toEqual({ connected: saved });
+  });
+  it("refuses a --url naming another address while connected", () => {
+    expect(() =>
+      resolveConnection({ saved, url: "https://other.example", interactive: true }),
+    ).toThrow(
+      "This machine is connected to https://hawkeye.example. To connect it to https://other.example instead, run npx hawkeye-review runner login --url https://other.example.",
+    );
+  });
+  it("connects to --url, else the saved or hosted address, when there is no token", () => {
+    expect(resolveConnection({ saved: unsaved, url: undefined, interactive: true })).toEqual({
+      connectTo: HOSTED_CONTROL_PLANE_URL,
+    });
+    expect(
+      resolveConnection({ saved: unsaved, url: "http://localhost:3000", interactive: true }),
+    ).toEqual({ connectTo: "http://localhost:3000" });
+  });
+  it("refuses to connect without a terminal to show the code in", () => {
+    expect(() => resolveConnection({ saved: unsaved, url: undefined, interactive: false })).toThrow(
+      "Not connected. Run npx hawkeye-review runner login in a terminal first, or set HAWKEYE_RUNNER_TOKEN.",
+    );
+  });
+  it("rejects a --url that is not http(s)", () => {
+    expect(() => resolveConnection({ saved, url: "hawkeye", interactive: true })).toThrow(
+      '--url must be an http(s) URL, got "hawkeye"',
+    );
   });
 });
 

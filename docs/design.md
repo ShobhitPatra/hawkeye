@@ -343,14 +343,13 @@ It checks against the ids recorded in `meta.json` when the round was prepared.
 
 ## The runner daemon
 
-On the machine that holds your Claude Code login:
+On the machine that holds your Claude Code or Codex login:
 
 ```sh
-npx hawkeye-review runner login --url <control plane url>   # once
 npx hawkeye-review runner
 ```
 
-`login` prints the code, the `/connect` link and that it is waiting; you approve the code in the browser, and it confirms the connection and that the runner token is stored in `~/.config/hawkeye/runner.json`. A `--token` from `/runners` skips the browser; `--name` overrides the hostname. Env overrides: `HAWKEYE_CONTROL_PLANE_URL`, `HAWKEYE_RUNNER_TOKEN`.
+A machine with no runner token connects first. `runner` starts a login against `--url` (default `https://hawkeye.reviews`), opens the `/connect` link in the browser when it can (`open` on macOS, `xdg-open` on a Linux desktop, never over SSH; a link that is not http(s) fails the login before anything opens), prints where to type the code, the code, the link and that it is waiting; once the code is typed and approved on `/connect` it saves the token to `~/.config/hawkeye/runner.json`, says so, and starts polling. Without a terminal it refuses rather than wait for an approval nobody sees. `--name` overrides the hostname. With a token saved, `--url` must name the same control plane; another address is refused with the login command that switches. `runner login` connects alone and exits, for reconnecting or switching; it keeps the saved address unless given `--url`, and a `--token` from `/runners` skips the browser. When the control plane refuses the token (the runner was removed or replaced) the daemon exits with a sentence naming `runner login`. Env overrides: `HAWKEYE_CONTROL_PLANE_URL`, `HAWKEYE_RUNNER_TOKEN`.
 
 The daemon then loops: claim a job, clone the PR with the one-hour token the job carries, run Claude Code with the review contract, heartbeat, report the result.
 

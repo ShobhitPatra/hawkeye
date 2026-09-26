@@ -18,7 +18,13 @@ import {
   renderReviewSummary,
   runReview,
 } from "@hawkeye/core";
-import { alreadyReviewedLines, connectedLines, reviewFailedLine } from "./cli-text.js";
+import {
+  alreadyReviewedLines,
+  connectedLine,
+  connectedLines,
+  reviewFailedLine,
+  runnerStoppedLine,
+} from "./cli-text.js";
 import { expandHome, loadConfig } from "./config.js";
 import { describePreparedRound, prepareRound } from "./local-review/prepare.js";
 import { dismissFinding, withdrawDismissal } from "./local-review/rounds.js";
@@ -30,7 +36,14 @@ import { runnerConsole } from "./runner/console.js";
 import { type ProgressLine, shortenHome, type TerminalStyle } from "./terminal.js";
 import { createControlPlaneClient } from "./runner/client.js";
 import { deviceLogin } from "./runner/device-login.js";
-import { assertControlPlaneUrl, loadRunnerConfig, writeRunnerConfig } from "./runner/config.js";
+import {
+  assertControlPlaneUrl,
+  HOSTED_CONTROL_PLANE_URL,
+  loadRunnerConfig,
+  resolveConnection,
+  type RunnerConfig,
+  writeRunnerConfig,
+} from "./runner/config.js";
 import { runRunnerLoop, watchClock } from "./runner/loop.js";
 
 const CONFIG_PATH = join(homedir(), ".config", "hawkeye", "config.json");
@@ -84,8 +97,37 @@ export function createProgram(io: {
   style?: TerminalStyle;
   stderrStyle?: TerminalStyle;
   progress?: ProgressLine;
+  interactive?: boolean;
+  openBrowser?(url: string): Promise<boolean>;
 }): Command {
+  const readRunnerConfig = () =>
+    loadRunnerConfig({
+      env: process.env,
+      configPath: RUNNER_CONFIG_PATH,
+      readFile: (p) => readFile(p, "utf8"),
+    });
+  const connect = async (input: {
+    url: string;
+    name: string;
+    lead?: string;
+  }): Promise<RunnerConfig> => {
+    assertControlPlaneUrl(input.url);
+    const token = await deviceLogin({
+      baseUrl: input.url,
+      runnerName: input.name,
+      fetch,
+      log: io.stderr,
+      ...(io.stderrStyle === undefined ? {} : { emphasize: io.stderrStyle.verdict }),
+      ...(io.openBrowser === undefined ? {} : { openBrowser: io.openBrowser }),
+      ...(input.lead === undefined ? {} : { lead: input.lead }),
+    });
+    const config = { controlPlaneUrl: input.url, token };
+    await writeRunnerConfig(RUNNER_CONFIG_PATH, config);
+    return config;
+  };
+
   const program = new Command("hawkeye")
+    .enablePositionalOptions()
     .version(packageJson.version)
     .description("Personal code reviewer on your own Claude plan");
 
@@ -236,6 +278,11 @@ export function createProgram(io: {
     .description("review armed pull requests claimed from the control plane")
     .option("--once", "claim at most one job, then exit", false)
     .option(
+      "--url <url>",
+      `control plane to connect to when this machine is not connected yet (default: ${HOSTED_CONTROL_PLANE_URL})`,
+    )
+    .option("--name <name>", "runner name when this machine connects", hostname())
+    .option(
       "--model <name>",
       "model passed to the claude CLI (else its default); a Codex job uses Codex's own default",
     )
@@ -243,93 +290,116 @@ export function createProgram(io: {
       "--contract <path>",
       "review contract that replaces the built-in lens and finding rules",
     )
-    .action(async (options: { once: boolean; contract?: string; model?: string }) => {
-      try {
-        const config = await loadRunnerConfig({
-          env: process.env,
-          configPath: RUNNER_CONFIG_PATH,
-          readFile: (p) => readFile(p, "utf8"),
-        });
-        const contract = await loadContractOverride({
-          ...(options.contract === undefined ? {} : { explicitPath: options.contract }),
-          env: process.env,
-          home: homedir(),
-          defaultPath: DEFAULT_CONTRACT_PATH,
-          readFile: (p) => readFile(p, "utf8"),
-        });
-        const terminal = runnerConsole({
-          stderr: io.stderr,
-          appendFile: (path, line) => appendFileSync(path, line),
-          home: homedir(),
-          ...(io.stderrStyle === undefined ? {} : { style: io.stderrStyle }),
-        });
-        if (contract) terminal.report({ state: "contract", detail: contract.path });
-        const stop = new AbortController();
-        const onSignal = (signal: NodeJS.Signals) => {
-          terminal.report({
-            state: "stopping",
-            detail: `${signal} received; finishing the current job`,
-          });
-          stop.abort();
-        };
-        process.once("SIGINT", onSignal);
-        process.once("SIGTERM", onSignal);
-        terminal.report({ state: "polling", detail: config.controlPlaneUrl });
-        const stopClock = watchClock(terminal.report);
+    .action(
+      async (options: {
+        once: boolean;
+        url?: string;
+        name: string;
+        contract?: string;
+        model?: string;
+      }) => {
         try {
-          await runRunnerLoop(
-            {
-              client: createControlPlaneClient({
-                baseUrl: config.controlPlaneUrl,
-                token: config.token,
-                fetch,
+          const connection = resolveConnection({
+            saved: await readRunnerConfig(),
+            url: options.url,
+            interactive: io.interactive === true,
+          });
+          let config: RunnerConfig;
+          if ("connected" in connection) config = connection.connected;
+          else {
+            config = await connect({
+              url: connection.connectTo,
+              name: options.name,
+              lead: "Not connected.",
+            });
+            io.stderr(
+              connectedLine({
+                runnerName: options.name,
+                configPath: RUNNER_CONFIG_PATH,
+                home: homedir(),
               }),
-              harness: createClaudeCodeHarness(
-                options.model === undefined ? {} : { model: options.model },
-              ),
-              harnesses: { codex: createCodexHarness() },
-              createWorktree,
-              readRepositoryRules,
-              createRunDirectory: (reference) =>
-                createRunDirectory({ root: RUNS_ROOT, reference, now: new Date() }),
-              fetch,
-              report: terminal.report,
-              log: terminal.log,
-              ...(contract ? { contractOverride: contract.content } : {}),
-              signal: stop.signal,
-            },
-            { once: options.once },
-          );
-        } finally {
-          stopClock();
-          process.off("SIGINT", onSignal);
-          process.off("SIGTERM", onSignal);
+            );
+          }
+          const contract = await loadContractOverride({
+            ...(options.contract === undefined ? {} : { explicitPath: options.contract }),
+            env: process.env,
+            home: homedir(),
+            defaultPath: DEFAULT_CONTRACT_PATH,
+            readFile: (p) => readFile(p, "utf8"),
+          });
+          const terminal = runnerConsole({
+            stderr: io.stderr,
+            appendFile: (path, line) => appendFileSync(path, line),
+            home: homedir(),
+            ...(io.stderrStyle === undefined ? {} : { style: io.stderrStyle }),
+          });
+          if (contract) terminal.report({ state: "contract", detail: contract.path });
+          const stop = new AbortController();
+          const onSignal = (signal: NodeJS.Signals) => {
+            terminal.report({
+              state: "stopping",
+              detail: `${signal} received; finishing the current job`,
+            });
+            stop.abort();
+          };
+          process.once("SIGINT", onSignal);
+          process.once("SIGTERM", onSignal);
+          terminal.report({ state: "polling", detail: config.controlPlaneUrl });
+          const stopClock = watchClock(terminal.report);
+          try {
+            await runRunnerLoop(
+              {
+                client: createControlPlaneClient({
+                  baseUrl: config.controlPlaneUrl,
+                  token: config.token,
+                  fetch,
+                }),
+                harness: createClaudeCodeHarness(
+                  options.model === undefined ? {} : { model: options.model },
+                ),
+                harnesses: { codex: createCodexHarness() },
+                createWorktree,
+                readRepositoryRules,
+                createRunDirectory: (reference) =>
+                  createRunDirectory({ root: RUNS_ROOT, reference, now: new Date() }),
+                fetch,
+                report: terminal.report,
+                log: terminal.log,
+                ...(contract ? { contractOverride: contract.content } : {}),
+                signal: stop.signal,
+              },
+              { once: options.once },
+            );
+          } finally {
+            stopClock();
+            process.off("SIGINT", onSignal);
+            process.off("SIGTERM", onSignal);
+          }
+        } catch (error) {
+          io.stderr(runnerStoppedLine(error));
+          process.exitCode = 1;
         }
-      } catch (error) {
-        io.stderr((error as Error).message);
-        process.exitCode = 1;
-      }
-    });
+      },
+    );
 
   runner
     .command("login")
     .description("connect this machine: approve a code on /connect, or pass a token directly")
-    .requiredOption("--url <url>", "control plane URL, e.g. https://hawkeye.example")
+    .option(
+      "--url <url>",
+      `control plane URL (default: the one this machine uses, else ${HOSTED_CONTROL_PLANE_URL})`,
+    )
     .option("--token <token>", "runner token created on /runners; omit for the device flow")
     .option("--name <name>", "runner name for the device flow (ignored with --token)", hostname())
-    .action(async (options: { url: string; token?: string; name: string }) => {
+    .action(async (options: { url?: string; token?: string; name: string }) => {
       try {
-        assertControlPlaneUrl(options.url);
-        const token =
-          options.token ??
-          (await deviceLogin({
-            baseUrl: options.url,
-            runnerName: options.name,
-            fetch,
-            log: io.stderr,
-            ...(io.stderrStyle === undefined ? {} : { emphasize: io.stderrStyle.verdict }),
-          }));
-        await writeRunnerConfig(RUNNER_CONFIG_PATH, { controlPlaneUrl: options.url, token });
+        const url = options.url ?? (await readRunnerConfig()).controlPlaneUrl;
+        if (options.token === undefined) await connect({ url, name: options.name });
+        else
+          await writeRunnerConfig(RUNNER_CONFIG_PATH, {
+            controlPlaneUrl: url,
+            token: options.token,
+          });
         for (const line of connectedLines({
           runnerName: options.token === undefined ? options.name : undefined,
           configPath: RUNNER_CONFIG_PATH,

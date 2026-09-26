@@ -1,13 +1,17 @@
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
+export const HOSTED_CONTROL_PLANE_URL = "https://hawkeye.reviews";
+
 export type RunnerConfig = { controlPlaneUrl: string; token: string };
+export type SavedRunnerConfig = { controlPlaneUrl: string; token: string | undefined };
+export type Connection = { connected: RunnerConfig } | { connectTo: string };
 
 export async function loadRunnerConfig(input: {
   env: Record<string, string | undefined>;
   configPath: string;
   readFile(path: string): Promise<string>;
-}): Promise<RunnerConfig> {
+}): Promise<SavedRunnerConfig> {
   const file = await input.readFile(input.configPath).then(
     (text) => JSON.parse(text) as Record<string, unknown>,
     (error: NodeJS.ErrnoException) => {
@@ -15,21 +19,38 @@ export async function loadRunnerConfig(input: {
       throw new Error(`Cannot read runner config ${input.configPath}: ${error.message}`);
     },
   );
-  const pick = (envName: string, fileName: keyof RunnerConfig): string => {
+  const pick = (envName: string, fileName: keyof RunnerConfig): string | undefined => {
     const fromFile = file[fileName];
     if (fromFile !== undefined && typeof fromFile !== "string")
       throw new Error(`Invalid ${fileName} in ${input.configPath}: expected a string`);
-    const value = input.env[envName] || fromFile;
-    if (value === undefined || value === "")
-      throw new Error(
-        `Not connected. Run npx hawkeye-review runner login --url <control plane url> first, or set ${envName}.`,
-      );
-    return value;
+    return input.env[envName] || fromFile || undefined;
   };
   return {
-    controlPlaneUrl: pick("HAWKEYE_CONTROL_PLANE_URL", "controlPlaneUrl"),
+    controlPlaneUrl:
+      pick("HAWKEYE_CONTROL_PLANE_URL", "controlPlaneUrl") ?? HOSTED_CONTROL_PLANE_URL,
     token: pick("HAWKEYE_RUNNER_TOKEN", "token"),
   };
+}
+
+export function resolveConnection(input: {
+  saved: SavedRunnerConfig;
+  url: string | undefined;
+  interactive: boolean;
+}): Connection {
+  const { saved, url } = input;
+  if (url !== undefined) assertControlPlaneUrl(url);
+  if (saved.token !== undefined) {
+    if (url !== undefined && URL.parse(url)?.href !== URL.parse(saved.controlPlaneUrl)?.href)
+      throw new Error(
+        `This machine is connected to ${saved.controlPlaneUrl}. To connect it to ${url} instead, run npx hawkeye-review runner login --url ${url}.`,
+      );
+    return { connected: { controlPlaneUrl: saved.controlPlaneUrl, token: saved.token } };
+  }
+  if (!input.interactive)
+    throw new Error(
+      "Not connected. Run npx hawkeye-review runner login in a terminal first, or set HAWKEYE_RUNNER_TOKEN.",
+    );
+  return { connectTo: url ?? saved.controlPlaneUrl };
 }
 
 export function assertControlPlaneUrl(value: string): void {
