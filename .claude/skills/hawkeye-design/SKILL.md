@@ -5,7 +5,7 @@ description: "Design, build, or restyle any Hawkeye surface: the control plane d
 
 # Design Hawkeye
 
-Hawkeye is a personal code reviewer. It reads a pull request on the author's own machine, on the author's own plan, and posts a judgment as `hawkeye[bot]`. The dashboard is an instrument panel the user owns, not a service they rent. The review comment is where most people first meet Hawkeye, and it delivers an opinion about someone's work. Every surface should carry that: sharp, quiet, trustworthy, unhurried, yours.
+Hawkeye is a personal code reviewer. It reads a pull request on the author's own machine, on the author's own plan, and posts a judgment as `hawkeye-review[bot]`. The dashboard is an instrument panel the user owns, not a service they rent. The review comment is where most people first meet Hawkeye, and it delivers an opinion about someone's work. Every surface should carry that: sharp, quiet, trustworthy, unhurried, yours.
 
 Never chatty, never gamified, never corporate SaaS. Confidence comes from precision and restraint, not from decoration, praise or exclamation.
 

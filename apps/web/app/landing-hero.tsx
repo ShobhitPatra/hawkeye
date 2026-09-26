@@ -308,7 +308,7 @@ export function LandingHero() {
                 <span className="ld-cm-avatar">
                   <Mark size={14} />
                 </span>
-                <b>hawkeye</b>
+                <b>hawkeye-review</b>
                 <span className="ld-cm-bot">bot</span>
                 <span>reviewed just now</span>
               </div>

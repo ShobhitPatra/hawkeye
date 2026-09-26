@@ -31,8 +31,8 @@ export default async function HomePage({
           <h1 className="hk-headline">Code review on your own Claude or Codex plan.</h1>
           <p className="hk-lede">
             Open a pull request. A runner on your machine reads every push with your own login and
-            posts one verdict as <span className="hk-mono">hawkeye[bot]</span>. No token bill, no
-            credentials in the cloud, and silence where the code is fine.
+            posts one verdict as <span className="hk-mono">hawkeye-review[bot]</span>. No token
+            bill, no credentials in the cloud, and silence where the code is fine.
           </p>
           <div className="hk-actions">
             <SignInButton {...signIn} variant="primary" size="large" />
@@ -73,7 +73,7 @@ export default async function HomePage({
             </div>
             <div>
               <p className="hk-claim">
-                The comment lands as <span className="hk-mono">hawkeye[bot]</span>.
+                The comment lands as <span className="hk-mono">hawkeye-review[bot]</span>.
               </p>
               <p className="hk-detail">
                 A comment, never a block. On the next push, addressed findings resolve and only new

@@ -2,7 +2,7 @@
 
 **The personal code reviewer. Runs on the Claude or ChatGPT plan you already pay for. Arms onto any PR you choose. Nothing for repo admins to install.**
 
-> The sharp-eyed one. `hawkeye[bot]` (currently `hawkeye-review[bot]`; the `hawkeye` slug is reserved for the hosted instance) looks over every PR you arm.
+> The sharp-eyed one. `hawkeye-review[bot]` looks over every PR you arm.
 
 Status: milestones 1 to 4 shipped, 5 and 6 open; the CLI is published as [`hawkeye-review`](https://www.npmjs.com/package/hawkeye-review) on npm. This is the design document; the README is the front door.
 
@@ -70,12 +70,12 @@ GitHub only lets an account comment on a PR if that account has access to the re
 
 | Where the PR lives | Posts as | Admin action needed |
 |---|---|---|
-| A repo with the Hawkeye App installed | The App — `hawkeye[bot]` on the official instance (currently `hawkeye-review[bot]`), `hawkeye-<handle>[bot]` on a self-hosted one | The App is installed once, by whoever admins the repo |
+| A repo with the Hawkeye App installed | The App — `hawkeye-review[bot]` on the hosted instance, `hawkeye-<handle>[bot]` on a self-hosted one | The App is installed once, by whoever admins the repo |
 | Any other PR you can see *(planned, milestone 5)* | **You**, the person who asked for the review | None |
 
 **Resolution order:** an App installation exists on the repo → post as the bot; else → post as the requesting user. There is no third case and no machine user.
 
-Only the first row exists today: every trigger is an App webhook, the clone token is an installation token, and the control plane posts with one. The second row needs all three replaced, and its credential is undecided — see [open question 3](#open-questions).
+Only the first row exists today: every trigger is an App webhook, the clone token is an installation token, and the control plane posts with one. The second row needs all three replaced, and its credential is undecided — see [open question 2](#open-questions).
 
 Posting as the user is what makes a review possible on a repo nobody will install an App on — your employer's monorepo, a public project you contribute to but do not maintain. It works because Hawkeye only ever posts `COMMENT`: GitHub's code review limits restrict *approving* and *requesting changes* to accounts with explicit access, while commenting stays open to anyone who can see the pull request.
 
@@ -479,7 +479,7 @@ Not yet in a milestone: a runner Docker image for a VPS, the App Manifest flow a
 - **Open source** (MIT); official hosted instance run by the author; self-hostable end to end.
 - **Split brain:** hosted control plane + user-owned runner; the model never runs hosted.
 - **Control plane posts;** runner returns JSON only.
-- **Identity:** the App where it is installed (`hawkeye[bot]` hosted, currently `hawkeye-review[bot]`; `hawkeye-<handle>[bot]` self-hosted), else the requesting user. No machine user.
+- **Identity:** the App where it is installed (`hawkeye-review[bot]` hosted; `hawkeye-<handle>[bot]` self-hosted), else the requesting user. No machine user.
 - **Contributions:** a review the App posts does not touch the user's contribution graph; a review posted as the user appears in their review activity like any other. Accepted, because the footer carries the distinction.
 - **Trigger:** automatic from open for the author's own pull requests (per-user switch, default on), or from the dashboard; then every push. Quiet window default 0.
 - **Hosting:** Next.js + Postgres, deployable to Vercel + Neon and as a single Docker Compose. No Workers/D1 (locks self-hosters to one vendor).
@@ -490,13 +490,12 @@ Not yet in a milestone: a runner Docker image for a VPS, the App Manifest flow a
 
 ## Open questions
 
-1. **Name collision.** "Hawkeye" is a common product name (and a Marvel character); fine for OSS. Register the `hawkeye` GitHub App slug and the `hawkeye-review` handle now.
-2. **The harness trust boundary.** The review runs `bypassPermissions` with Bash over a checkout of code the user did not write, with their own environment and filesystem in reach. Reviewing pull requests you do not own widens that from code you trust to code anyone can send you, so the boundary has to be closed before that ships.
-3. **Posting as the user.** Sign-in uses the App's OAuth client, and a GitHub App user token reaches only repositories the App is installed on, so it cannot post on the repositories this identity exists for. The second identity needs another credential (an OAuth App grant, or a fine-grained token the user supplies), a trigger that is not a webhook (polling the user's open pull requests, or review-now from the dashboard), and a clone path that uses it. Undecided; nothing is built on the second row until it is.
+1. **The harness trust boundary.** The review runs `bypassPermissions` with Bash over a checkout of code the user did not write, with their own environment and filesystem in reach. Reviewing pull requests you do not own widens that from code you trust to code anyone can send you, so the boundary has to be closed before that ships.
+2. **Posting as the user.** Sign-in uses the App's OAuth client, and a GitHub App user token reaches only repositories the App is installed on, so it cannot post on the repositories this identity exists for. The second identity needs another credential (an OAuth App grant, or a fine-grained token the user supplies), a trigger that is not a webhook (polling the user's open pull requests, or review-now from the dashboard), and a clone path that uses it. Undecided; nothing is built on the second row until it is.
 
 ## Name
 
-**Hawkeye** — the sharp-eyed reviewer; reads naturally as `hawkeye[bot]`.
+**Hawkeye** — the sharp-eyed reviewer. The hosted App posts as `hawkeye-review[bot]`, the same name as the npm package; `hawkeye` alone belongs to a GitHub account that is not ours, and no App can take an account's name.
 
 Availability check (2026-08-22): npm `hawkeye`, `hawkeye-bot`, `hawkeye-review` unclaimed; GitHub App slugs `hawkeye`, `hawkeye-bot`, `hawkeye-review`, `hawkeye-code-review`, `hawkeye-pr` show no public app (App names are globally unique including private apps, so confirm at creation time; `hawkeye-reviewer` and `hawkeye-app` are taken). GitHub usernames `hawkeye`, `hawkeye-bot`, `hawkeyebot`, `hawkeye-app`, `hawkeye-dev` are taken; `hawkeye-review`, `hawkeyereview`, `usehawkeye`, `hawkeyehq` are free. Domains: `hawkeye.dev/.app/.sh/.bot` resolve (taken); `hawkeye.review`, `hawkeyereview.com`, `hawkeyebot.com`, `gethawkeye.dev` have no DNS and are worth checking at a registrar.
 
