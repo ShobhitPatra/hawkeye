@@ -37,7 +37,7 @@ export default async function ConnectPage({
   return (
     <ConnectView
       controlPlaneUrl={siteUrl()}
-      approve={<ApproveLoginForm prefill={code} {...(codeState ? { code: codeState } : {})} />}
+      approve={<ApproveLoginForm {...(codeState ? { code: codeState } : {})} />}
       runner={runner}
       now={now}
     />
