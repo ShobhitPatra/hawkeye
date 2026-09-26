@@ -65,7 +65,7 @@ You need a machine with Node 22 or newer, git 2.31 or newer, and [Claude Code](h
    The Runners page shows it online within a minute. If the machine sleeps or the terminal closes, reviews wait in the queue and run when it is back.
 5. **Open a pull request of your own**, not a draft, in a repository you installed the App on. A draft is reviewed once you mark it ready, unless you turn on "Review drafts too" in Settings. Within a minute its checks show `hawkeye` as "Reviewing on <your machine>", and a few minutes later the review is posted as a comment. Every later push is reviewed again, and the same comment is updated in place.
 
-To stop: Pause on the Pull requests page stops one pull request. Settings turns automatic review off for the pull requests you open from then on; ones already being reviewed keep going until you pause them. Closing the terminal stops the runner, and queued reviews wait for it.
+To stop: open the pull request's page from the Pull requests list and press Pause reviews; Turn reviews on brings it back. Settings turns automatic review off for the pull requests you open from then on; ones already being reviewed keep going until you pause them. Closing the terminal stops the runner, and queued reviews wait for it.
 
 If nothing happens, the Runners page says whether your runner is online, and each pull request's page on the dashboard lists its runs with the reason when one failed.
 
