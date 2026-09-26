@@ -112,9 +112,10 @@ export default async function HomePage({
               </p>
             </div>
             <div>
-              <p className="hk-claim">Every finding with its file, line and fix.</p>
+              <p className="hk-claim">Every finding says what breaks and what to do.</p>
               <p className="hk-detail">
-                No praise, no hedging, and silence where the code is fine.
+                Pinned to the changed line when there is one, with a one-line replacement when that
+                alone fixes it. No praise, no hedging, and silence where the code is fine.
               </p>
             </div>
             <div>

@@ -21,7 +21,7 @@ npx hawkeye-review prepare https://github.com/owner/repo/pull/123
 ## What a review gives you
 
 - **A verdict that follows the findings.** Blocked only when something must be fixed, Changes needed when something should be. The model's own opinion never sets it.
-- **Every finding with its file, line and fix.** No praise, no hedging, and silence where the code is fine.
+- **Every finding says what breaks and what to do.** Pinned to the changed line when there is one, with a one-line replacement when that alone fixes it. No praise, no hedging, and silence where the code is fine.
 - **Held to your repository's rules.** It reads `AGENTS.md`, `CLAUDE.md` and `CONTRIBUTING.md`, then looks at intent, behavior, blast radius, verification, fit and hygiene.
 - **It follows up on every push.** One comment, updated in place. Fixed findings resolve, only new ones are raised, and problems older than your change are marked Inherited and never block it.
 
