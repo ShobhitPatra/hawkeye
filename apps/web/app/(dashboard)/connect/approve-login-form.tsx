@@ -8,13 +8,7 @@ export type LoginCodeState =
   | { state: "approved"; runnerName: string }
   | { state: "expired" };
 
-export function ApproveLoginForm({
-  code,
-  prefill = "",
-}: {
-  code?: LoginCodeState;
-  prefill?: string;
-}) {
+export function ApproveLoginForm({ code }: { code?: LoginCodeState }) {
   const { state, pending, onSubmit } = useFormAction(approveRunnerLoginAction, {});
 
   if (state.runnerName)
@@ -30,6 +24,7 @@ export function ApproveLoginForm({
   return (
     <>
       <form onSubmit={onSubmit} className="hk-form-row">
+        {/* The code is typed, never filled from the link, so a link someone else sends cannot approve their runner in one click. */}
         <input
           className="hk-input hk-mono"
           name="code"
@@ -40,8 +35,7 @@ export function ApproveLoginForm({
           autoCorrect="off"
           spellCheck={false}
           enterKeyHint="go"
-          defaultValue={prefill}
-          autoFocus={prefill === ""}
+          autoFocus
         />
         <button type="submit" className="hk-button" data-variant="primary" disabled={pending}>
           Approve
