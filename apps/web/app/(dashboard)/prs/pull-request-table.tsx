@@ -4,7 +4,6 @@ import { formatUpdated } from "@/format-updated";
 import type { ListedPullRequest } from "@/pull-requests";
 import type { PullRequestStatus } from "@/pull-request-status";
 import { verdictLabel } from "@/run-format";
-import { ReviewControl } from "./review-control";
 
 function StatusWord({
   status,
@@ -15,7 +14,11 @@ function StatusWord({
 }) {
   switch (status.kind) {
     case "armed":
-      return null;
+      return (
+        <span key="on" className="hk-status hk-arrive">
+          Reviews on
+        </span>
+      );
     case "queued":
       return runnerOnline ? (
         <span key="queued" className="hk-status hk-arrive">
@@ -80,9 +83,6 @@ export function PullRequestTable({
             <th scope="col" data-secondary>
               Reviewed
             </th>
-            <th scope="col">
-              <span className="hk-visually-hidden">Review control</span>
-            </th>
           </tr>
         </thead>
         <tbody>
@@ -95,32 +95,28 @@ export function PullRequestTable({
               <tr key={pullRequest.htmlUrl} data-dim={isArmed ? undefined : "true"}>
                 <td>
                   <div className="hk-cell-stack">
-                    {isArmed ? (
-                      <Link href={pageHref}>{pullRequest.title}</Link>
-                    ) : (
-                      <a href={pullRequest.htmlUrl}>{pullRequest.title}</a>
-                    )}
+                    <Link href={pageHref}>{pullRequest.title}</Link>
                     <span className="hk-metadata">
                       {pullRequest.owner}/{pullRequest.repo}{" "}
                       <span className="hk-mono">#{pullRequest.number}</span>
-                      {!isArmed && " · on GitHub"}
                     </span>
                   </div>
                 </td>
-                <td>{status && <StatusWord status={status} runnerOnline={runnerOnline} />}</td>
+                <td>
+                  {status ? (
+                    <StatusWord status={status} runnerOnline={runnerOnline} />
+                  ) : (
+                    <span key="off" className="hk-status hk-arrive">
+                      Off
+                    </span>
+                  )}
+                </td>
                 <td className="hk-numeric" data-secondary>
                   {last?.rounds ?? ""}
                 </td>
                 <td className="hk-numeric">{last?.openFindings ?? ""}</td>
                 <td data-secondary>
                   {last ? formatUpdated(last.reviewedAt.toISOString(), now) : ""}
-                </td>
-                <td>
-                  <ReviewControl
-                    reference={pullRequest}
-                    installationId={pullRequest.installationId}
-                    reviewing={isArmed}
-                  />
                 </td>
               </tr>
             );

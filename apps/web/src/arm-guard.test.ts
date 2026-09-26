@@ -1,6 +1,10 @@
 import { GitHubRequestError, type GitHubClient } from "@hawkeye/core";
 import { describe, expect, it, vi } from "vitest";
-import { assertPullRequestInInstallation } from "./arm-guard";
+import {
+  assertAuthoredBy,
+  assertPullRequestInInstallation,
+  PullRequestRefusedError,
+} from "./arm-guard";
 
 function unsupported() {
   return vi.fn(() => {
@@ -68,5 +72,18 @@ describe("assertPullRequestInInstallation", () => {
     await expect(assertPullRequestInInstallation(github, "10", reference)).rejects.toThrow(
       "failed: 500 Server Error",
     );
+  });
+});
+
+describe("assertAuthoredBy", () => {
+  const pullRequest = { number: 7, author: "Octocat" } as Awaited<
+    ReturnType<GitHubClient["pullRequest"]>
+  >;
+  it("accepts the author whatever the case and refuses everyone else", () => {
+    expect(() => assertAuthoredBy(pullRequest, "octocat")).not.toThrow();
+    expect(() => assertAuthoredBy(pullRequest, "alice")).toThrow(
+      "pull request #7 was opened by Octocat, not by the signed-in user",
+    );
+    expect(() => assertAuthoredBy(pullRequest, undefined)).toThrow(PullRequestRefusedError);
   });
 });

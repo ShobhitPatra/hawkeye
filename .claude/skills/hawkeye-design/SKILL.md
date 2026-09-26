@@ -52,7 +52,7 @@ Design in monochrome on a warm neutral. Color is a secondary cue, always paired 
 - Amber (`--hk-warn`) only for states that need the user to act: runner offline, pull requests waiting.
 - No green. A posted review, a passing verdict, an online runner are the normal state and stay neutral.
 - No blue. Focus rings use the foreground color.
-- Whether a pull request is reviewed is the review control (`.hk-review-control`): a filled or hollow circle with its word beside it, Reviewing or Review, never a color. Hovering shows what a click does, Pause or Review; the moment after a click the word shimmers Starting or Pausing, and a refusal rolls the control back with one sentence under it. On a pull request page that has a posted review and reviews on, a plain button beside it reads Review from scratch; while the click is in flight it reads Queuing, and a refusal puts one sentence under it.
+- Whether a pull request is reviewed is a state word in the list (Reviews on, or Off on a dimmed row) and a plain button on its page: Pause reviews when they are on, Turn reviews on when they are off. While the click is in flight the button's word shimmers Pausing or Starting, and a refusal puts one sentence under it. On a pull request page that has a posted review and reviews on, a second plain button reads Review from scratch; in flight it reads Queuing. Nothing in a list row acts; a row states.
 - Both themes always. The system preference is the default; the theme choice (Light, Dark, System) in the account menu and the landing bar is kept in a cookie and stamped on `<html>` as `data-theme` by the server, so no page flashes; System stamps nothing and follows the media query. Never ship a color that only exists in one theme.
 
 ### Typography
@@ -112,11 +112,11 @@ The signed-in root. It answers, in order: is the runner up and is anything waiti
 
 ### Dashboard lists
 
-A list is a table at compact size. Text columns left, numbers right, header alignment matches its cells. The title is the link; hover shifts its color, never underlines. The last column is the review control, circle and word, the one button in the row. Under 760px the Round and Reviewed columns (`data-secondary`) hide so the title, the status word and the control fit a phone. Status is one word about the review itself: Queued, Waiting with runner offline in amber, In review with the shimmer, Run failed in red, or the verdict word; a pull request with reviews on and nothing yet reviewed shows no status word, the control already says Reviewing. A cell that needs a second line (repo under a title) stacks it as metadata, never as a second column. Status is a word, colored only by the rules above. Rows for unarmed or closed pull requests dim to secondary text. No row hover surfaces, no zebra stripes.
+A list is a table at compact size. Text columns left, numbers right, header alignment matches its cells. The title is the link; hover shifts its color, never underlines. No row carries a control. Under 760px the Round and Reviewed columns (`data-secondary`) hide so the title and the status word fit a phone. Status is one word about the review itself: Reviews on when nothing has been reviewed yet, Queued, Waiting with runner offline in amber, In review with the shimmer, Run failed in red, the verdict word, or Off on a pull request whose reviews are paused. A cell that needs a second line (repo under a title) stacks it as metadata, never as a second column. Status is a word, colored only by the rules above. Rows for unarmed or closed pull requests dim to secondary text. No row hover surfaces, no zebra stripes.
 
 ### Dashboard detail pages
 
-Top to bottom: crumb; title row with the review control and Re-review at the right; meta line; verdict (word on its own line at heading size, reason below); findings in the margin column grouped by severity in contract order; rounds table; review lenses behind a disclosure; link to the comment on GitHub. The review control sits on the title line because turning reviews on or off is the one action the page exists for.
+Top to bottom: crumb; title row with Pause reviews or Turn reviews on, then Review from scratch, at the right; meta line; verdict (word on its own line at heading size, reason below); findings in the margin column grouped by severity in contract order; rounds table; review lenses behind a disclosure; link to the comment on GitHub. The buttons sit on the title line because turning reviews on or off is the one action the page exists for, and the page is the one place it happens. Every listed pull request has a page, including one whose reviews were never on: it shows the title, No review yet, and Turn reviews on. Open on GitHub is the page's link out; list titles link only to the page.
 
 ### Landing
 
@@ -184,7 +184,7 @@ Verdict: `hk-verdict[data-verdict]`, `hk-verdict-word`, `hk-verdict-why`.
 
 Margin column: `hk-margin`, `hk-entry[data-severity]`, `hk-gutter`, `hk-severity[data-severity]`, `hk-lens`, `hk-entry-body`, `hk-claim`, `hk-path` (wrap the text in `<bdi>`), `hk-detail`, `hk-group-heading`.
 
-Controls: `hk-button[data-variant="primary"]`, `hk-review` with `hk-review-control[data-on][data-pending]`, `hk-review-word`, `hk-review-next`, `hk-input`, `hk-textarea`, `hk-choice` (`data-stack` for a column), `hk-field`, `hk-field-wide`, `hk-form-row`, `hk-action-row`, `hk-help`, `hk-link` (on an `<a>` inside `hk-root` only: forces the underline back inside any context that removes it, the top bar, navigation, crumbs, tables and the menu; a bare link in running text already underlines).
+Controls: `hk-button[data-variant="primary"]`, `hk-review` (a button with its refusal sentence beneath), `hk-input`, `hk-textarea`, `hk-choice` (`data-stack` for a column), `hk-field`, `hk-field-wide`, `hk-form-row`, `hk-action-row`, `hk-help`, `hk-link` (on an `<a>` inside `hk-root` only: forces the underline back inside any context that removes it, the top bar, navigation, crumbs, tables and the menu; a bare link in running text already underlines).
 
 Code and sections: `hk-code`, `hk-code-row` (a positioned wrapper whose `hk-copy` icon button sits inside the block's top right corner, showing a check for two seconds after copying), `hk-section`, `hk-steps` (an `<ol>` whose items carry `hk-step-body`).
 

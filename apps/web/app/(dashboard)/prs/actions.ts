@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { parseArmInput, parsePullRequestInput } from "@/arm-input";
-import { assertPullRequestInInstallation } from "@/arm-guard";
+import { assertAuthoredBy, assertPullRequestInInstallation } from "@/arm-guard";
 import { armPullRequest, disarmPullRequest } from "@/arming";
 import { resolveReviewTarget } from "@/review-target";
 import { enqueueJob } from "@/jobs";
@@ -34,6 +34,7 @@ async function armAndQueue(formData: FormData, options: { fromScratch: boolean }
     input.installationId,
     input,
   );
+  assertAuthoredBy(pullRequest, session.user.githubLogin);
 
   const target = await resolveReviewTarget(github, {
     reference: input,

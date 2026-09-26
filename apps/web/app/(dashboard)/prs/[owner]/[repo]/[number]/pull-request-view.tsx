@@ -3,8 +3,8 @@ import Link from "next/link";
 import { formatUpdated } from "@/format-updated";
 import { postingNote } from "@/posting-note";
 import { formatDuration, formatError, runFailureLabel, shortSha, verdictLabel } from "@/run-format";
-import type { ArmedPullRequestSummary, PullRequestFinding, PullRequestRun } from "@/runs";
-import { ReviewControl } from "../../../review-control";
+import type { PullRequestFinding, PullRequestRun } from "@/runs";
+import { ReviewToggle } from "../../../review-toggle";
 import { ReviewFromScratch } from "../../../review-from-scratch";
 
 const SEVERITY_LABELS: Record<Severity, string> = {
@@ -26,14 +26,16 @@ const LENS_LABELS: Record<Lens, string> = {
 export function PullRequestView({
   reference,
   title,
-  arm,
+  installationId,
+  armed,
   runs,
   findings,
   now,
 }: {
   reference: PullRequestReference;
   title?: string;
-  arm: ArmedPullRequestSummary;
+  installationId: string;
+  armed: boolean;
   runs: PullRequestRun[];
   findings: PullRequestFinding[];
   now: number;
@@ -65,13 +67,9 @@ export function PullRequestView({
             {title ?? `${reference.owner}/${reference.repo} #${reference.number}`}
           </h1>
           <div className="hk-actions">
-            <ReviewControl
-              reference={reference}
-              installationId={arm.installationId}
-              reviewing={arm.armed}
-            />
-            {lastReview && arm.armed && (
-              <ReviewFromScratch reference={reference} installationId={arm.installationId} />
+            <ReviewToggle reference={reference} installationId={installationId} reviewing={armed} />
+            {lastReview && armed && (
+              <ReviewFromScratch reference={reference} installationId={installationId} />
             )}
             <a className="hk-button" href={htmlUrl}>
               Open on GitHub
@@ -117,9 +115,9 @@ export function PullRequestView({
         <div className="hk-state hk-arrive">
           <p>No review yet.</p>
           <p>
-            {arm.armed
+            {armed
               ? "The next push queues one, or the runner picks up the job already waiting."
-              : "Click Review and its next push is reviewed."}
+              : "Turn reviews on and its next push is reviewed."}
           </p>
         </div>
       )}
