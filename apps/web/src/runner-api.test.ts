@@ -318,7 +318,21 @@ describe("claimJob", () => {
     expect(run).toMatchObject({ status: "error", error: "installation token" });
   });
 
-  it("names codex and drops the Claude model when the user chose Codex", async () => {
+  it("carries a Codex model when the user chose one", async () => {
+    await enqueue();
+    await db.insert(schema.userSettings).values({
+      userId: "user-1",
+      harness: "codex",
+      model: "gpt-6-sol",
+    });
+
+    const response = await claimJob(request("/api/runner/jobs"), claimDeps());
+
+    const { settings } = await response.json();
+    expect(settings).toMatchObject({ harness: "codex", model: "gpt-6-sol" });
+  });
+
+  it("names codex and drops a Claude model left over from before", async () => {
     await enqueue();
     await db.insert(schema.userSettings).values({
       userId: "user-1",

@@ -11,11 +11,11 @@ import {
 import {
   CONCURRENCY_RANGE,
   isHarnessChoice,
-  isModelChoice,
   MAX_QUIET_WINDOW_SECONDS,
   MAX_TURNS_RANGE,
   type ReviewSettings,
   type RunnerSettings,
+  modelFor,
   WALL_CLOCK_MINUTES_RANGE,
 } from "./review-settings";
 
@@ -130,11 +130,13 @@ function wholeNumber(
 }
 
 export function parseRunnerSettings(formData: FormData): RunnerSettings {
-  const harness = String(formData.get("harness") ?? "");
-  if (!isHarnessChoice(harness))
-    throw new FieldError("harness", "That harness is not in the list.");
-  const rawModel = String(formData.get("model") ?? "");
-  if (harness === "claude-code" && rawModel !== "" && !isModelChoice(rawModel)) {
+  const choice = String(formData.get("choice") ?? "");
+  const separator = choice.indexOf(":");
+  const harness = choice.slice(0, separator);
+  if (separator === -1 || !isHarnessChoice(harness))
+    throw new FieldError("model", "That harness is not in the list.");
+  const rawModel = choice.slice(separator + 1);
+  if (rawModel !== "" && modelFor(harness, rawModel) === undefined) {
     throw new FieldError("model", "That model is not in the list.");
   }
   return {

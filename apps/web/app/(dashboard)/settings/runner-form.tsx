@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import type { ReactNode } from "react";
 import {
   CONCURRENCY_RANGE,
   HARNESSES,
-  isModelChoice,
   MAX_TURNS_RANGE,
+  modelFor,
   MODELS,
+  retiredModel,
   type RunnerSettings,
   WALL_CLOCK_MINUTES_RANGE,
 } from "@/review-settings";
@@ -16,91 +17,83 @@ import { saveRunnerSettingsAction } from "./actions";
 import { FieldRefusal } from "./field-refusal";
 import { SaveRow } from "./save-row";
 
+function Choice({
+  value,
+  checked,
+  invalid,
+  children,
+}: {
+  value: string;
+  checked: boolean;
+  invalid: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <label>
+      <input
+        type="radio"
+        name="choice"
+        value={value}
+        defaultChecked={checked}
+        aria-invalid={invalid}
+      />
+      <span>{children}</span>
+    </label>
+  );
+}
+
 export function RunnerForm({ settings }: { settings: RunnerSettings }) {
   const form = useFormAction(saveRunnerSettingsAction, {});
   const refused = (field: SettingsField) =>
     form.state.field === field && !form.dirty ? form.state.error : undefined;
-  const retired = settings.model !== null && !isModelChoice(settings.model);
-  const [harness, setHarness] = useState(settings.harness);
+  const kept = modelFor(settings.harness, settings.model);
+  const retired = kept === undefined ? undefined : retiredModel(settings.harness, kept);
+  const chosen = (harness: string, model: string | undefined) =>
+    settings.harness === harness && kept === model;
+  const invalid = refused("model") !== undefined;
   return (
     <form onSubmit={form.onSubmit} onInput={form.onInput} className="hk-section" noValidate>
       <fieldset
         className="hk-choice"
         data-stack
-        aria-describedby={refused("harness") && "harness-refusal"}
-      >
-        <legend className="hk-compact">Harness</legend>
-        {HARNESSES.map((choice) => (
-          <label key={choice.value}>
-            <input
-              type="radio"
-              name="harness"
-              value={choice.value}
-              defaultChecked={settings.harness === choice.value}
-              aria-invalid={refused("harness") !== undefined}
-              onChange={() => setHarness(choice.value)}
-            />
-            {choice.label}
-          </label>
-        ))}
-      </fieldset>
-      <FieldRefusal id="harness-refusal" message={refused("harness")} />
-      <p className="hk-help">
-        The CLI the runner reviews with, signed in on your machine. A runner without that CLI fails
-        the review and says so.
-      </p>
-      {harness !== "claude-code" && (
-        <>
-          <input type="hidden" name="model" value={settings.model ?? ""} />
-          <p className="hk-help">
-            Codex picks its own model; the saved Claude Code model is kept for when you switch back.
-          </p>
-        </>
-      )}
-      <fieldset
-        className="hk-choice"
-        data-stack
-        hidden={harness !== "claude-code"}
-        disabled={harness !== "claude-code"}
         aria-describedby={refused("model") && "model-refusal"}
       >
-        <legend className="hk-compact">Model</legend>
-        {MODELS.map((model) => (
-          <label key={model.value}>
-            <input
-              type="radio"
-              name="model"
-              value={model.value}
-              defaultChecked={settings.model === model.value}
-              aria-invalid={refused("model") !== undefined}
-            />
-            {model.label}
-          </label>
-        ))}
-        <label>
-          <input
-            type="radio"
-            name="model"
-            value=""
-            defaultChecked={settings.model === null}
-            aria-invalid={refused("model") !== undefined}
-          />
-          The CLI's default
-        </label>
+        <legend>Model</legend>
+        <div className="hk-choice">
+          {HARNESSES.map((harness) => (
+            <fieldset key={harness.value} className="hk-choice" data-stack>
+              <legend>{harness.label}</legend>
+              {MODELS.filter((model) => model.harness === harness.value).map((model) => (
+                <Choice
+                  key={model.value}
+                  value={`${harness.value}:${model.value}`}
+                  checked={chosen(harness.value, model.value)}
+                  invalid={invalid}
+                >
+                  {model.label} <span className="hk-muted">· {model.hint}</span>
+                </Choice>
+              ))}
+              <Choice
+                value={`${harness.value}:`}
+                checked={chosen(harness.value, undefined)}
+                invalid={invalid}
+              >
+                {harness.label}&apos;s default
+              </Choice>
+              {retired?.harness === harness.value && (
+                <Choice value={`${harness.value}:${retired.value}`} checked invalid={invalid}>
+                  {retired.label} <span className="hk-muted">· no longer offered</span>
+                </Choice>
+              )}
+            </fieldset>
+          ))}
+        </div>
       </fieldset>
       <FieldRefusal id="model-refusal" message={refused("model")} />
-      {retired && harness === "claude-code" && (
-        <p className="hk-help">
-          Your saved model, {settings.model}, is no longer in the list. Reviews still ask for it;
-          saving switches to the choice above, or to the CLI's default if none is picked.
-        </p>
-      )}
-      {harness === "claude-code" && (
-        <p className="hk-help">
-          Passed to the claude CLI as --model on every review from the next claim. A runner started
-          with --model keeps that model instead.
-        </p>
-      )}
+      <p className="hk-help hk-prose">
+        The runner reviews with that CLI, signed in on your machine; a runner without it fails the
+        review and says so. A runner started with --model keeps its own model for Claude Code.
+      </p>
       <div className="hk-field">
         <label htmlFor="max-turns">Turns per review</label>
         <div className="hk-form-row">

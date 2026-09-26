@@ -816,12 +816,33 @@ html {
 
 /* Choice controls */
 
+:where(.hk-choice) {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
 .hk-choice {
   display: flex;
   gap: var(--hk-space-4);
   flex-wrap: wrap;
   font-size: var(--hk-type-compact);
   line-height: var(--hk-leading-compact);
+}
+.hk-choice > legend:not(.hk-visually-hidden) {
+  float: left;
+  width: 100%;
+  padding: 0;
+}
+.hk-choice:not([data-stack]):has(> .hk-choice) {
+  column-gap: var(--hk-space-6);
+  row-gap: var(--hk-space-4);
+}
+.hk-choice .hk-choice > legend {
+  font-size: var(--hk-type-metadata);
+  line-height: var(--hk-leading-metadata);
+  font-weight: var(--hk-weight-semibold);
+  color: var(--hk-fg-3);
 }
 .hk-choice label {
   display: inline-flex;

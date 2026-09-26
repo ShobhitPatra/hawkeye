@@ -140,12 +140,11 @@ describe("runner settings", () => {
     expect((await readRunnerSettings(db, "u1")).model).toBe("haiku");
   });
 
-  it("parses the radios and the limits", () => {
+  it("parses the choice and the limits", () => {
     expect(
       parseRunnerSettings(
         form({
-          harness: "claude-code",
-          model: "claude-sonnet-5",
+          choice: "claude-code:claude-sonnet-5",
           maxTurns: "12",
           wallClockMinutes: "5",
           concurrency: "1",
@@ -161,8 +160,7 @@ describe("runner settings", () => {
     expect(
       parseRunnerSettings(
         form({
-          harness: "claude-code",
-          model: "",
+          choice: "claude-code:",
           maxTurns: "1",
           wallClockMinutes: "60",
           concurrency: "1",
@@ -175,8 +173,7 @@ describe("runner settings", () => {
     expect(() =>
       parseRunnerSettings(
         form({
-          harness: "gemini",
-          model: "",
+          choice: "gemini:",
           maxTurns: "12",
           wallClockMinutes: "5",
           concurrency: "1",
@@ -186,8 +183,7 @@ describe("runner settings", () => {
     expect(
       parseRunnerSettings(
         form({
-          harness: "codex",
-          model: "",
+          choice: "codex:",
           maxTurns: "12",
           wallClockMinutes: "5",
           concurrency: "1",
@@ -196,26 +192,28 @@ describe("runner settings", () => {
     ).toBe("codex");
   });
 
-  it("keeps a saved model that left the list while Codex is the harness", () => {
+  it("keeps a retired model under its own CLI and refuses one from the other CLI", () => {
+    const limits = { maxTurns: "12", wallClockMinutes: "5", concurrency: "1" };
     expect(
-      parseRunnerSettings(
-        form({
-          harness: "codex",
-          model: "claude-old",
-          maxTurns: "12",
-          wallClockMinutes: "5",
-          concurrency: "1",
-        }),
-      ).model,
-    ).toBe("claude-old");
+      parseRunnerSettings(form({ choice: "claude-code:claude-opus-4-8", ...limits })),
+    ).toMatchObject({ harness: "claude-code", model: "claude-opus-4-8" });
+    expect(parseRunnerSettings(form({ choice: "codex:gpt-6-sol", ...limits }))).toMatchObject({
+      harness: "codex",
+      model: "gpt-6-sol",
+    });
+    expect(() => parseRunnerSettings(form({ choice: "codex:claude-opus-5", ...limits }))).toThrow(
+      "That model is not in the list.",
+    );
+    expect(() => parseRunnerSettings(form({ choice: "claude-code", ...limits }))).toThrow(
+      "That harness is not in the list.",
+    );
   });
 
   it("refuses an unknown model and limits outside the range", () => {
     expect(() =>
       parseRunnerSettings(
         form({
-          harness: "claude-code",
-          model: "haiku",
+          choice: "claude-code:haiku",
           maxTurns: "12",
           wallClockMinutes: "5",
           concurrency: "1",
@@ -225,8 +223,7 @@ describe("runner settings", () => {
     expect(
       parseRunnerSettings(
         form({
-          harness: "claude-code",
-          model: "claude-fable-5-1",
+          choice: "claude-code:claude-fable-5-1",
           maxTurns: "12",
           wallClockMinutes: "5",
           concurrency: "1",
@@ -236,8 +233,7 @@ describe("runner settings", () => {
     expect(() =>
       parseRunnerSettings(
         form({
-          harness: "claude-code",
-          model: "",
+          choice: "claude-code:",
           maxTurns: "0",
           wallClockMinutes: "5",
           concurrency: "1",
@@ -247,8 +243,7 @@ describe("runner settings", () => {
     expect(() =>
       parseRunnerSettings(
         form({
-          harness: "claude-code",
-          model: "",
+          choice: "claude-code:",
           maxTurns: "201",
           wallClockMinutes: "5",
           concurrency: "1",
@@ -258,8 +253,7 @@ describe("runner settings", () => {
     expect(() =>
       parseRunnerSettings(
         form({
-          harness: "claude-code",
-          model: "",
+          choice: "claude-code:",
           maxTurns: "12",
           wallClockMinutes: "61",
           concurrency: "1",
@@ -269,8 +263,7 @@ describe("runner settings", () => {
     expect(() =>
       parseRunnerSettings(
         form({
-          harness: "claude-code",
-          model: "",
+          choice: "claude-code:",
           maxTurns: "1.5",
           wallClockMinutes: "5",
           concurrency: "1",
@@ -280,8 +273,7 @@ describe("runner settings", () => {
     expect(() =>
       parseRunnerSettings(
         form({
-          harness: "claude-code",
-          model: "",
+          choice: "claude-code:",
           maxTurns: "12",
           wallClockMinutes: "5",
           concurrency: "4",
@@ -308,18 +300,20 @@ describe("field refusals", () => {
     expect(
       refusal(() =>
         parseRunnerSettings(
-          form({ harness: "claude-code", maxTurns: "0", wallClockMinutes: "5", concurrency: "1" }),
+          form({ choice: "claude-code:", maxTurns: "0", wallClockMinutes: "5", concurrency: "1" }),
         ),
       ),
     ).toBe("maxTurns");
-    expect(refusal(() => parseRunnerSettings(form({ harness: "vim" })))).toBe("harness");
+    expect(refusal(() => parseRunnerSettings(form({ choice: "vim:" })))).toBe("model");
     const runner = {
-      harness: "claude-code",
+      choice: "claude-code:",
       maxTurns: "20",
       wallClockMinutes: "5",
       concurrency: "1",
     };
-    expect(refusal(() => parseRunnerSettings(form({ ...runner, model: "gpt" })))).toBe("model");
+    expect(refusal(() => parseRunnerSettings(form({ ...runner, choice: "claude-code:gpt" })))).toBe(
+      "model",
+    );
     expect(refusal(() => parseRunnerSettings(form({ ...runner, wallClockMinutes: "0" })))).toBe(
       "wallClockMinutes",
     );
