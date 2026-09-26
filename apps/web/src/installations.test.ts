@@ -5,6 +5,7 @@ import * as schema from "./db/schema";
 import type { WebhookEvent } from "./github/webhook-events";
 import {
   installationBelongsToUser,
+  installationForOwner,
   syncUserInstallations,
   linkInstallationToUser,
   recordInstallation,
@@ -132,6 +133,20 @@ describe("installationBelongsToUser", () => {
     expect(await installationBelongsToUser(db, "80", "user-3")).toBe(false);
     await recordInstallation(db, installationEvent("unsuspend", 80, 800));
     expect(await installationBelongsToUser(db, "80", "user-3")).toBe(true);
+  });
+});
+
+describe("installationForOwner", () => {
+  it("finds the user's live installation on that account and nothing else", async () => {
+    await db.insert(schema.user).values({ id: "owner-u", name: "o", email: "owner@example.com" });
+    await db.insert(schema.installation).values([
+      { id: "in-1", accountLogin: "acme", accountType: "Organization" },
+      { id: "in-2", accountLogin: "acme", accountType: "Organization", deletedAt: new Date() },
+    ]);
+    await db.insert(schema.installationUser).values({ installationId: "in-1", userId: "owner-u" });
+    expect(await installationForOwner(db, "owner-u", "acme")).toBe("in-1");
+    expect(await installationForOwner(db, "owner-u", "other")).toBeUndefined();
+    expect(await installationForOwner(db, "someone-else", "acme")).toBeUndefined();
   });
 });
 

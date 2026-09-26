@@ -95,15 +95,10 @@ export function PullRequestTable({
               <tr key={pullRequest.htmlUrl} data-dim={isArmed ? undefined : "true"}>
                 <td>
                   <div className="hk-cell-stack">
-                    {isArmed ? (
-                      <Link href={pageHref}>{pullRequest.title}</Link>
-                    ) : (
-                      <a href={pullRequest.htmlUrl}>{pullRequest.title}</a>
-                    )}
+                    <Link href={pageHref}>{pullRequest.title}</Link>
                     <span className="hk-metadata">
                       {pullRequest.owner}/{pullRequest.repo}{" "}
                       <span className="hk-mono">#{pullRequest.number}</span>
-                      {!isArmed && " · on GitHub"}
                     </span>
                   </div>
                 </td>

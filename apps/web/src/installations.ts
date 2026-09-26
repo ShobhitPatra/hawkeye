@@ -112,3 +112,24 @@ export async function syncUserInstallations(
     return { linked: linked.length, unlinked: unlinked.length };
   });
 }
+
+export async function installationForOwner(
+  db: Db,
+  userId: string,
+  accountLogin: string,
+): Promise<string | undefined> {
+  const [row] = await db
+    .select({ id: installation.id })
+    .from(installationUser)
+    .innerJoin(installation, eq(installation.id, installationUser.installationId))
+    .where(
+      and(
+        eq(installationUser.userId, userId),
+        eq(installation.accountLogin, accountLogin),
+        isNull(installation.deletedAt),
+      ),
+    )
+    .orderBy(installation.id)
+    .limit(1);
+  return row?.id;
+}

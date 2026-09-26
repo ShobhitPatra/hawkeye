@@ -116,7 +116,7 @@ A list is a table at compact size. Text columns left, numbers right, header alig
 
 ### Dashboard detail pages
 
-Top to bottom: crumb; title row with Pause reviews or Turn reviews on, then Review from scratch, at the right; meta line; verdict (word on its own line at heading size, reason below); findings in the margin column grouped by severity in contract order; rounds table; review lenses behind a disclosure; link to the comment on GitHub. The buttons sit on the title line because turning reviews on or off is the one action the page exists for, and the page is the one place it happens.
+Top to bottom: crumb; title row with Pause reviews or Turn reviews on, then Review from scratch, at the right; meta line; verdict (word on its own line at heading size, reason below); findings in the margin column grouped by severity in contract order; rounds table; review lenses behind a disclosure; link to the comment on GitHub. The buttons sit on the title line because turning reviews on or off is the one action the page exists for, and the page is the one place it happens. Every listed pull request has a page, including one whose reviews were never on: it shows the title, No review yet, and Turn reviews on. Open on GitHub is the page's link out; list titles link only to the page.
 
 ### Landing
 

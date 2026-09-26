@@ -2,8 +2,9 @@ import { notFound } from "next/navigation";
 import { parsePullRequestParams } from "@/arm-input";
 import { getDb } from "@/db";
 import { createGitHubAppClient } from "@/github/app";
+import { installationForOwner } from "@/installations";
 import { findArmedPullRequest, listFindingsForPullRequest, listRunsForPullRequest } from "@/runs";
-import { fillTitles } from "@/pull-request-titles";
+import { fillTitles, pullRequestTitles, titleKey } from "@/pull-request-titles";
 import { requireSession } from "@/session";
 import { PullRequestView } from "./pull-request-view";
 
@@ -22,27 +23,34 @@ export default async function PullRequestPage({
   const db = getDb();
   const coordinates = { ...reference, userId: session.user.id };
   const arm = await findArmedPullRequest(db, coordinates);
-  if (!arm) notFound();
+  const installationId =
+    arm?.installationId ?? (await installationForOwner(db, session.user.id, reference.owner));
+  if (installationId === undefined) notFound();
+  const github = createGitHubAppClient({ fetch });
 
-  const [runs, findings, [titled]] = await Promise.all([
+  const [runs, findings, title] = await Promise.all([
     listRunsForPullRequest(db, coordinates),
     listFindingsForPullRequest(db, coordinates),
-    fillTitles(db, createGitHubAppClient({ fetch }), [
-      {
-        ...reference,
-        installationId: arm.installationId,
-        armedPrId: arm.id,
-        ...(arm.title === undefined ? {} : { title: arm.title }),
-      },
-    ]),
+    arm
+      ? fillTitles(db, github, [
+          {
+            ...reference,
+            installationId,
+            armedPrId: arm.id,
+            ...(arm.title === undefined ? {} : { title: arm.title }),
+          },
+        ]).then(([titled]) => titled?.title)
+      : pullRequestTitles(github, [{ ...reference, installationId }]).then((titles) =>
+          titles.get(titleKey(reference)),
+        ),
   ]);
 
-  const title = titled?.title;
   return (
     <PullRequestView
       reference={reference}
       {...(title ? { title } : {})}
-      arm={arm}
+      installationId={installationId}
+      armed={arm?.armed ?? false}
       runs={runs}
       findings={findings}
       now={Date.now()}
