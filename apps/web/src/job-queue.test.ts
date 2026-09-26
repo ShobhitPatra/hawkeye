@@ -10,6 +10,7 @@ import {
   createRun,
   heartbeatJob,
   holdsJobClaim,
+  jobSupersededStatement,
   requeueStaleJobs,
   requeueStaleJobsStatement,
 } from "./job-queue";
@@ -193,6 +194,11 @@ describe("the queue's indexes", () => {
     const ownSweepPlan = await plan(ownSweep);
     expect(ownSweepPlan).not.toContain("Seq Scan on job");
     expect(ownSweepPlan).toContain("job_stale");
+    const supersededPlan = await plan(
+      jobSupersededStatement(db, { id: "any-job", armedPrId: "seed-a5" }),
+    );
+    expect(supersededPlan).not.toContain("Seq Scan on job");
+    expect(supersededPlan).toContain("job_by_armed_pr");
   });
 });
 
@@ -310,6 +316,29 @@ describe("requeueStaleJobs", () => {
     const rows = await db.select().from(schema.job);
     expect(rows.find((row) => row.id === one.id)?.state).toBe("queued");
     expect(rows.find((row) => row.id === two.id)?.state).toBe("queued");
+  });
+
+  it("fails a stale claim once its pull request moved to a newer head, claimed or finished", async () => {
+    for (const newer of ["claimed", "done"] as const) {
+      const stale = await enqueue("armed-1", minutesBefore(10));
+      await claim();
+      await heartbeatJob(db, { jobId: stale.id, runnerId: "runner-1", now: minutesBefore(6) });
+      const later = await queueJob(db, {
+        headCurrentAt: new Date(),
+        armedPrId: "armed-1",
+        headSha: "c".repeat(40),
+        baseSha: "b".repeat(40),
+        notBefore: minutesBefore(5),
+      });
+      if (newer === "claimed") await claim("runner-2");
+      else await db.update(schema.job).set({ state: "done" }).where(eq(schema.job.id, later.id));
+
+      expect((await requeueStaleJobs(db, { now })).swept).toBe(1);
+
+      const [row] = await db.select().from(schema.job).where(eq(schema.job.id, stale.id));
+      expect(row?.state, newer).toBe("failed");
+      await db.delete(schema.job);
+    }
   });
 
   it("puts back only the named user's stale claims when scoped to one", async () => {

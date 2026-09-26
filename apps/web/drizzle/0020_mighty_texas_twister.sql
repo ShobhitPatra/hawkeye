@@ -1,0 +1,1 @@
+CREATE INDEX "job_by_armed_pr" ON "job" USING btree ("armed_pr_id","created_at","id");

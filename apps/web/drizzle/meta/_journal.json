@@ -141,6 +141,13 @@
       "when": 1790132452375,
       "tag": "0019_uneven_zeigeist",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790436252157,
+      "tag": "0020_mighty_texas_twister",
+      "breakpoints": true
     }
   ]
 }

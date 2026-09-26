@@ -99,6 +99,11 @@ export function requeueStaleJobsStatement(
                                    and newer.state = 'claimed'
                                    and newer.heartbeat_at < ${cutoff}
                                    and (newer.created_at, newer.id) > (${job.createdAt}, ${job.id}))
+                      or exists (select 1
+                                 from ${job} later
+                                 where later.armed_pr_id = ${job.armedPrId}
+                                   and later.head_sha <> ${job.headSha}
+                                   and (later.created_at, later.id) > (${job.createdAt}, ${job.id}))
                     then 'failed'
                     else 'queued'
                   end)::job_state`,
@@ -310,12 +315,12 @@ export async function newerRunIsLive(
   return live !== undefined;
 }
 
-export async function jobSuperseded(
+export function jobSupersededStatement(
   db: Db,
   current: Pick<Job, "id" | "armedPrId">,
-): Promise<boolean> {
+): Statement<{ id: string }> {
   const own = alias(job, "own");
-  const [newer] = await db
+  return db
     .select({ id: job.id })
     .from(job)
     .innerJoin(own, eq(own.id, current.id))
@@ -327,5 +332,12 @@ export async function jobSuperseded(
       ),
     )
     .limit(1);
+}
+
+export async function jobSuperseded(
+  db: Db,
+  current: Pick<Job, "id" | "armedPrId">,
+): Promise<boolean> {
+  const [newer] = await jobSupersededStatement(db, current);
   return newer !== undefined;
 }

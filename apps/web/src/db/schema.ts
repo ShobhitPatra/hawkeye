@@ -140,6 +140,7 @@ export const job = pgTable(
     index("job_stale")
       .on(t.heartbeatAt)
       .where(sql`${t.state} = 'claimed'`),
+    index("job_by_armed_pr").on(t.armedPrId, t.createdAt, t.id),
   ],
 );
 
