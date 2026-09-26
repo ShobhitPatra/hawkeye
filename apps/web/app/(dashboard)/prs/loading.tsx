@@ -16,7 +16,6 @@ export default function Loading() {
           { label: "Round", numeric: true, width: "2ch", secondary: true },
           { label: "Findings", numeric: true, width: "2ch" },
           { label: "Reviewed", width: "9ch", secondary: true },
-          { label: "", width: "8ch" },
         ]}
       />
     </main>

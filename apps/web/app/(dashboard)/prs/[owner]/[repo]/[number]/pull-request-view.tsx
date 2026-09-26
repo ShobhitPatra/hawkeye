@@ -4,7 +4,7 @@ import { formatUpdated } from "@/format-updated";
 import { postingNote } from "@/posting-note";
 import { formatDuration, formatError, runFailureLabel, shortSha, verdictLabel } from "@/run-format";
 import type { ArmedPullRequestSummary, PullRequestFinding, PullRequestRun } from "@/runs";
-import { ReviewControl } from "../../../review-control";
+import { ReviewToggle } from "../../../review-toggle";
 import { ReviewFromScratch } from "../../../review-from-scratch";
 
 const SEVERITY_LABELS: Record<Severity, string> = {
@@ -65,7 +65,7 @@ export function PullRequestView({
             {title ?? `${reference.owner}/${reference.repo} #${reference.number}`}
           </h1>
           <div className="hk-actions">
-            <ReviewControl
+            <ReviewToggle
               reference={reference}
               installationId={arm.installationId}
               reviewing={arm.armed}
@@ -119,7 +119,7 @@ export function PullRequestView({
           <p>
             {arm.armed
               ? "The next push queues one, or the runner picks up the job already waiting."
-              : "Click Review and its next push is reviewed."}
+              : "Turn reviews on and its next push is reviewed."}
           </p>
         </div>
       )}

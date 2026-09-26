@@ -781,96 +781,6 @@ html {
   flex-direction: column;
   gap: var(--hk-space-1);
 }
-.hk-review-control {
-  display: inline-grid;
-  grid-template-columns: 10px auto;
-  column-gap: var(--hk-space-2);
-  align-items: center;
-  position: relative;
-  font: inherit;
-  font-size: var(--hk-type-compact);
-  line-height: var(--hk-leading-compact);
-  color: var(--hk-fg-2);
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  transition:
-    color var(--hk-duration) var(--hk-ease-color),
-    transform 120ms var(--hk-ease);
-}
-.hk-review-control:active:not([data-pending]) {
-  transform: scale(0.98);
-}
-.hk-review-control i {
-  grid-area: 1 / 1;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 1.5px solid currentColor;
-  flex: none;
-  transition: background-color var(--hk-duration) var(--hk-ease-color);
-}
-.hk-review-control[data-on] {
-  color: var(--hk-fg);
-}
-.hk-review-control[data-on] i,
-.hk-review-control[data-pending] i {
-  background: currentColor;
-}
-.hk-review-control:focus-visible {
-  color: var(--hk-fg);
-}
-.hk-review-word,
-.hk-review-next,
-.hk-review-control > .hk-status {
-  grid-area: 1 / 2;
-  white-space: nowrap;
-}
-.hk-review-next,
-.hk-review-control:not([data-pending]) > .hk-status {
-  visibility: hidden;
-}
-.hk-review-control[data-pending] .hk-review-word {
-  color: var(--hk-fg-2);
-  animation: hk-vanish 1ms linear 300ms forwards;
-}
-@keyframes hk-vanish {
-  to {
-    visibility: hidden;
-  }
-}
-.hk-review-control:not([data-pending], [data-settled]):focus-visible .hk-review-word {
-  visibility: hidden;
-}
-.hk-review-control:not([data-pending], [data-settled]):focus-visible .hk-review-next {
-  visibility: visible;
-}
-@media (hover: hover) and (pointer: fine) {
-  .hk-review-control:hover {
-    color: var(--hk-fg);
-  }
-  .hk-review-control:not([data-pending], [data-settled]):hover .hk-review-word {
-    visibility: hidden;
-  }
-  .hk-review-control:not([data-pending], [data-settled]):hover .hk-review-next {
-    visibility: visible;
-  }
-}
-.hk-review-control::before {
-  content: "";
-  position: absolute;
-  inset: -8px -6px;
-}
-.hk-review-control[data-pending] > .hk-status {
-  opacity: 0;
-  animation:
-    hk-appear 1ms linear 300ms forwards,
-    hk-shimmer 1.8s linear infinite;
-}
-.hk-review-control[data-pending] {
-  cursor: progress;
-}
 
 .hk-input {
   height: 30px;
@@ -1434,12 +1344,8 @@ span.hk-arrive {
     background: none;
     -webkit-text-fill-color: currentColor;
   }
-  .hk-progress,
-  .hk-review-control[data-pending] > .hk-status {
+  .hk-progress {
     opacity: 1;
-  }
-  .hk-review-control[data-pending] .hk-review-word {
-    visibility: hidden;
   }
   .hk-progress::after {
     width: 100%;
@@ -1544,9 +1450,6 @@ span.hk-arrive {
   .hk-menu-who {
     flex-direction: column;
     align-items: flex-start;
-  }
-  .hk-review-control {
-    min-height: 44px;
   }
   .hk-copy {
     top: 2px;
