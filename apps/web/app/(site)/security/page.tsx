@@ -25,7 +25,7 @@ export default function SecurityPage() {
         <li>The control plane: sign-in, the GitHub App webhook, the runner API, token handling.</li>
         <li>The runner: the daemon, the review harness and the worktree it reviews in.</li>
         <li>The review contract: the fences around untrusted repository content in the prompt.</li>
-        <li>The hosted instance at hawkeye-review.vercel.app.</li>
+        <li>The hosted instance at hawkeye.reviews.</li>
       </ul>
       <p>
         Findings that need physical access to a machine, or that only affect a self-hosted instance

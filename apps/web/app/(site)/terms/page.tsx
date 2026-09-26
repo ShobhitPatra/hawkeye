@@ -7,8 +7,8 @@ export default function TermsPage() {
     <>
       <h1 className="hk-title">Terms</h1>
       <p className="hk-lede">
-        The terms for using the hosted instance at hawkeye-review.vercel.app. The software itself is
-        MIT licensed, and running your own instance is covered by that license alone.
+        The terms for using the hosted instance at hawkeye.reviews. The software itself is MIT
+        licensed, and running your own instance is covered by that license alone.
       </p>
       <h2 className="hk-heading">What you get</h2>
       <p>

@@ -16,7 +16,7 @@ You will get an acknowledgement within three days and a fix or a decision within
 - The runner (`packages/runner`): the daemon, the review harness and the worktree it reviews in.
 - The review contract (`packages/core`): prompt fences around untrusted repository content.
 
-Findings about the hosted instance at https://hawkeye-review.vercel.app are in scope. Findings that need physical access to a user's machine, or that only affect a self-hosted instance configured against the documentation, are still welcome but may be handled as hardening rather than as a vulnerability.
+Findings about the hosted instance at https://hawkeye.reviews are in scope. Findings that need physical access to a user's machine, or that only affect a self-hosted instance configured against the documentation, are still welcome but may be handled as hardening rather than as a vulnerability.
 
 ## Supported versions
 

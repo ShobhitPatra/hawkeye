@@ -2,7 +2,7 @@
 
 Hawkeye is two parts. The control plane is a Next.js app on Postgres: sign-in, the GitHub App webhook, the queue, the dashboard, and the posting of reviews. The runner is `npx hawkeye-review runner` on a machine with a Claude Code login; it never holds GitHub credentials of its own. This guide sets up the control plane; the runner is the same two commands whichever way you host it.
 
-Most people should use the hosted instance at [hawkeye-review.vercel.app](https://hawkeye-review.vercel.app); this guide is for running your own. The shape is Vercel for the app and Neon for Postgres, which is how the hosted instance runs. A local machine with Docker Compose works for development.
+Most people should use the hosted instance at [hawkeye.reviews](https://hawkeye.reviews); this guide is for running your own. The shape is Vercel for the app and Neon for Postgres, which is how the hosted instance runs. A local machine with Docker Compose works for development.
 
 ## 1. Create a GitHub App
 

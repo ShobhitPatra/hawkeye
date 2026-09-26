@@ -16,7 +16,7 @@ jobs:
       - name: Requeue stale review jobs
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          CONTROL_PLANE_URL: ${{ vars.CONTROL_PLANE_URL || 'https://hawkeye-review.vercel.app' }}
+          CONTROL_PLANE_URL: ${{ vars.CONTROL_PLANE_URL || 'https://hawkeye.reviews' }}
         run: |
           if [ -z "$CRON_SECRET" ]; then
             echo "::notice::CRON_SECRET is not set; nothing swept."

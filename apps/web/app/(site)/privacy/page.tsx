@@ -7,9 +7,9 @@ export default function PrivacyPage() {
     <>
       <h1 className="hk-title">Privacy</h1>
       <p className="hk-lede">
-        What the hosted instance at hawkeye-review.vercel.app keeps, what never reaches it, and how
-        to have your data removed. This page describes the code as it runs; the code is open, so you
-        can check it.
+        What the hosted instance at hawkeye.reviews keeps, what never reaches it, and how to have
+        your data removed. This page describes the code as it runs; the code is open, so you can
+        check it.
       </p>
       <h2 className="hk-heading">What the control plane stores</h2>
       <ul>
