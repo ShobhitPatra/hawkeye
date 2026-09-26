@@ -18,6 +18,21 @@ Hawkeye is a code reviewer that belongs to you, not to a repository. Open a pull
 npx hawkeye-review prepare https://github.com/owner/repo/pull/123
 ```
 
+## What a review gives you
+
+- **A verdict that follows the findings.** Blocked only when something must be fixed, Changes needed when something should be. The model's own opinion never sets it.
+- **Every finding with its file, line and fix.** No praise, no hedging, and silence where the code is fine.
+- **Held to your repository's rules.** It reads `AGENTS.md`, `CLAUDE.md` and `CONTRIBUTING.md`, then looks at intent, behavior, blast radius, verification, fit and hygiene.
+- **It follows up on every push.** One comment, updated in place. Fixed findings resolve, only new ones are raised, and problems older than your change are marked Inherited and never block it.
+
+## What it caught on its own pull requests
+
+Three findings from Hawkeye's reviews of Hawkeye, each fixed before merge. [Every review is public](https://github.com/ShobhitPatra/hawkeye/pulls?q=is%3Apr).
+
+- **Must fix** · [#260](https://github.com/ShobhitPatra/hawkeye/pull/260#discussion_r4111551292) · The new fallback lets a user arm a pull request they did not author.
+- **Should fix** · [#262](https://github.com/ShobhitPatra/hawkeye/pull/262#discussion_r4111681774) · Concurrent claims can invalidate the replacement run they just handed out.
+- **Should fix** · [#238](https://github.com/ShobhitPatra/hawkeye/pull/238#discussion_r4103863493) · `event.currentTarget` is null once `await navigator.clipboard.writeText` has rejected, so the refused branch throws.
+
 ## A real review
 
 The first round on this repository's own [pull request #87](https://github.com/ShobhitPatra/hawkeye/pull/87) is a review the bot posted: a verdict, one line per finding with the file and line, the lenses behind a disclosure, and the round in the footer. The [landing page](https://hawkeye.reviews) replays it from open to posted.
@@ -26,12 +41,10 @@ The first round on this repository's own [pull request #87](https://github.com/S
 
 1. **Every push queues one job for its head.** Pushes collapse to the latest head, so a busy branch never piles up reviews. The hosted control plane holds only the queue, webhooks and findings.
 2. **Your runner claims it and clones the branch.** One process on hardware you own. The control plane never sees a plan credential and never proxies model traffic.
-3. **Your coding agent reviews it under your login.** Six lenses, four severities, one verdict. Only validated findings JSON leaves the machine.
-4. **The comment lands as `hawkeye-review[bot]`.** A comment, never a block. On the next push, addressed findings resolve and only new ones are raised.
+3. **Your coding agent reviews it under your login.** Only the validated findings leave the machine; the checkout and your login stay there.
+4. **The comment lands as `hawkeye-review[bot]`.** A comment and a passing commit status that carries the verdict, never a block. Merging stays your call.
 
-## What it costs
-
-Nothing beyond the plan you already pay for. Your plan's limits are the budget, and the dashboard shows what each review cost in turns and minutes.
+Your plan's limits are the budget, and the dashboard shows what each review took in turns and minutes.
 
 ## What the runner can reach
 
