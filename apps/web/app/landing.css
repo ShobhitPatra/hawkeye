@@ -412,6 +412,16 @@
 .ld-steps[data-plain] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
+@media (min-width: 901px) {
+  .ld-steps[data-plain]:has(> :nth-child(4)) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (min-width: 761px) and (max-width: 900px) {
+  .ld-steps[data-plain]:has(> :nth-child(4)) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
 .ld-steps[data-plain] > div::before {
   content: none;
 }
