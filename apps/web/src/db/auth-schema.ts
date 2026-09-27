@@ -38,8 +38,6 @@ export const account = pgTable(
   "account",
   {
     id: text("id").primaryKey(),
-    // Better Auth 1.7.6 no longer writes issuer; the column is dropped once no deployment runs 1.7.1.
-    issuer: text("issuer"),
     accountId: text("account_id").notNull(),
     providerId: text("provider_id").notNull(),
     userId: text("user_id")

@@ -6,7 +6,7 @@ import * as schema from "./db/schema";
 import { createTestDb } from "./test/pglite";
 
 describe("Better Auth on the migrated schema", () => {
-  it("creates a GitHub user and account without an issuer", async () => {
+  it("creates a GitHub user and account", async () => {
     const db = await createTestDb();
     const auth = betterAuth({
       database: drizzleAdapter(db, { provider: "pg", schema }),
@@ -24,7 +24,6 @@ describe("Better Auth on the migrated schema", () => {
       providerId: "github",
       accountId: "583231",
       userId: user.id,
-      issuer: null,
     });
   });
 });

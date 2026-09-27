@@ -50,7 +50,7 @@ pnpm install
 DATABASE_URL='<the Neon connection string>' pnpm --filter web db:migrate
 ```
 
-Run the same command after pulling a version that adds a migration; migrations are additive and safe to run before the matching deployment goes live.
+Run the same command after pulling a version that adds a migration; migrations are additive and safe to run before the matching deployment goes live. The one exception is `0022_curvy_polaris`, which drops `account.issuer`: the version before it still reads that column, so deploy first and run it after.
 
 Then set the App's callback and webhook URLs to the deployment's URL, if you left them for later, and redeploy once so `BETTER_AUTH_URL` is baked in.
 
@@ -99,4 +99,4 @@ GitHub has to reach the webhook, so `BETTER_AUTH_URL` and the App's URLs need a 
 
 ## Updating
 
-Pull `main`, run the migration command against your database, and redeploy. Vercel redeploys on push if the project is connected to your fork; the runner updates itself on the next `npx hawkeye-review` start, or pin a version with `npx hawkeye-review@<version>`.
+Pull `main`, run the migration command against your database, and redeploy. When the update brings `0022_curvy_polaris`, reverse the first two: redeploy, then run the migration, since the version before it still reads the column it drops. Vercel redeploys on push if the project is connected to your fork; the runner updates itself on the next `npx hawkeye-review` start, or pin a version with `npx hawkeye-review@<version>`.
