@@ -16,12 +16,17 @@ Re-running `prepare` on the same pull request starts the next round: the prompt 
 
 Needs Node 22+, git 2.31+, and a GitHub token (`--github-token`, `GITHUB_TOKEN`, or `gh auth token`).
 
-## Connect a machine to a Hawkeye control plane
+## Review every push with the runner
 
 ```sh
-npx hawkeye-review runner login --url <control plane url>   # approve the code in the browser
-npx hawkeye-review runner                                   # long-lived daemon on your Claude Code login
+npx hawkeye-review runner
 ```
+
+Leave it running. The first run connects this machine: it opens the Connect page and waits while you type the code it prints there, then saves the runner token to `~/.config/hawkeye/runner.json` and starts. Turn reviews on for a pull request from the dashboard, and the runner reviews every push to it.
+
+It connects to https://hawkeye.reviews unless you pass `--url` for your own control plane. `npx hawkeye-review runner login` connects again without starting, for example after the runner was removed.
+
+Needs Node 22+, git 2.31+, and Claude Code or Codex installed and signed in.
 
 ## License
 

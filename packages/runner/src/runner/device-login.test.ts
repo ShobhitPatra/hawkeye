@@ -10,7 +10,10 @@ const started = {
 };
 const slept: number[] = [];
 
-function login(responses: (Response | Error)[]) {
+function login(
+  responses: (Response | Error)[],
+  extra: Pick<Parameters<typeof deviceLogin>[0], "lead" | "openBrowser"> = {},
+) {
   slept.length = 0;
   const fetch = vi.fn(async () => {
     const next = responses.shift();
@@ -29,6 +32,7 @@ function login(responses: (Response | Error)[]) {
     sleep: async (milliseconds) => {
       slept.push(milliseconds);
     },
+    ...extra,
   });
   return { fetch, logged, promise };
 }
@@ -43,8 +47,9 @@ describe("deviceLogin", () => {
     await expect(promise).resolves.toBe("hk_new");
     expect(slept).toEqual([5000, 5000]);
     expect(logged).toEqual([
-      "Code <AAAA-BBBB>",
-      "Approve it at " + started.verifyUrl,
+      "Type this code in a browser, at the link below:",
+      "<AAAA-BBBB>",
+      started.verifyUrl,
       "Waiting for approval, up to 10 minutes.",
     ]);
     const [startUrl, startInit] = fetch.mock.calls[0]! as unknown as [string, RequestInit];
@@ -53,6 +58,52 @@ describe("deviceLogin", () => {
     const [collectUrl, collectInit] = fetch.mock.calls[1]! as unknown as [string, RequestInit];
     expect(collectUrl).toBe("https://hawkeye.example/api/runner/login/collect");
     expect(JSON.parse(collectInit.body as string)).toEqual({ deviceSecret: "hkd_secret" });
+  });
+  it("opens the link in a browser and says so after the lead", async () => {
+    const opened: string[] = [];
+    const { logged, promise } = login(
+      [
+        Response.json(started, { status: 201 }),
+        Response.json({ status: "approved", token: "hk_new" }),
+      ],
+      {
+        lead: "Not connected.",
+        openBrowser: async (url) => {
+          opened.push(url);
+          return true;
+        },
+      },
+    );
+    await expect(promise).resolves.toBe("hk_new");
+    expect(opened).toEqual([started.verifyUrl]);
+    expect(logged[0]).toBe("Not connected. Type this code in the browser that just opened:");
+  });
+  it("refuses a link that is not http(s) before opening or printing it", async () => {
+    for (const verifyUrl of ["file:///etc/passwd", "vscode://open", "--help", "not a url"]) {
+      const openBrowser = vi.fn(async () => true);
+      const { logged, promise } = login(
+        [Response.json({ ...started, verifyUrl }, { status: 201 })],
+        { openBrowser },
+      );
+      await expect(promise).rejects.toThrow("invalid login response: verifyUrl");
+      expect(openBrowser).not.toHaveBeenCalled();
+      expect(logged).toEqual([]);
+    }
+  });
+  it("points at the link when the browser did not open", async () => {
+    const { logged, promise } = login(
+      [
+        Response.json(started, { status: 201 }),
+        Response.json({ status: "approved", token: "hk_new" }),
+      ],
+      { openBrowser: async () => false },
+    );
+    await expect(promise).resolves.toBe("hk_new");
+    expect(logged.slice(0, 3)).toEqual([
+      "Type this code in a browser, at the link below:",
+      "<AAAA-BBBB>",
+      started.verifyUrl,
+    ]);
   });
   it("throws when the login expires on the server", async () => {
     const { promise } = login([

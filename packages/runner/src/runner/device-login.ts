@@ -7,6 +7,8 @@ export type DeviceLoginInput = {
   fetch: typeof fetch;
   log(line: string): void;
   emphasize?(text: string): string;
+  lead?: string;
+  openBrowser?(url: string): Promise<boolean>;
   now?(): number;
   sleep?(milliseconds: number): Promise<void>;
 };
@@ -19,6 +21,13 @@ function text(value: unknown, field: string): string {
   if (typeof value !== "string" || value === "")
     throw new Error(`invalid login response: ${field}`);
   return value;
+}
+
+function link(value: unknown, field: string): string {
+  const url = URL.parse(text(value, field));
+  if (url === null || (url.protocol !== "http:" && url.protocol !== "https:"))
+    throw new Error(`invalid login response: ${field}`);
+  return url.href;
 }
 
 function seconds(value: unknown, field: string): number {
@@ -47,15 +56,19 @@ export async function deviceLogin(input: DeviceLoginInput): Promise<string> {
     );
   const code = text(payload.code, "code");
   const deviceSecret = text(payload.deviceSecret, "deviceSecret");
-  const verifyUrl = text(payload.verifyUrl, "verifyUrl");
+  const verifyUrl = link(payload.verifyUrl, "verifyUrl");
   const intervalSeconds = seconds(payload.intervalSeconds, "intervalSeconds");
 
   const expiresAt = typeof payload.expiresAt === "string" ? Date.parse(payload.expiresAt) : NaN;
   const minutes = Number.isNaN(expiresAt)
     ? undefined
     : Math.round((expiresAt - (input.now ?? Date.now)()) / 60_000);
-  input.log(`Code ${(input.emphasize ?? ((value) => value))(code)}`);
-  input.log(`Approve it at ${verifyUrl}`);
+  const opened = (await input.openBrowser?.(verifyUrl)) ?? false;
+  input.log(
+    `${input.lead === undefined ? "" : `${input.lead} `}${opened ? "Type this code in the browser that just opened:" : "Type this code in a browser, at the link below:"}`,
+  );
+  input.log((input.emphasize ?? ((value) => value))(code));
+  input.log(verifyUrl);
   input.log(
     `Waiting for approval${minutes === undefined || minutes < 1 ? "" : `, up to ${minutes} minute${minutes === 1 ? "" : "s"}`}.`,
   );
