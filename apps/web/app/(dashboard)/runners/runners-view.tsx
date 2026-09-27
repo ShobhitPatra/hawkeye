@@ -2,7 +2,15 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { RunnerRow, type RunnerRowData } from "./runner-row";
 
-export function RunnersView({ runners, create }: { runners: RunnerRowData[]; create: ReactNode }) {
+export function RunnersView({
+  runners,
+  connectCommand,
+  create,
+}: {
+  runners: RunnerRowData[];
+  connectCommand: string;
+  create: ReactNode;
+}) {
   return (
     <main className="hk-page">
       <div className="hk-header">
@@ -24,8 +32,8 @@ export function RunnersView({ runners, create }: { runners: RunnerRowData[]; cre
         <div className="hk-state">
           <p>No runners yet.</p>
           <p>
-            Run <span className="hk-mono">npx hawkeye-review runner</span> on a machine you own; its
-            first run connects it.
+            Run <span className="hk-mono">{connectCommand}</span> on a machine you own; its first
+            run connects it.
           </p>
         </div>
       ) : (

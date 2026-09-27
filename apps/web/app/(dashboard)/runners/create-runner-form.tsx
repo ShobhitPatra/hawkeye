@@ -4,10 +4,10 @@ import { useFormAction } from "../use-form-action";
 import { createRunnerAction } from "./actions";
 import { TokenShown } from "./token-shown";
 
-export function CreateRunnerForm({ urlFlag }: { urlFlag: string }) {
+export function CreateRunnerForm({ controlPlaneUrl }: { controlPlaneUrl: string }) {
   const { state, pending, onSubmit } = useFormAction(createRunnerAction, {});
 
-  if (state.token) return <TokenShown token={state.token} urlFlag={urlFlag} />;
+  if (state.token) return <TokenShown token={state.token} controlPlaneUrl={controlPlaneUrl} />;
   return (
     <div className="hk-section">
       <form onSubmit={onSubmit} className="hk-form-row">

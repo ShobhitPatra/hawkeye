@@ -3,7 +3,7 @@ import { formatUpdated } from "@/format-updated";
 import { findRunnerLogin, sweepRunnerLogins } from "@/runner-login";
 import { requestRunnerStatus } from "@/request-runner-status";
 import { requireSession } from "@/session";
-import { urlFlag } from "@/runner-command";
+import { connectCommand } from "@/runner-command";
 import { siteUrl } from "@/site-url";
 import { ApproveLoginForm } from "./approve-login-form";
 import { ApproveView, type LoginCodeState } from "./approve-view";
@@ -39,7 +39,7 @@ export default async function ConnectPage({
 
   return (
     <ConnectView
-      command={`npx hawkeye-review runner${urlFlag(siteUrl())}`}
+      command={connectCommand(siteUrl())}
       approve={<ApproveLoginForm />}
       runner={await requestRunnerStatus(session.user.id)}
       now={now}

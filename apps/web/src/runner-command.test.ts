@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { urlFlag } from "./runner-command";
+import { connectCommand } from "./runner-command";
 
-describe("urlFlag", () => {
-  it("is empty on the hosted instance, where the runner connects by default", () => {
-    expect(urlFlag("https://hawkeye.reviews")).toBe("");
+describe("connectCommand", () => {
+  it("is the bare command on the hosted instance, where a fresh runner connects by default", () => {
+    expect(connectCommand("https://hawkeye.reviews")).toBe("npx hawkeye-review runner");
   });
   it("names any other control plane", () => {
-    expect(urlFlag("https://hawkeye.example")).toBe(" --url https://hawkeye.example");
+    expect(connectCommand("https://hawkeye.example")).toBe(
+      "npx hawkeye-review runner --url https://hawkeye.example",
+    );
   });
 });
