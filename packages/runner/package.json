@@ -1,7 +1,7 @@
 {
   "name": "hawkeye-review",
   "version": "0.9.0",
-  "description": "Code review on the AI subscription you already pay for.",
+  "description": "Code review on your own Claude or Codex plan.",
   "keywords": [
     "ai-agents",
     "ai-code-review",
