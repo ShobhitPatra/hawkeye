@@ -9,23 +9,25 @@ import { enqueueJob, type EnqueueJobInput, type Job } from "../jobs";
 
 const migrationsFolder = join(import.meta.dirname, "..", "..", "drizzle");
 
-let shared: { db: Db; tables: string[] } | undefined;
-
-// Vitest gives every test file its own module instance, so this is one database per file.
-export async function createTestDb(): Promise<Db> {
-  if (shared) {
-    await shared.db.execute(
-      sql.raw(`truncate table ${shared.tables.map((name) => `"${name}"`).join(", ")} cascade`),
-    );
-    return shared.db;
-  }
+async function migratedDb(): Promise<{ db: Db; tables: string[] }> {
   const db = drizzle(new PGlite(), { schema });
   await migrate(db, { migrationsFolder });
   const rows = await db.execute<{ table_name: string }>(
     sql`select table_name from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'`,
   );
-  shared = { db, tables: rows.rows.map((row) => row.table_name) };
-  return db;
+  return { db, tables: rows.rows.map((row) => row.table_name) };
+}
+
+// Vitest gives every test file its own module instance, so this is one database per file. It starts
+// while the file is imported, which has no time limit, because starting PGlite compiles its
+// WebAssembly and takes seconds when every worker does it at once.
+const shared = await migratedDb();
+
+export async function createTestDb(): Promise<Db> {
+  await shared.db.execute(
+    sql.raw(`truncate table ${shared.tables.map((name) => `"${name}"`).join(", ")} cascade`),
+  );
+  return shared.db;
 }
 
 export type SeedArmedPullRequestOverrides = Partial<{
