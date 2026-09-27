@@ -50,7 +50,7 @@ pnpm install
 DATABASE_URL='<the Neon connection string>' pnpm --filter web db:migrate
 ```
 
-Run the same command after pulling a version that adds a migration; migrations are additive and safe to run before the matching deployment goes live.
+Run the same command after pulling a version that adds a migration; migrations are additive and safe to run before the matching deployment goes live. The one exception is `0022_curvy_polaris`, which drops `account.issuer`: the version before it still reads that column, so deploy first and run it after.
 
 Then set the App's callback and webhook URLs to the deployment's URL, if you left them for later, and redeploy once so `BETTER_AUTH_URL` is baked in.
 
