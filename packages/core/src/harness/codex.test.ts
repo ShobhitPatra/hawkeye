@@ -115,8 +115,11 @@ describe("codex harness", () => {
 
   it("stops at the turn limit", async () => {
     const s = await scratch();
+    const completed = '{"type":"item.completed","item":{"type":"agent_message"}}';
+    // One cat writes the three lines in a single write; bash's printf writes each line to a pipe
+    // separately, so the third could arrive after the stop at turn two.
     const exe = await fakeCodex(
-      `cat > /dev/null; line='{"type":"item.completed","item":{"type":"agent_message"}}'; printf '%s\\n%s\\n%s\\n' "$line" "$line" "$line"; sleep 5`,
+      `cat > /dev/null\ncat <<'LINES'\n${completed}\n${completed}\n${completed}\nLINES\nsleep 5`,
     );
     const turns: number[] = [];
     let stdoutLines = 0;
