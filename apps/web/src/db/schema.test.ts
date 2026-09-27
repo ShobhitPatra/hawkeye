@@ -272,7 +272,6 @@ describe("schema migrations", () => {
 
     await db.insert(schema.account).values({
       id: "account-3",
-      issuer: "https://github.com",
       accountId: "gh-3",
       providerId: "github",
       userId: "u3",
@@ -283,7 +282,6 @@ describe("schema migrations", () => {
       .where(eq(schema.account.id, "account-3"));
     expect(selectedAccount).toMatchObject({
       id: "account-3",
-      issuer: "https://github.com",
       accountId: "gh-3",
       providerId: "github",
       userId: "u3",
