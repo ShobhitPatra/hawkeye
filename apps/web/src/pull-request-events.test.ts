@@ -93,7 +93,6 @@ async function seedAuthor(input: { userId: string; accountId: string; installati
     .onConflictDoNothing();
   await db.insert(schema.account).values({
     id: `account-${input.userId}`,
-    issuer: "https://github.com",
     accountId: input.accountId,
     providerId: "github",
     userId: input.userId,

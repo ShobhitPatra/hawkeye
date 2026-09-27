@@ -26,7 +26,6 @@ beforeAll(async () => {
   ]);
   await db.insert(schema.account).values({
     id: "account-1",
-    issuer: "https://github.com",
     accountId: "42",
     providerId: "github",
     userId: "u-1",

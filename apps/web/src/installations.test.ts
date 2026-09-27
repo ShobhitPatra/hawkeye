@@ -67,7 +67,6 @@ describe("recordInstallation", () => {
       .values({ id: "user-2", name: "octocat", email: "octocat2@example.com" });
     await db.insert(schema.account).values({
       id: "account-2",
-      issuer: "https://github.com",
       accountId: "501",
       providerId: "github",
       userId: "user-2",
@@ -92,7 +91,6 @@ describe("linkInstallationToUser", () => {
       .values({ id: "user-1", name: "octocat", email: "octocat@example.com" });
     await db.insert(schema.account).values({
       id: "account-1",
-      issuer: "https://github.com",
       accountId: "700",
       providerId: "github",
       userId: "user-1",
@@ -117,7 +115,6 @@ describe("installationBelongsToUser", () => {
       .values({ id: "user-3", name: "hubot", email: "hubot@example.com" });
     await db.insert(schema.account).values({
       id: "account-3",
-      issuer: "https://github.com",
       accountId: "800",
       providerId: "github",
       userId: "user-3",
