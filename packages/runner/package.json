@@ -1,6 +1,6 @@
 {
   "name": "hawkeye-review",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "Code review on your own Claude or Codex plan.",
   "keywords": [
     "ai-agents",
