@@ -3,6 +3,7 @@ import { formatUpdated } from "@/format-updated";
 import { RUNNER_ONLINE_WINDOW_MS, reviewingByRunner } from "@/runner-status";
 import { listRunners } from "@/runner-tokens";
 import { requireSession } from "@/session";
+import { urlFlag } from "@/runner-command";
 import { siteUrl } from "@/site-url";
 import { CreateRunnerForm } from "./create-runner-form";
 import type { RunnerRowData } from "./runner-row";
@@ -31,5 +32,5 @@ export default async function RunnersPage() {
     };
   });
 
-  return <RunnersView runners={rows} create={<CreateRunnerForm controlPlaneUrl={siteUrl()} />} />;
+  return <RunnersView runners={rows} create={<CreateRunnerForm urlFlag={urlFlag(siteUrl())} />} />;
 }

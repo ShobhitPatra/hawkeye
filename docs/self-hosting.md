@@ -73,14 +73,13 @@ Open the deployment, sign in with GitHub, and install the App on the repositorie
 
 ## 5. Connect a runner
 
-On the machine with your Claude Code login:
+On the machine with your Claude Code or Codex login:
 
 ```sh
-npx hawkeye-review runner login --url https://<your control plane>
-npx hawkeye-review runner
+npx hawkeye-review runner --url https://<your control plane>
 ```
 
-Approve the code in the browser when the first command prints it. The second command is the daemon; leave it running. It needs Node 22, git 2.31 and the `claude` CLI signed in. Turn reviews on for a pull request from the dashboard, or push to one that already has reviews on.
+The first run opens your control plane's Connect page and prints a code; type it there and approve it, and the runner saves its token and starts reviewing. Leave it running. It needs Node 22, git 2.31 and the `claude` or `codex` CLI signed in. Turn reviews on for a pull request from the dashboard, or push to one that already has reviews on.
 
 ## Local machine instead
 

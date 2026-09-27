@@ -1,7 +1,8 @@
 import { chmod, mkdir, writeFile } from "node:fs/promises";
+import { HAWKEYE_HOSTED_URL } from "@hawkeye/core";
 import { dirname } from "node:path";
 
-export const HOSTED_CONTROL_PLANE_URL = "https://hawkeye.reviews";
+export const HOSTED_CONTROL_PLANE_URL = HAWKEYE_HOSTED_URL;
 
 export type RunnerConfig = { controlPlaneUrl: string; token: string };
 export type SavedRunnerConfig = { controlPlaneUrl: string; token: string | undefined };

@@ -50,7 +50,7 @@ export {
   type PostRenderedReviewInput,
   type PostedReview,
 } from "./review/post.js";
-export { HAWKEYE_REPOSITORY_URL } from "./repository-url.js";
+export { HAWKEYE_HOSTED_URL, HAWKEYE_REPOSITORY_URL } from "./repository-url.js";
 export type {
   ReviewResult,
   Finding,

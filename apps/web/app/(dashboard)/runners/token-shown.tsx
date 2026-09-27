@@ -1,7 +1,7 @@
 import { CodeBlock } from "../../code-block";
 
-export function TokenShown({ token, controlPlaneUrl }: { token: string; controlPlaneUrl: string }) {
-  const command = `npx hawkeye-review runner login --url ${controlPlaneUrl} --token ${token}`;
+export function TokenShown({ token, urlFlag }: { token: string; urlFlag: string }) {
+  const command = `npx hawkeye-review runner login${urlFlag} --token ${token}`;
   return (
     <div className="hk-section hk-arrive">
       <CodeBlock text={token} />
