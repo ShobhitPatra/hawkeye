@@ -1,7 +1,5 @@
-import { HAWKEYE_HOSTED_URL } from "@hawkeye/core";
-
+// The address is always named: without --url a machine already connected to another control plane
+// keeps that connection, and with it the runner refuses and says how to switch.
 export function connectCommand(controlPlaneUrl: string): string {
-  return controlPlaneUrl === HAWKEYE_HOSTED_URL
-    ? "npx hawkeye-review runner"
-    : `npx hawkeye-review runner --url ${controlPlaneUrl}`;
+  return `npx hawkeye-review runner --url ${controlPlaneUrl}`;
 }
