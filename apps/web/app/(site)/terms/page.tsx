@@ -1,4 +1,5 @@
 import { HAWKEYE_REPOSITORY_URL } from "@hawkeye/core";
+import { CONTACT_EMAIL } from "@/contact";
 
 export const metadata = { title: "Terms, Hawkeye" };
 
@@ -7,8 +8,10 @@ export default function TermsPage() {
     <>
       <h1 className="hk-title">Terms</h1>
       <p className="hk-lede">
-        The terms for using the hosted instance at hawkeye.reviews. The software itself is MIT
-        licensed, and running your own instance is covered by that license alone.
+        The terms for using the hosted instance at hawkeye.reviews, which Shobhit Patra runs as an
+        individual in India. Signing in means you accept them and the{" "}
+        <a href="/privacy">Privacy notice</a>. The software itself is MIT licensed, and running your
+        own instance is covered by that license alone.
       </p>
       <h2 className="hk-heading">What you get</h2>
       <p>
@@ -16,7 +19,12 @@ export default function TermsPage() {
         repository you linked, and for any other pull request you turn on, and posts the reviews on
         GitHub as the Hawkeye bot. Reviews start without a click, so each pull request you open
         spends your plan. It is offered as it is, without warranty of any kind, and it may change,
-        pause or stop; when it stops, this page and the repository say so first.
+        pause or stop; when it stops, this page and the repository say so first. Nothing is billed,
+        so there is nothing to refund.
+      </p>
+      <h2 className="hk-heading">Who can use it</h2>
+      <p>
+        Anyone old enough to hold a GitHub account where they live, signing in with that account.
       </p>
       <h2 className="hk-heading">What you are responsible for</h2>
       <ul>
@@ -44,10 +52,18 @@ export default function TermsPage() {
         machines behind it, or to circumvent GitHub's or your plan's terms. Accounts that do are
         removed.
       </p>
+      <h2 className="hk-heading">Names</h2>
+      <p>
+        Claude and Claude Code are trademarks of Anthropic, and Codex is a trademark of OpenAI.
+        Hawkeye is an independent project, not affiliated with or endorsed by either.
+      </p>
+      <h2 className="hk-heading">Law</h2>
+      <p>These terms are governed by the laws of India.</p>
       <h2 className="hk-heading">Changes and contact</h2>
       <p>
-        These terms may change with the product; the repository's history records every change.
-        Questions go to an issue on <a href={HAWKEYE_REPOSITORY_URL}>the repository</a>.
+        These terms may change with the product; the repository&apos;s history records every change.
+        Questions go to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> or an issue on{" "}
+        <a href={HAWKEYE_REPOSITORY_URL}>the repository</a>.
       </p>
     </>
   );
