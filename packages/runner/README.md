@@ -1,33 +1,92 @@
-# hawkeye-review
+<!-- Generated from the repository's README.md by `pnpm readme`; edit that file instead. -->
 
-Code review on your own Claude or Codex plan. Reviews run under the Claude Code or Codex login already on your machine, so there is no API key. `prepare` and `show` are read-only, and the runner reports only to the control plane you connect.
+<picture>
+  <source srcset="https://raw.githubusercontent.com/ShobhitPatra/hawkeye/main/.github/banner-dark.svg" media="(prefers-color-scheme: dark)">
+  <source srcset="https://raw.githubusercontent.com/ShobhitPatra/hawkeye/main/.github/banner-light.svg" media="(prefers-color-scheme: light)">
+  <img src="https://raw.githubusercontent.com/ShobhitPatra/hawkeye/main/.github/banner-light.svg" alt="hawkeye. Code review on your own Claude Code or Codex plan." width="100%">
+</picture>
 
-Design, docs and source: https://github.com/ShobhitPatra/hawkeye
+<p align="center">
+  <a href="https://www.npmjs.com/package/hawkeye-review"><img src="https://img.shields.io/npm/v/hawkeye-review?style=flat-square&labelColor=131211&color=57524c&label=npm" alt="npm version"></a>
+  <a href="https://github.com/ShobhitPatra/hawkeye/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-57524c?style=flat-square&labelColor=131211" alt="MIT license"></a>
+  <a href="https://github.com/ShobhitPatra/hawkeye/pulls?q=is%3Apr"><img src="https://img.shields.io/badge/reviewed%20by-hawkeye-57524c?style=flat-square&labelColor=131211" alt="Reviewed by Hawkeye"></a>
+</p>
 
-## Review a pull request in any agent session (read-only)
+Hawkeye is a code reviewer that belongs to you, not to a repository. Open a pull request, and a runner on your machine reads every push with the coding agent you already pay for, under your own login, then posts one verdict as `hawkeye-review[bot]`.
+
+- **What it costs:** nothing beyond that plan. No seat, no token bill.
+- **Why it is different:** every other AI reviewer is bought per seat and wired into a repository by an admin. This one runs on your subscription, on your hardware. Your plan credential and your repository never reach a server of ours; only the findings do.
+- **What it needs today:** a Claude Code or Codex login on the machine that runs the reviews.
+
+[Sign in with GitHub](https://hawkeye.reviews) to review every push, or try one review with no account:
 
 ```sh
-npx hawkeye-review prepare https://github.com/owner/repo/pull/123
-# your agent session reads <round>/prompt.md, reviews the checkout, writes result.json
-npx hawkeye-review show <round-dir>
+npx hawkeye-review prepare <pr-url>
 ```
 
-`show` prints the verdict and one line per finding, and `--full` prints the whole review. Re-running `prepare` on the same pull request starts the next round: the prompt carries the previous findings, the interdiff, and your dismissals (`dismiss` / `undismiss`).
+## What a review gives you
 
-Needs Node 22+, git 2.31+, and a GitHub token (`--github-token`, `GITHUB_TOKEN`, or `gh auth token`).
+- **A verdict that follows the findings.** Blocked only when something must be fixed, Changes needed when something should be. The model's own opinion never sets it.
+- **Every finding says what breaks and what to do.** Pinned to the changed line when there is one, with a one-line replacement when that alone fixes it. No praise, no hedging, and silence where the code is fine.
+- **Held to your repository's rules.** It reads `AGENTS.md`, `CLAUDE.md` and `CONTRIBUTING.md`, then looks at intent, behavior, blast radius, verification, fit and hygiene.
+- **It follows up on every push.** One comment, updated in place. Fixed findings resolve, only new ones are raised, and problems older than your change are marked Inherited and never block it.
 
-## Review every push with the runner
+## What it caught on its own pull requests
 
-```sh
-npx hawkeye-review runner
-```
+Three findings from Hawkeye's reviews of Hawkeye, each fixed before merge. [Every review is public](https://github.com/ShobhitPatra/hawkeye/pulls?q=is%3Apr).
 
-Leave it running. The first run connects this machine: it opens the Connect page and waits while you type the code it prints there, then saves the runner token to `~/.config/hawkeye/runner.json` and starts. Turn reviews on for a pull request from the dashboard, and the runner reviews every push to it.
+- **Must fix** · [#260](https://github.com/ShobhitPatra/hawkeye/pull/260#discussion_r4111551292) · The new fallback lets a user arm a pull request they did not author.
+- **Should fix** · [#262](https://github.com/ShobhitPatra/hawkeye/pull/262#discussion_r4111681774) · Concurrent claims can invalidate the replacement run they just handed out.
+- **Should fix** · [#238](https://github.com/ShobhitPatra/hawkeye/pull/238#discussion_r4103863493) · `event.currentTarget` is null once `await navigator.clipboard.writeText` has rejected, so the refused branch throws.
 
-It connects to https://hawkeye.reviews unless you pass `--url` for your own control plane. `npx hawkeye-review runner login` connects again without starting, for example after the runner was removed.
+## A real review
 
-Needs Node 22+, git 2.31+, and Claude Code or Codex installed and signed in.
+The first round on this repository's own [pull request #87](https://github.com/ShobhitPatra/hawkeye/pull/87) is a review the bot posted: a verdict, one line per finding with the file and line, the lenses behind a disclosure, and the round in the footer. The [landing page](https://hawkeye.reviews) replays it from open to posted.
 
-## License
+## What happens when you open a pull request
 
-MIT
+1. **Every push queues one job for its head.** Pushes collapse to the latest head, so a busy branch never piles up reviews. The hosted control plane holds only the queue, webhooks and findings.
+2. **Your runner claims it and clones the branch.** One process on hardware you own. The control plane never sees a plan credential and never proxies model traffic.
+3. **Your coding agent reviews it under your login.** Only the validated findings leave the machine; the checkout and your login stay there.
+4. **The comment lands as `hawkeye-review[bot]`.** A comment and a passing commit status that carries the verdict, never a block. Merging stays your call.
+
+Your plan's limits are the budget, and the dashboard shows what each review took in turns and minutes.
+
+## What the runner can reach
+
+A review runs a coding agent on your machine, as you, over code you did not write. Know what that means before you connect a runner.
+
+- **What it can reach.** The agent runs shell commands to read and test the checkout, with your environment and your files in reach, not only the pull request. Anything your own terminal can read, change or run, a command it runs could too.
+- **What it is denied.** Its file-editing, web-fetch and web-search tools are removed. The shell stays, so the first point holds in full: a command can still write a file or start a program. The checkout's own agent configuration (`CLAUDE.md`, `.claude/`) is removed before it starts and the repository's settings are never loaded, so a pull request cannot change the reviewer's tools or settings. The branch's `AGENTS.md`, `CLAUDE.md` and `CONTRIBUTING.md` are still read into the prompt as repository rules, fenced as untrusted text. The token that cloned the branch is never written into the checkout.
+- **What bounds the risk today.** The runner reviews pull requests you open, in repositories you chose, so the exposure is code from the people who can push to your branches. `prepare` reviews whatever pull request URL you hand it, inside your own agent session and with that session's permissions: the tool and settings denials above stop at the runner, while the removed agent configuration and the clone token kept out of the checkout apply there too. Hand it code you would be willing to run. Reviewing strangers' pull requests waits for a sandbox around the shell ([#160](https://github.com/ShobhitPatra/hawkeye/issues/160)).
+
+Run the runner on a machine, or under a user, whose files you are willing to have read by a program reviewing that code.
+
+## Start with one pull request
+
+You need a machine with Node 22 or newer, git 2.31 or newer, and [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) or [Codex](https://developers.openai.com/codex/cli) installed and signed in (run `claude` or `codex` once and check it answers). Nothing else is installed; `npx` fetches the runner each time.
+
+1. **Sign in** with GitHub at [hawkeye.reviews](https://hawkeye.reviews).
+2. **Install the GitHub App** on a repository you admin: open [github.com/apps/hawkeye-review](https://github.com/apps/hawkeye-review), choose Install, and pick the repositories. The App is how the review gets posted: it reads the repository, its issues and its pull requests, and writes review comments and commit statuses. Signing in also shares the email address on your GitHub account.
+3. **Start the runner** on that machine and leave it running:
+
+   ```sh
+   npx hawkeye-review runner
+   ```
+
+   The first run connects the machine: it opens the Connect page and prints a code. Type the code there and approve it; the terminal says it is connected, saves its token and starts. The Runners page shows it online within a minute. If the machine sleeps or the terminal closes, reviews wait in the queue and run when it is back.
+4. **Open a pull request of your own**, not a draft, in a repository you installed the App on. A draft is reviewed once you mark it ready, unless you turn on "Review drafts too" in Settings. Within a minute its checks show `hawkeye` as "Reviewing on <your machine>", and a few minutes later the review is posted as a comment. Every later push is reviewed again, and the same comment is updated in place.
+
+To stop: open the pull request's page from the Pull requests list and press Pause reviews; Turn reviews on brings it back. Settings turns automatic review off for the pull requests you open from then on; ones already being reviewed keep going until you pause them. Closing the terminal stops the runner, and queued reviews wait for it.
+
+If nothing happens, the Runners page says whether your runner is online, and each pull request's page on the dashboard lists its runs with the reason when one failed.
+
+## Try one review with no account
+
+`npx hawkeye-review prepare <pr-url>` fetches the pull request and writes the review prompt into a round directory. Open the prompt in any coding agent session, let it review the checkout, then run the `show` command it printed to read the verdict. Nothing is posted anywhere. It needs Node 22, git, and a GitHub token (`gh auth token` is enough).
+
+## Open source, yours to run
+
+- MIT licensed, and every pull request to this repository is reviewed by Hawkeye itself before a maintainer reads it.
+- Run your own instance: the [self-hosting guide](https://github.com/ShobhitPatra/hawkeye/blob/main/docs/self-hosting.md) covers a Vercel deployment on Neon Postgres, the way the hosted instance runs. Docker Compose is there for development.
+- Read [how it works and why](https://github.com/ShobhitPatra/hawkeye/blob/main/docs/design.md), the [contributing guide](https://github.com/ShobhitPatra/hawkeye/blob/main/CONTRIBUTING.md), and the [security policy](https://github.com/ShobhitPatra/hawkeye/blob/main/SECURITY.md).

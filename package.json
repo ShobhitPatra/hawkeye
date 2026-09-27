@@ -8,7 +8,8 @@
     "format:check": "oxfmt --check",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "readme": "tsx --tsconfig packages/runner/tsconfig.json packages/runner/scripts/write-readme.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
