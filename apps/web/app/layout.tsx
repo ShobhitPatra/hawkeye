@@ -2,6 +2,7 @@ import type { Viewport } from "next";
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { parseTheme, THEME_COLORS, THEME_COOKIE, themeAttribute } from "@/theme";
 import "../../../.claude/skills/hawkeye-design/stylesheet.css";
 
@@ -44,7 +45,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       className={`${plexSans.variable} ${plexMono.variable}`}
       data-theme={themeAttribute(theme)}
     >
-      <body className="hk-root">{children}</body>
+      <body className="hk-root">
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }
