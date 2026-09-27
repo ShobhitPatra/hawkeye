@@ -99,4 +99,4 @@ GitHub has to reach the webhook, so `BETTER_AUTH_URL` and the App's URLs need a 
 
 ## Updating
 
-Pull `main`, run the migration command against your database, and redeploy. Vercel redeploys on push if the project is connected to your fork; the runner updates itself on the next `npx hawkeye-review` start, or pin a version with `npx hawkeye-review@<version>`.
+Pull `main`, run the migration command against your database, and redeploy. When the update brings `0022_curvy_polaris`, reverse the first two: redeploy, then run the migration, since the version before it still reads the column it drops. Vercel redeploys on push if the project is connected to your fork; the runner updates itself on the next `npx hawkeye-review` start, or pin a version with `npx hawkeye-review@<version>`.
