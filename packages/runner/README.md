@@ -1,6 +1,6 @@
 # hawkeye-review
 
-Code review on the AI subscription you already pay for. It runs on your own Claude Code login today, with Codex next, and needs no API key. `prepare` and `show` are read-only; the runner daemon only reports to the control plane you connect.
+Code review on your own Claude or Codex plan. Reviews run under the Claude Code or Codex login already on your machine, so there is no API key. `prepare` and `show` are read-only, and the runner reports only to the control plane you connect.
 
 Design, docs and source: https://github.com/ShobhitPatra/hawkeye
 
@@ -9,10 +9,10 @@ Design, docs and source: https://github.com/ShobhitPatra/hawkeye
 ```sh
 npx hawkeye-review prepare https://github.com/owner/repo/pull/123
 # your agent session reads <round>/prompt.md, reviews the checkout, writes result.json
-npx hawkeye-review show <round-dir>          # the verdict and one line per finding; --full for the whole review
+npx hawkeye-review show <round-dir>
 ```
 
-Re-running `prepare` on the same pull request starts the next round: the prompt carries the previous findings, the interdiff, and your dismissals (`dismiss` / `undismiss`).
+`show` prints the verdict and one line per finding, and `--full` prints the whole review. Re-running `prepare` on the same pull request starts the next round: the prompt carries the previous findings, the interdiff, and your dismissals (`dismiss` / `undismiss`).
 
 Needs Node 22+, git 2.31+, and a GitHub token (`--github-token`, `GITHUB_TOKEN`, or `gh auth token`).
 

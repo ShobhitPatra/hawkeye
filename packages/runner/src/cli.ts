@@ -129,7 +129,7 @@ export function createProgram(io: {
   const program = new Command("hawkeye")
     .enablePositionalOptions()
     .version(packageJson.version)
-    .description("Personal code reviewer on your own Claude plan");
+    .description("Code review on your own Claude or Codex plan");
 
   program
     .command("review")
