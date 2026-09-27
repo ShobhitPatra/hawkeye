@@ -6,6 +6,7 @@ import { localPath } from "@/local-path";
 import { getSession } from "@/session";
 import { CodeBlock } from "./code-block";
 import { LandingHero } from "./landing-hero";
+import { PublicAnalytics } from "./public-analytics";
 import { SignInButton } from "./sign-in-button";
 import { CONTRIBUTING_URL, REVIEWS_URL, SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
@@ -262,6 +263,7 @@ export default async function HomePage({
 
         <SiteFooter theme={theme} />
       </main>
+      <PublicAnalytics />
     </>
   );
 }
