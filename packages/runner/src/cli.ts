@@ -91,6 +91,13 @@ export async function loadContractOverride(input: {
   }
 }
 
+const readRunnerConfig = () =>
+  loadRunnerConfig({
+    env: process.env,
+    configPath: RUNNER_CONFIG_PATH,
+    readFile: (p) => readFile(p, "utf8"),
+  });
+
 export function createProgram(io: {
   stdout(line: string): void;
   stderr(line: string): void;
@@ -100,12 +107,6 @@ export function createProgram(io: {
   interactive?: boolean;
   openBrowser?(url: string): Promise<boolean>;
 }): Command {
-  const readRunnerConfig = () =>
-    loadRunnerConfig({
-      env: process.env,
-      configPath: RUNNER_CONFIG_PATH,
-      readFile: (p) => readFile(p, "utf8"),
-    });
   const connect = async (input: {
     url: string;
     name: string;
