@@ -3,12 +3,7 @@
 import { useFormAction } from "../use-form-action";
 import { approveRunnerLoginAction } from "./actions";
 
-export type LoginCodeState =
-  | { state: "pending"; runnerName: string; requested: string }
-  | { state: "approved"; runnerName: string }
-  | { state: "expired" };
-
-export function ApproveLoginForm({ code }: { code?: LoginCodeState }) {
+export function ApproveLoginForm() {
   const { state, pending, onSubmit } = useFormAction(approveRunnerLoginAction, {});
 
   if (state.runnerName)
@@ -17,7 +12,7 @@ export function ApproveLoginForm({ code }: { code?: LoginCodeState }) {
         <p>
           Runner <span className="hk-mono">{state.runnerName}</span> connected.
         </p>
-        <p>Go back to your terminal; it is already polling.</p>
+        <p>It is reviewing now; leave that terminal open.</p>
       </div>
     );
 
@@ -42,24 +37,6 @@ export function ApproveLoginForm({ code }: { code?: LoginCodeState }) {
         </button>
       </form>
       {state.error && <p className="hk-compact">{state.error}</p>}
-      {code?.state === "pending" && (
-        <p className="hk-compact hk-muted">
-          Requested {code.requested} by a runner named{" "}
-          <span className="hk-mono">{code.runnerName}</span>. Approve it only if that is your
-          machine.
-        </p>
-      )}
-      {code?.state === "approved" && (
-        <p className="hk-compact hk-muted">
-          This code was already approved for <span className="hk-mono">{code.runnerName}</span>.
-        </p>
-      )}
-      {code?.state === "expired" && (
-        <p className="hk-compact">
-          This code is not pending. Codes last ten minutes; run the login command again for a new
-          one.
-        </p>
-      )}
     </>
   );
 }

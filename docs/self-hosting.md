@@ -1,6 +1,6 @@
 # Self-hosting Hawkeye
 
-Hawkeye is two parts. The control plane is a Next.js app on Postgres: sign-in, the GitHub App webhook, the queue, the dashboard, and the posting of reviews. The runner is `npx hawkeye-review runner` on a machine with a Claude Code login; it never holds GitHub credentials of its own. This guide sets up the control plane; the runner is the same two commands whichever way you host it.
+Hawkeye is two parts. The control plane is a Next.js app on Postgres: sign-in, the GitHub App webhook, the queue, the dashboard, and the posting of reviews. The runner is `npx hawkeye-review runner` on a machine with a Claude Code or Codex login; it never holds GitHub credentials of its own. This guide sets up the control plane; the runner is the same one command whichever way you host it, with `--url` naming your control plane.
 
 Most people should use the hosted instance at [hawkeye.reviews](https://hawkeye.reviews); this guide is for running your own. The shape is Vercel for the app and Neon for Postgres, which is how the hosted instance runs. A local machine with Docker Compose works for development.
 
@@ -73,14 +73,13 @@ Open the deployment, sign in with GitHub, and install the App on the repositorie
 
 ## 5. Connect a runner
 
-On the machine with your Claude Code login:
+On the machine with your Claude Code or Codex login:
 
 ```sh
-npx hawkeye-review runner login --url https://<your control plane>
-npx hawkeye-review runner
+npx hawkeye-review runner --url https://<your control plane>
 ```
 
-Approve the code in the browser when the first command prints it. The second command is the daemon; leave it running. It needs Node 22, git 2.31 and the `claude` CLI signed in. Turn reviews on for a pull request from the dashboard, or push to one that already has reviews on.
+The first run opens your control plane's Connect page and prints a code; type it there and approve it, and the runner saves its token and starts reviewing. Leave it running. It needs Node 22, git 2.31 and the `claude` or `codex` CLI signed in. Turn reviews on for a pull request from the dashboard, or push to one that already has reviews on.
 
 ## Local machine instead
 

@@ -2,7 +2,15 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { RunnerRow, type RunnerRowData } from "./runner-row";
 
-export function RunnersView({ runners, create }: { runners: RunnerRowData[]; create: ReactNode }) {
+export function RunnersView({
+  runners,
+  connectCommand,
+  create,
+}: {
+  runners: RunnerRowData[];
+  connectCommand: string;
+  create: ReactNode;
+}) {
   return (
     <main className="hk-page">
       <div className="hk-header">
@@ -16,7 +24,7 @@ export function RunnersView({ runners, create }: { runners: RunnerRowData[]; cre
         </div>
         <p className="hk-compact hk-muted hk-prose">
           A runner is one process on a machine you own. It polls for review jobs with its own token
-          and runs Claude Code under your login. The control plane never sees that login.
+          and runs Claude Code or Codex under your login. The control plane never sees that login.
         </p>
       </div>
 
@@ -24,8 +32,8 @@ export function RunnersView({ runners, create }: { runners: RunnerRowData[]; cre
         <div className="hk-state">
           <p>No runners yet.</p>
           <p>
-            Connect one from the command line, or create a token below and pass it with{" "}
-            <span className="hk-mono">--token</span>.
+            Run <span className="hk-mono">{connectCommand}</span> on a machine you own; its first
+            run connects it.
           </p>
         </div>
       ) : (
@@ -53,15 +61,16 @@ export function RunnersView({ runners, create }: { runners: RunnerRowData[]; cre
 
       <hr className="hk-rule" />
 
-      <section className="hk-section" aria-labelledby="create">
-        <h2 className="hk-heading" id="create">
-          Create a runner token
-        </h2>
-        <p className="hk-compact hk-muted hk-prose">
-          For machines without a browser. The token is shown once.
-        </p>
-        {create}
-      </section>
+      <details className="hk-disclosure">
+        <summary>Create a runner token</summary>
+        <div className="hk-section">
+          <p className="hk-compact hk-muted hk-prose">
+            For a machine where no one can type a code, such as a server set up by a script. The
+            token is shown once.
+          </p>
+          {create}
+        </div>
+      </details>
     </main>
   );
 }
