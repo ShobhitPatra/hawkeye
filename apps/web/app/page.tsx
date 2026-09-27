@@ -67,6 +67,15 @@ const CAUGHT: {
   },
 ];
 
+function SignInConsent() {
+  return (
+    <p className="hk-help">
+      By signing in you accept the <a href="/terms">Terms</a> and the{" "}
+      <a href="/privacy">Privacy notice</a>.
+    </p>
+  );
+}
+
 export default async function HomePage({
   searchParams,
 }: {
@@ -219,11 +228,14 @@ export default async function HomePage({
           <h2 className="hk-heading" id="start">
             Start with one pull request
           </h2>
-          <div className="hk-actions">
-            <SignInButton {...signIn} variant="primary" />
-            <a className="hk-button" href={HAWKEYE_REPOSITORY_URL}>
-              Read the source
-            </a>
+          <div className="ld-signin">
+            <div className="hk-actions">
+              <SignInButton {...signIn} variant="primary" />
+              <a className="hk-button" href={HAWKEYE_REPOSITORY_URL}>
+                Read the source
+              </a>
+            </div>
+            <SignInConsent />
           </div>
           <p className="ld-cap">
             Install the GitHub App on a repo you admin, start the runner on your machine, open a

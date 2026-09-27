@@ -11,6 +11,11 @@
   gap: var(--hk-space-4);
   max-width: var(--hk-measure);
 }
+.ld-signin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hk-space-2);
+}
 .ld-try {
   display: flex;
   flex-direction: column;
