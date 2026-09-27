@@ -19,7 +19,7 @@ Hawkeye is a code reviewer that belongs to you, not to a repository. Open a pull
 [Sign in with GitHub](https://hawkeye.reviews) to review every push, or try one review with no account:
 
 ```sh
-npx hawkeye-review prepare https://github.com/owner/repo/pull/123
+npx hawkeye-review prepare <pr-url>
 ```
 
 ## What a review gives you
@@ -62,25 +62,18 @@ Run the runner on a machine, or under a user, whose files you are willing to hav
 
 ## Start with one pull request
 
-You need a machine with Node 22 or newer, git 2.31 or newer, and [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) installed and signed in (run `claude` once and check it answers). Nothing else is installed; `npx` fetches the runner each time.
+You need a machine with Node 22 or newer, git 2.31 or newer, and [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) or [Codex](https://developers.openai.com/codex/cli) installed and signed in (run `claude` or `codex` once and check it answers). Nothing else is installed; `npx` fetches the runner each time.
 
 1. **Sign in** with GitHub at [hawkeye.reviews](https://hawkeye.reviews).
 2. **Install the GitHub App** on a repository you admin: open [github.com/apps/hawkeye-review](https://github.com/apps/hawkeye-review), choose Install, and pick the repositories. The App is how the review gets posted: it reads the repository, its issues and its pull requests, and writes review comments and commit statuses. Signing in also shares the email address on your GitHub account.
-3. **Connect a runner** on that machine:
-
-   ```sh
-   npx hawkeye-review runner login --url https://hawkeye.reviews
-   ```
-
-   It prints a code and a link. Open the link, type the code, approve it. The terminal then says it is connected and where it saved its token.
-4. **Start it and leave it running:**
+3. **Start the runner** on that machine and leave it running:
 
    ```sh
    npx hawkeye-review runner
    ```
 
-   The Runners page shows it online within a minute. If the machine sleeps or the terminal closes, reviews wait in the queue and run when it is back.
-5. **Open a pull request of your own**, not a draft, in a repository you installed the App on. A draft is reviewed once you mark it ready, unless you turn on "Review drafts too" in Settings. Within a minute its checks show `hawkeye` as "Reviewing on <your machine>", and a few minutes later the review is posted as a comment. Every later push is reviewed again, and the same comment is updated in place.
+   The first run connects the machine: it opens the Connect page and prints a code. Type the code there and approve it; the terminal says it is connected, saves its token and starts. The Runners page shows it online within a minute. If the machine sleeps or the terminal closes, reviews wait in the queue and run when it is back.
+4. **Open a pull request of your own**, not a draft, in a repository you installed the App on. A draft is reviewed once you mark it ready, unless you turn on "Review drafts too" in Settings. Within a minute its checks show `hawkeye` as "Reviewing on <your machine>", and a few minutes later the review is posted as a comment. Every later push is reviewed again, and the same comment is updated in place.
 
 To stop: open the pull request's page from the Pull requests list and press Pause reviews; Turn reviews on brings it back. Settings turns automatic review off for the pull requests you open from then on; ones already being reviewed keep going until you pause them. Closing the terminal stops the runner, and queued reviews wait for it.
 
