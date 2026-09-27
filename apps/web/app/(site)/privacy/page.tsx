@@ -55,13 +55,20 @@ export default function PrivacyPage() {
           Your repository. The runner clones it on your machine; only the validated findings JSON
           leaves it.
         </li>
-        <li>
-          Analytics. There is no tracking script and no third-party analytics. The operator counts,
-          from the rows listed above, how many accounts signed in, installed the App, connected a
-          runner, had it come online and got a first review, by the week they signed in. The counts
-          never leave the database they are read from.
-        </li>
+        <li>Anything from the pages you see signed in. No analytics script runs on them.</li>
       </ul>
+      <h2 className="hk-heading">Counting visits</h2>
+      <p>
+        The public pages, the landing and these Security, Privacy and Terms pages, count visits with
+        Vercel Web Analytics. It sets no cookie; Vercel tells visitors apart by a hash of the
+        request that changes every day and keeps no personal data. Each page&apos;s address is sent
+        without its query, so a sign-in link that names a pull request is not reported.
+      </p>
+      <p>
+        The operator also counts, from the rows listed above, how many accounts signed in, installed
+        the App, connected a runner, had it come online and got a first review, by the week they
+        signed in. Those counts never leave the database they are read from.
+      </p>
       <h2 className="hk-heading">Where it lives</h2>
       <p>
         The control plane runs on Vercel and its database on Neon Postgres. GitHub receives the

@@ -54,6 +54,8 @@ Run the same command after pulling a version that adds a migration; migrations a
 
 Then set the App's callback and webhook URLs to the deployment's URL, if you left them for later, and redeploy once so `BETTER_AUTH_URL` is baked in.
 
+The public pages (the landing, Security, Privacy and Terms) load Vercel Web Analytics. It counts visits only when Web Analytics is turned on for your Vercel project; with it off, nothing is counted. If you turn it on, say so on your own privacy page.
+
 ## Schedule the sweep
 
 A runner that dies mid-review leaves its job claimed. When any runner of the same user next asks for work, the claim puts that job back and hands it over, five minutes after the last heartbeat; no clock is needed for that. The sweep covers the rest: a runner that never comes back leaves its pull request showing In review until something requeues it. `POST /api/internal/sweep` (GET works too) puts every job whose runner has been silent for five minutes back in the queue, and answers 401 to any caller that does not send `Authorization: Bearer <CRON_SECRET>`. Nothing calls it on its own, so give it a clock; every one to five minutes is plenty.
