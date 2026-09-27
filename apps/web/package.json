@@ -16,18 +16,18 @@
     "@hawkeye/core": "workspace:*",
     "@vercel/analytics": "^2.0.1",
     "better-auth": "1.7.1",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "^0.45.3",
     "next": "^16.3.6",
     "pg": "^8.23.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.5.5",
+    "@electric-sql/pglite": "0.5.8",
     "@types/pg": "^8.23.1",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "auth": "1.7.1",
-    "drizzle-kit": "^0.31.10"
+    "drizzle-kit": "^0.31.11"
   }
 }
