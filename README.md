@@ -4,7 +4,11 @@
   <img src=".github/banner-light.svg" alt="hawkeye. Code review on your own Claude Code or Codex plan." width="100%">
 </picture>
 
-<br>
+<p align="center">
+  <a href="https://www.npmjs.com/package/hawkeye-review"><img src="https://img.shields.io/npm/v/hawkeye-review?style=flat-square&labelColor=131211&color=57524c&label=npm" alt="npm version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-57524c?style=flat-square&labelColor=131211" alt="MIT license"></a>
+  <a href="https://github.com/ShobhitPatra/hawkeye/pulls?q=is%3Apr"><img src="https://img.shields.io/badge/reviewed%20by-hawkeye-57524c?style=flat-square&labelColor=131211" alt="Reviewed by Hawkeye"></a>
+</p>
 
 Hawkeye is a code reviewer that belongs to you, not to a repository. Open a pull request, and a runner on your machine reads every push with the coding agent you already pay for, under your own login, then posts one verdict as `hawkeye-review[bot]`.
 
