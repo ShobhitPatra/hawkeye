@@ -15,8 +15,10 @@ export default function PrivacyPage() {
       <ul>
         <li>
           Your GitHub account as GitHub reports it at sign-in: name, email, login, avatar URL, and
-          the sign-in token GitHub issues. The token keeps you signed in, and at sign-in it lists
-          the installations of the Hawkeye App your account can see, so they link to you.
+          the token GitHub issues at sign-in, stored encrypted. It is used only to ask GitHub which
+          installations of the Hawkeye App your account can see, at sign-in and when the pull
+          requests page loads, so they link to you. What keeps you signed in is the session below,
+          and its cookie.
         </li>
         <li>
           Each session: when it was created, the IP address it was opened from, and the
