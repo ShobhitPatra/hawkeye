@@ -7,6 +7,12 @@
   "ignorePatterns": ["dist", "workspace"],
   "overrides": [
     {
+      "files": ["**/*.test.ts"],
+      "rules": {
+        "unicorn/consistent-function-scoping": "off"
+      }
+    },
+    {
       "files": ["packages/core/src/worktree/worktree.ts"],
       "rules": {
         "preserve-caught-error": "off"
