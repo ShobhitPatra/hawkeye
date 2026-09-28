@@ -502,11 +502,8 @@ export function createProgram(io: {
             "--wall-clock-minutes",
             options.wallClockMinutes,
           );
-          const model = options.model === undefined ? {} : { model: options.model };
           const harness =
-            options.harness === "codex"
-              ? createCodexHarness(model)
-              : createClaudeCodeHarness(model);
+            options.harness === "codex" ? createCodexHarness() : createClaudeCodeHarness();
           prepared = await prepare(pullRequest, options);
           io.stderr(describePreparedRound(prepared, homedir())[0]!);
           const { owner, repo, number } = prepared.meta.pullRequest;
@@ -526,6 +523,7 @@ export function createProgram(io: {
             onTurn: progress.turn,
             log: progress.log,
             warn: (line) => progress.log(`warning: ${line}`),
+            ...(options.model === undefined ? {} : { model: options.model }),
             ...(io.style === undefined ? {} : { style: io.style }),
           }).finally(progress.finish);
           io.stderr(

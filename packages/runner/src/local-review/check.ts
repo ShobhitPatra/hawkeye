@@ -23,7 +23,8 @@ function failure(name: string, outcome: HarnessResult, wallClockMs: number): str
     return `${name} stopped at the turn limit after ${outcome.turns} turns; raise it with --max-turns.`;
   if (outcome.status === "timeout")
     return `${name} ran past ${Math.round(wallClockMs / 60_000)} minutes; raise it with --wall-clock-minutes.`;
-  return `${name} ${outcome.error ?? `stopped (${outcome.status})`}.`;
+  const error = outcome.error ?? `${name} stopped (${outcome.status})`;
+  return error.endsWith(".") ? error : `${error}.`;
 }
 
 export async function reviewRound(

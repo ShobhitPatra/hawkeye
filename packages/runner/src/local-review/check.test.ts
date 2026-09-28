@@ -119,8 +119,16 @@ describe("reviewRound", () => {
         "claude ran past 15 minutes; raise it with --wall-clock-minutes.",
       ],
       [
-        { status: "error", turns: 2, error: "exited 1 after 2 turns (not logged in)" },
-        "claude exited 1 after 2 turns (not logged in).",
+        { status: "error", turns: 2, error: "claude exited with 1: not logged in" },
+        "claude exited with 1: not logged in.",
+      ],
+      [
+        {
+          status: "error",
+          turns: 0,
+          error: "Model x was refused by the claude CLI; choose another.",
+        },
+        "Model x was refused by the claude CLI; choose another.",
       ],
     ] as const) {
       const round = await prepared();
