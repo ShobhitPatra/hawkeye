@@ -13,7 +13,7 @@ import { SiteHeader } from "./site-header";
 import { parseTheme, THEME_COOKIE } from "@/theme";
 import "./landing.css";
 
-const PREPARE_COMMAND = "npx hawkeye-review prepare <pr-url>";
+const CHECK_COMMAND = "npx hawkeye-review check <pr-url>";
 
 const CAUGHT: {
   pullRequest: number;
@@ -103,7 +103,7 @@ export default async function HomePage({
           </div>
           <div className="ld-try">
             <span>Or try one review with no account:</span>
-            <CodeBlock text={PREPARE_COMMAND} />
+            <CodeBlock text={CHECK_COMMAND} />
           </div>
         </section>
 
