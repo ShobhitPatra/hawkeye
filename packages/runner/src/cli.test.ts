@@ -98,6 +98,28 @@ describe("loadContractOverride", () => {
   });
 });
 
+describe("check", () => {
+  it("refuses an unknown harness or an empty model before preparing anything", async () => {
+    for (const [args, message] of [
+      [["--harness", "gemini"], '--harness must be claude or codex, got "gemini"'],
+      [["--model", ""], "--model must not be empty"],
+    ] as const) {
+      const stderr = vi.fn();
+      const exitCode = process.exitCode;
+      await createProgram({ stdout: vi.fn(), stderr }).parseAsync([
+        "node",
+        "hawkeye",
+        "check",
+        "octo/repo#1",
+        ...args,
+      ]);
+      expect(stderr).toHaveBeenCalledWith(message);
+      expect(process.exitCode).toBe(1);
+      process.exitCode = exitCode;
+    }
+  });
+});
+
 describe("runner login", () => {
   it("takes --url itself rather than leaving it to the runner command", async () => {
     vi.stubEnv("HAWKEYE_CONTROL_PLANE_URL", "from-env");

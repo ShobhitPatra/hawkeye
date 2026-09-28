@@ -497,6 +497,8 @@ export function createProgram(io: {
         try {
           if (options.harness !== "claude" && options.harness !== "codex")
             throw new Error(`--harness must be claude or codex, got "${options.harness}"`);
+          if (options.model !== undefined && options.model.trim() === "")
+            throw new Error("--model must not be empty");
           const maxTurns = positiveInteger("--max-turns", options.maxTurns);
           const wallClockMinutes = positiveInteger(
             "--wall-clock-minutes",
