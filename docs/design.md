@@ -285,15 +285,18 @@ Reviews post as `<app-slug>[bot]` (the author's instance: `hawkeye-review[bot]`)
 
 ## Reviewing locally in any agent session
 
-Four commands — `prepare`, `show`, `dismiss`, `undismiss` — let any agent session (any model) review a pull request with the Hawkeye contract, without the control plane, a harness, or posting.
+`check` reviews a pull request on this machine with a harness and prints the review; four more commands — `prepare`, `show`, `dismiss`, `undismiss` — let any agent session (any model) do the review instead. None of them needs the control plane or posts anything.
 
 ```sh
+npx hawkeye-review check <pr-url> [--harness claude|codex] [--model <name>] [--max-turns <n>] [--wall-clock-minutes <n>] [--github-token <token>] [--contract <path>] [--root <dir>]
 npx hawkeye-review prepare <pr-url> [--github-token <token>] [--contract <path>] [--root <dir>]
 # … the session reads prompt.md, reviews checkout/, writes result.json …
 npx hawkeye-review show <round-dir> [--full]
 ```
 
-`prepare` fetches the pull request, checks its head out, writes the review prompt into a round directory, and prints the round with its prompt, checkout and result paths and the `show` command to run next. `show` validates the result file, derives the verdict, and prints the verdict, its reason and one line per finding with its path and id, then where the full result lives; `--full` prints the whole review with details, prior findings, lenses and rounds. Exit code is 0 whenever the result parses — the verdict is information, not a failure.
+`prepare` fetches the pull request, checks its head out, writes the review prompt into a round directory, and prints the round with its prompt, checkout and result paths and the `show` command to run next. `show` validates the result file, derives the verdict, and prints the verdict, its reason and one line per finding with its path and id, then where the full result lives; `--full` prints the whole review with details, prior findings, lenses and rounds, in plain labels, bold headings and dim locations on a terminal, with red kept for Blocked and Must fix. Exit code is 0 whenever the result parses — the verdict is information, not a failure.
+
+`check` prepares the round as `prepare` does, then runs Claude Code, or Codex with `--harness codex`, on its prompt and checkout with the runner's tool restrictions, a turn limit (default 40) and a wall clock (default 15 minutes). It rewrites the `Reviewing …` line while the harness runs, then prints `Reviewed … in N turns · time` and the whole review as `show --full` does; a model the CLI refuses is retried on its default. A run that stops at a limit or fails says why and what to raise, then where the round is kept, and exits 1. Running it again after a push is the next round.
 
 ### Credentials and layout
 

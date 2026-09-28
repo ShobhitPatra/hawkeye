@@ -9,6 +9,10 @@ export function reviewProgressLine(input: {
   return `Reviewing ${input.subject} · ${input.turns} turn${input.turns === 1 ? "" : "s"} · ${formatDuration(input.elapsedMs)}`;
 }
 
+export function reviewedLine(input: { subject: string; turns: number; elapsedMs: number }): string {
+  return `Reviewed ${input.subject} in ${input.turns} turn${input.turns === 1 ? "" : "s"} · ${formatDuration(input.elapsedMs)}`;
+}
+
 export type ReviewProgress = {
   log(line: string): void;
   turn(turns: number): void;

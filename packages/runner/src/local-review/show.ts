@@ -11,10 +11,17 @@ import { listRounds, priorFindingsBefore, readRoundMeta, readRoundResult } from 
 export async function showRound(
   directory: string,
   warn: (line: string) => void = () => {},
+  style?: Partial<ReviewTextStyle>,
 ): Promise<string> {
   const { result, meta, priorClaims } = await loadRound(directory, warn);
   const rounds = await roundsOf(dirname(directory), warn);
-  return renderReviewText({ result, meta, rounds, priorClaims });
+  return renderReviewText({
+    result,
+    meta,
+    rounds,
+    priorClaims,
+    ...(style === undefined ? {} : { style }),
+  });
 }
 
 export async function summarizeRound(

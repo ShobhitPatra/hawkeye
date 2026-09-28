@@ -21,7 +21,7 @@ Hawkeye is a code reviewer that belongs to you, not to a repository. Open a pull
 [Sign in with GitHub](https://hawkeye.reviews) to review every push, or try one review with no account:
 
 ```sh
-npx hawkeye-review prepare <pr-url>
+npx hawkeye-review check <pr-url>
 ```
 
 ## What a review gives you
@@ -83,7 +83,9 @@ If nothing happens, the Runners page says whether your runner is online, and eac
 
 ## Try one review with no account
 
-`npx hawkeye-review prepare <pr-url>` fetches the pull request and writes the review prompt into a round directory. Open the prompt in any coding agent session, let it review the checkout, then run the `show` command it printed to read the verdict. Nothing is posted anywhere. It needs Node 22, git, and a GitHub token (`gh auth token` is enough).
+`npx hawkeye-review check <pr-url>` reviews the pull request with Claude Code or Codex on your machine and prints the review in the terminal: the verdict, then each finding with its file, line and what to do. Nothing is posted anywhere. Run it again after a new push and it reviews what changed since. It needs Node 22, git, Claude Code or Codex signed in, and a GitHub token (`gh auth token` is enough).
+
+To have your own agent session do the review instead, `npx hawkeye-review prepare <pr-url>` writes the review prompt, and the `show` command it prints reads the result.
 
 ## Open source, yours to run
 

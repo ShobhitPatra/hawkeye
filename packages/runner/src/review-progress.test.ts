@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { reviewProgress, reviewProgressLine } from "./review-progress.js";
+import { reviewedLine, reviewProgress, reviewProgressLine } from "./review-progress.js";
 
 describe("reviewProgressLine", () => {
   it("names the subject, turns and elapsed time", () => {
@@ -56,5 +56,16 @@ describe("reviewProgress", () => {
     vi.advanceTimersByTime(2000);
     expect(update).toHaveBeenCalledTimes(2);
     vi.useRealTimers();
+  });
+});
+
+describe("reviewedLine", () => {
+  it("says what the finished review took", () => {
+    expect(reviewedLine({ subject: "o/r#7", turns: 10, elapsedMs: 90_000 })).toBe(
+      "Reviewed o/r#7 in 10 turns · 1m 30s",
+    );
+    expect(reviewedLine({ subject: "o/r#7", turns: 1, elapsedMs: 4_000 })).toBe(
+      "Reviewed o/r#7 in 1 turn · 0m 04s",
+    );
   });
 });
