@@ -32,10 +32,10 @@ describe("showRound", () => {
       findings: [{ severity: "optional", claim: "Nit", detail: "small" }],
     });
     const text = await showRound(directory);
-    expect(text.startsWith("Verdict: MERGEABLE\n\n- fine\n\noptional:\n")).toBe(true);
+    expect(text.startsWith("Mergeable\n\n- fine\n\nOptional\n")).toBe(true);
     expect(
       text.endsWith(
-        "Rounds:\n- round 3 · ccccccc · mergeable · 2026-08-26T10:00:00.000Z (this review)",
+        "Rounds\n- round 3 · ccccccc · Mergeable · 2026-08-26T10:00:00.000Z (this review)",
       ),
     ).toBe(true);
   });
@@ -106,15 +106,15 @@ describe("showRound", () => {
     expect(warnings).toHaveLength(2);
     expect(warnings[0]).toContain(`${join(pullRequestDir, "round-4")}: Invalid review result`);
     expect(warnings[1]).toContain(`skipping ${join(pullRequestDir, "round-5")}`);
-    expect(text).toContain("Prior findings:\n- [id1] addressed · guarded now");
+    expect(text).toContain("Prior findings\n- id1 addressed · guarded now");
     expect(
       text.endsWith(
         [
-          "Rounds:",
-          "- round 1 · 1111111 · blocked · 2026-08-25T10:00:00.000Z",
-          "- round 2 · 2222222 · pending · 2026-08-26T10:00:00.000Z",
-          "- round 3 · ccccccc · ship · 2026-08-26T10:00:00.000Z (this review)",
-          "- round 4 · 4444444 · invalid · 2026-08-26T10:00:00.000Z",
+          "Rounds",
+          "- round 1 · 1111111 · Blocked · 2026-08-25T10:00:00.000Z",
+          "- round 2 · 2222222 · Pending · 2026-08-26T10:00:00.000Z",
+          "- round 3 · ccccccc · Ship · 2026-08-26T10:00:00.000Z (this review)",
+          "- round 4 · 4444444 · Invalid · 2026-08-26T10:00:00.000Z",
         ].join("\n"),
       ),
     ).toBe(true);
@@ -246,7 +246,7 @@ describe("showRound", () => {
     const warnings: string[] = [];
     const text = await showRound(directory, (line) => warnings.push(line));
     expect(warnings).toEqual([]);
-    expect(text).toContain(`- [${findingId(undefined, "Old")}] withdrawn · Old · dismissed`);
+    expect(text).toContain(`- ${findingId(undefined, "Old")} withdrawn · Old · dismissed`);
   });
   it("checks the reported prior findings against what the prompt carried", async () => {
     const directory = await roundWith({

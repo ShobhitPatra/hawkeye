@@ -26,11 +26,12 @@ import {
   runnerStoppedLine,
 } from "./cli-text.js";
 import { expandHome, loadConfig } from "./config.js";
+import { reviewRound } from "./local-review/check.js";
 import { describePreparedRound, prepareRound } from "./local-review/prepare.js";
 import { dismissFinding, withdrawDismissal } from "./local-review/rounds.js";
 import { showRound, summarizeRound } from "./local-review/show.js";
 import { resolveGitHubToken } from "./local-review/token.js";
-import { reviewProgress } from "./review-progress.js";
+import { reviewedLine, reviewProgress } from "./review-progress.js";
 import { createRunDirectory } from "./run-directory.js";
 import { runnerConsole } from "./runner/console.js";
 import { type ProgressLine, shortenHome, type TerminalStyle } from "./terminal.js";
@@ -125,6 +126,39 @@ export function createProgram(io: {
     const config = { controlPlaneUrl: input.url, token };
     await writeRunnerConfig(RUNNER_CONFIG_PATH, config);
     return config;
+  };
+
+  type PrepareOptions = { githubToken?: string; contract?: string; root: string };
+  const prepare = async (pullRequest: string, options: PrepareOptions) => {
+    const reference = parsePullRequestReference(pullRequest);
+    const token = await resolveGitHubToken({
+      ...(options.githubToken === undefined ? {} : { option: options.githubToken }),
+      env: process.env,
+      exec,
+    });
+    const contract = await loadContractOverride({
+      ...(options.contract === undefined ? {} : { explicitPath: options.contract }),
+      env: process.env,
+      home: homedir(),
+      defaultPath: DEFAULT_CONTRACT_PATH,
+      readFile: (p) => readFile(p, "utf8"),
+    });
+    if (contract) io.stderr(`using contract override: ${contract.path}`);
+    return prepareRound(
+      {
+        reference,
+        token,
+        root: expandHome(options.root, homedir()),
+        ...(contract ? { contractOverride: contract.content } : {}),
+      },
+      {
+        fetch,
+        createWorktree,
+        readRepositoryRules,
+        now: () => new Date(),
+        warn: (line) => io.stderr(`warning: ${line}`),
+      },
+    );
   };
 
   const program = new Command("hawkeye")
@@ -423,44 +457,88 @@ export function createProgram(io: {
       "review contract that replaces the built-in lens and finding rules",
     )
     .option("--root <dir>", "where review rounds are kept", REVIEWS_ROOT)
+    .action(async (pullRequest: string, options: PrepareOptions) => {
+      try {
+        for (const line of describePreparedRound(await prepare(pullRequest, options), homedir()))
+          io.stdout(line);
+      } catch (error) {
+        io.stderr((error as Error).message);
+        process.exitCode = 1;
+      }
+    });
+
+  program
+    .command("check")
+    .description(
+      "review a pull request with Claude Code or Codex on this machine and print the review; nothing is posted",
+    )
+    .argument("<pull-request>", "https://github.com/owner/repo/pull/N or owner/repo#N")
+    .option("--harness <name>", "claude or codex", "claude")
+    .option("--model <name>", "model passed to the CLI (else its default)")
+    .option("--max-turns <n>", "assistant turn limit", "40")
+    .option("--wall-clock-minutes <n>", "wall clock limit in minutes", "15")
+    .option("--github-token <token>", "GitHub token; else GITHUB_TOKEN, else gh auth token")
+    .option(
+      "--contract <path>",
+      "review contract that replaces the built-in lens and finding rules",
+    )
+    .option("--root <dir>", "where review rounds are kept", REVIEWS_ROOT)
     .action(
       async (
         pullRequest: string,
-        options: { githubToken?: string; contract?: string; root: string },
+        options: PrepareOptions & {
+          harness: string;
+          model?: string;
+          maxTurns: string;
+          wallClockMinutes: string;
+        },
       ) => {
+        let prepared: Awaited<ReturnType<typeof prepare>> | undefined;
         try {
-          const reference = parsePullRequestReference(pullRequest);
-          const token = await resolveGitHubToken({
-            ...(options.githubToken === undefined ? {} : { option: options.githubToken }),
-            env: process.env,
-            exec,
-          });
-          const contract = await loadContractOverride({
-            ...(options.contract === undefined ? {} : { explicitPath: options.contract }),
-            env: process.env,
-            home: homedir(),
-            defaultPath: DEFAULT_CONTRACT_PATH,
-            readFile: (p) => readFile(p, "utf8"),
-          });
-          if (contract) io.stderr(`using contract override: ${contract.path}`);
-          const prepared = await prepareRound(
-            {
-              reference,
-              token,
-              root: expandHome(options.root, homedir()),
-              ...(contract ? { contractOverride: contract.content } : {}),
-            },
-            {
-              fetch,
-              createWorktree,
-              readRepositoryRules,
-              now: () => new Date(),
-              warn: (line) => io.stderr(`warning: ${line}`),
-            },
+          if (options.harness !== "claude" && options.harness !== "codex")
+            throw new Error(`--harness must be claude or codex, got "${options.harness}"`);
+          const maxTurns = positiveInteger("--max-turns", options.maxTurns);
+          const wallClockMinutes = positiveInteger(
+            "--wall-clock-minutes",
+            options.wallClockMinutes,
           );
-          for (const line of describePreparedRound(prepared, homedir())) io.stdout(line);
+          const model = options.model === undefined ? {} : { model: options.model };
+          const harness =
+            options.harness === "codex"
+              ? createCodexHarness(model)
+              : createClaudeCodeHarness(model);
+          prepared = await prepare(pullRequest, options);
+          io.stderr(describePreparedRound(prepared, homedir())[0]!);
+          const { owner, repo, number } = prepared.meta.pullRequest;
+          const subject = `${owner}/${repo}#${number}`;
+          const startedAt = Date.now();
+          const progress = reviewProgress({
+            progress: io.progress ?? { update: () => {}, clear: () => {} },
+            stderr: io.stderr,
+            subject,
+          });
+          const reviewed = await reviewRound({
+            prepared,
+            harness,
+            harnessName: options.harness,
+            maxTurns,
+            wallClockMs: wallClockMinutes * 60_000,
+            onTurn: progress.turn,
+            log: progress.log,
+            warn: (line) => progress.log(`warning: ${line}`),
+            ...(io.style === undefined ? {} : { style: io.style }),
+          }).finally(progress.finish);
+          io.stderr(
+            reviewedLine({ subject, turns: reviewed.turns, elapsedMs: Date.now() - startedAt }),
+          );
+          io.stdout("");
+          io.stdout(reviewed.review);
         } catch (error) {
-          io.stderr((error as Error).message);
+          io.stderr(
+            prepared === undefined
+              ? (error as Error).message
+              : `${reviewFailedLine((error as Error).message, io.stderrStyle?.must)} The round is kept in ${shortenHome(prepared.directory, homedir())}.`,
+          );
           process.exitCode = 1;
         }
       },
@@ -477,7 +555,7 @@ export function createProgram(io: {
         const warn = (line: string) => io.stderr(`warning: ${line}`);
         io.stdout(
           options.full
-            ? await showRound(directory, warn)
+            ? await showRound(directory, warn, io.style)
             : await summarizeRound(directory, warn, io.style),
         );
       } catch (error) {
