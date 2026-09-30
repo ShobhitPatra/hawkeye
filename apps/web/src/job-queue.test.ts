@@ -11,8 +11,10 @@ import {
   heartbeatJob,
   holdsJobClaim,
   jobSupersededStatement,
+  releaseJob,
   requeueStaleJobs,
   requeueStaleJobsStatement,
+  takeBackClaim,
 } from "./job-queue";
 import { createTestDb, seedArmedPullRequest, queueJob } from "./test/pglite";
 
@@ -392,6 +394,7 @@ describe("createRun and completeRun", () => {
     expect(created).toMatchObject({
       jobId: claimed.id,
       runnerId: "runner-1",
+      headSha: "a".repeat(40),
       status: "running",
       turns: 0,
       result: null,
@@ -520,6 +523,173 @@ describe("createRun and completeRun", () => {
 
     const [row] = await db.select().from(schema.job).where(eq(schema.job.id, other.id));
     expect(row?.state).toBe("claimed");
+  });
+});
+
+describe("takeBackClaim", () => {
+  async function lostClaim() {
+    const queued = await enqueue("armed-1", minutesBefore(10));
+    await claim();
+    const lost = await createRun(db, { jobId: queued.id, runnerId: "runner-1" });
+    await heartbeatJob(db, { jobId: queued.id, runnerId: "runner-1", now: minutesBefore(6) });
+    await requeueStaleJobs(db, { now });
+    return { jobId: queued.id, runId: lost.id };
+  }
+
+  async function rows(lost: { jobId: string; runId: string }) {
+    const [jobRow] = await db.select().from(schema.job).where(eq(schema.job.id, lost.jobId));
+    const [runRow] = await db.select().from(schema.run).where(eq(schema.run.id, lost.runId));
+    return { job: jobRow, run: runRow };
+  }
+
+  const untouched = {
+    job: { state: "queued", claimedByRunnerId: null },
+    run: { status: "error", error: "heartbeat lost" },
+  };
+
+  it("gives the claim back for the run that lost its heartbeat while the job still waits", async () => {
+    const lost = await lostClaim();
+
+    const taken = await takeBackClaim(db, { runId: lost.runId, runnerId: "runner-1", now });
+
+    expect(taken?.id).toBe(lost.jobId);
+    expect(await rows(lost)).toMatchObject({
+      job: { state: "claimed", claimedByRunnerId: "runner-1", claimedAt: now, heartbeatAt: now },
+      run: { status: "running", error: null, endedAt: null },
+    });
+  });
+
+  it("gives the claim back by job, to the runner's latest lost run", async () => {
+    const lost = await lostClaim();
+    const earlier = await createRun(db, { jobId: lost.jobId, runnerId: "runner-1" });
+    await db
+      .update(schema.run)
+      .set({ status: "error", error: "heartbeat lost", startedAt: minutesBefore(60) })
+      .where(eq(schema.run.id, earlier.id));
+
+    const taken = await takeBackClaim(db, { jobId: lost.jobId, runnerId: "runner-1", now });
+
+    expect(taken?.id).toBe(lost.jobId);
+    expect((await rows(lost)).run).toMatchObject({ status: "running", error: null });
+    const [older] = await db.select().from(schema.run).where(eq(schema.run.id, earlier.id));
+    expect(older).toMatchObject({ status: "error", error: "heartbeat lost" });
+  });
+
+  it("refuses another runner", async () => {
+    const lost = await lostClaim();
+
+    expect(
+      await takeBackClaim(db, { runId: lost.runId, runnerId: "runner-2", now }),
+    ).toBeUndefined();
+    expect(
+      await takeBackClaim(db, { jobId: lost.jobId, runnerId: "runner-2", now }),
+    ).toBeUndefined();
+    expect(await rows(lost)).toMatchObject(untouched);
+  });
+
+  it("refuses once the job was claimed again", async () => {
+    const lost = await lostClaim();
+    await claim("runner-2");
+
+    expect(
+      await takeBackClaim(db, { runId: lost.runId, runnerId: "runner-1", now }),
+    ).toBeUndefined();
+    expect(await rows(lost)).toMatchObject({
+      job: { state: "claimed", claimedByRunnerId: "runner-2" },
+      run: untouched.run,
+    });
+  });
+
+  it("refuses once a push moved the waiting job to a newer head", async () => {
+    const lost = await lostClaim();
+    await queueJob(db, {
+      armedPrId: "armed-1",
+      headSha: "c".repeat(40),
+      baseSha: "b".repeat(40),
+      headCurrentAt: new Date(Date.now() + 60_000),
+      notBefore: minutesBefore(1),
+    });
+
+    expect(
+      await takeBackClaim(db, { runId: lost.runId, runnerId: "runner-1", now }),
+    ).toBeUndefined();
+    expect(await rows(lost)).toMatchObject({
+      job: { ...untouched.job, headSha: "c".repeat(40) },
+      run: untouched.run,
+    });
+  });
+
+  it("refuses once the waiting job was asked to review from scratch", async () => {
+    const lost = await lostClaim();
+    await queueJob(db, {
+      armedPrId: "armed-1",
+      headSha: "a".repeat(40),
+      baseSha: "b".repeat(40),
+      headCurrentAt: new Date(Date.now() + 60_000),
+      notBefore: minutesBefore(1),
+      fromScratch: true,
+    });
+
+    expect(
+      await takeBackClaim(db, { runId: lost.runId, runnerId: "runner-1", now }),
+    ).toBeUndefined();
+    expect(await rows(lost)).toMatchObject(untouched);
+  });
+
+  it("refuses once the pull request's reviews were paused", async () => {
+    const lost = await lostClaim();
+    await db
+      .update(schema.armedPr)
+      .set({ disarmedAt: now })
+      .where(eq(schema.armedPr.id, "armed-1"));
+
+    expect(
+      await takeBackClaim(db, { runId: lost.runId, runnerId: "runner-1", now }),
+    ).toBeUndefined();
+    expect(await rows(lost)).toMatchObject(untouched);
+  });
+
+  it("refuses a job the sweep failed because a newer one overtook it", async () => {
+    const stale = await enqueue("armed-1", minutesBefore(10));
+    await claim();
+    const lost = await createRun(db, { jobId: stale.id, runnerId: "runner-1" });
+    await heartbeatJob(db, { jobId: stale.id, runnerId: "runner-1", now: minutesBefore(6) });
+    await enqueue("armed-1", minutesBefore(1));
+    await requeueStaleJobs(db, { now });
+
+    expect(await takeBackClaim(db, { runId: lost.id, runnerId: "runner-1", now })).toBeUndefined();
+    const [jobRow] = await db.select().from(schema.job).where(eq(schema.job.id, stale.id));
+    expect(jobRow?.state).toBe("failed");
+  });
+
+  it("refuses a run that ended for another reason", async () => {
+    const queued = await enqueue("armed-1", minutesBefore(10));
+    await claim();
+    const released = await createRun(db, { jobId: queued.id, runnerId: "runner-1" });
+    await releaseJob(db, {
+      jobId: queued.id,
+      runId: released.id,
+      runnerId: "runner-1",
+      error: "installation token",
+      now,
+    });
+
+    expect(
+      await takeBackClaim(db, { runId: released.id, runnerId: "runner-1", now }),
+    ).toBeUndefined();
+    expect(
+      await takeBackClaim(db, { jobId: queued.id, runnerId: "runner-1", now }),
+    ).toBeUndefined();
+  });
+
+  it("refuses a run that was opened before runs recorded their head", async () => {
+    const lost = await lostClaim();
+    await db.update(schema.run).set({ headSha: null }).where(eq(schema.run.id, lost.runId));
+
+    expect(
+      await takeBackClaim(db, { runId: lost.runId, runnerId: "runner-1", now }),
+    ).toBeUndefined();
+    expect(await rows(lost)).toMatchObject(untouched);
   });
 });
 

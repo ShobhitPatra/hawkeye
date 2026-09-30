@@ -1,5 +1,5 @@
 import type { ReviewResult, RunResultStatus } from "@hawkeye/core";
-import { and, eq, inArray, isNull, ne, sql, type SQLWrapper } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, sql, type SQLWrapper } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import { armedPr, job, run } from "./db/schema";
@@ -8,6 +8,7 @@ import type { Job } from "./jobs";
 export type Run = typeof run.$inferSelect;
 
 export const DEFAULT_STALE_AFTER_SECONDS = 300;
+export const HEARTBEAT_LOST = "heartbeat lost";
 
 const queuedSibling = sql`exists (select 1
                                   from ${job} waiting
@@ -138,7 +139,7 @@ export async function requeueStaleJobs(
     if (requeued.length === 0) return { swept: requeued, ended: [] };
     const abandoned = await tx
       .update(run)
-      .set({ status: "error", error: "heartbeat lost", endedAt: input.now })
+      .set({ status: "error", error: HEARTBEAT_LOST, endedAt: input.now })
       .where(
         and(
           inArray(
@@ -184,6 +185,56 @@ export async function requeueStaleJobs(
   return { swept: swept.length, failed };
 }
 
+// A push, or a review from scratch asked for while the job waits, rewrites the queued row in place,
+// so the claim comes back only while the row still holds the head the lost run was reviewing.
+export async function takeBackClaim(
+  db: Db,
+  input: { runnerId: string; now: Date } & ({ runId: string } | { jobId: string }),
+): Promise<Job | undefined> {
+  return db.transaction(async (tx) => {
+    const [lost] = await tx
+      .select({ id: run.id, jobId: run.jobId, headSha: run.headSha })
+      .from(run)
+      .innerJoin(job, eq(job.id, run.jobId))
+      .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
+      .where(
+        and(
+          "runId" in input ? eq(run.id, input.runId) : eq(run.jobId, input.jobId),
+          eq(run.runnerId, input.runnerId),
+          eq(run.status, "error"),
+          eq(run.error, HEARTBEAT_LOST),
+          isNull(armedPr.disarmedAt),
+        ),
+      )
+      .orderBy(desc(run.startedAt))
+      .limit(1);
+    if (!lost?.headSha) return undefined;
+    const [taken] = await tx
+      .update(job)
+      .set({
+        state: "claimed",
+        claimedByRunnerId: input.runnerId,
+        claimedAt: input.now,
+        heartbeatAt: input.now,
+      })
+      .where(
+        and(
+          eq(job.id, lost.jobId),
+          eq(job.state, "queued"),
+          eq(job.headSha, lost.headSha),
+          eq(job.fromScratch, false),
+        ),
+      )
+      .returning();
+    if (!taken) return undefined;
+    await tx
+      .update(run)
+      .set({ status: "running", error: null, endedAt: null })
+      .where(eq(run.id, lost.id));
+    return taken;
+  });
+}
+
 export async function releaseJob(
   db: Db,
   input: { jobId: string; runId: string; runnerId: string; error: string; now: Date },
@@ -214,7 +265,11 @@ export async function releaseJob(
 export async function createRun(db: Db, input: { jobId: string; runnerId: string }): Promise<Run> {
   const [created] = await db
     .insert(run)
-    .values({ jobId: input.jobId, runnerId: input.runnerId })
+    .values({
+      jobId: input.jobId,
+      runnerId: input.runnerId,
+      headSha: sql`(select ${job.headSha} from ${job} where ${job.id} = ${input.jobId})`,
+    })
     .returning();
   if (!created) throw new Error(`failed to create a run for job ${input.jobId}`);
   return created;

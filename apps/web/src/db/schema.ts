@@ -154,6 +154,7 @@ export const run = pgTable("run", {
   runnerId: text("runner_id")
     .notNull()
     .references(() => runner.id),
+  headSha: text("head_sha"),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   endedAt: timestamp("ended_at", { withTimezone: true }),
   status: runStatus("status").notNull().default("running"),
