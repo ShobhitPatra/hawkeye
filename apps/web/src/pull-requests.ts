@@ -3,6 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { hold, type HoldStore } from "./hold";
 import { describeSyncFailure } from "./installation-sync";
+import type { InstallationSync } from "./installations";
 import { installation, installationUser } from "./db/schema";
 
 export interface ListedPullRequest extends OpenPullRequest {
@@ -21,6 +22,7 @@ type Listing = {
   pullRequests: ListedPullRequest[];
   failures: InstallationFailure[];
   installations: number;
+  suspendedInstallations: number;
 };
 const listings: HoldStore<Listing> = new Map();
 
@@ -32,7 +34,7 @@ export async function listUserOpenPullRequests(
   deps: {
     db: Db;
     github: GitHubClient;
-    syncInstallations?: () => Promise<unknown>;
+    syncInstallations?: () => Promise<InstallationSync>;
     cache?: HoldStore<Listing>;
   },
   input: { userId: string; login: string; now?: number },
@@ -51,11 +53,12 @@ export async function listUserOpenPullRequests(
 }
 
 async function fetchUserOpenPullRequests(
-  deps: { db: Db; github: GitHubClient; syncInstallations?: () => Promise<unknown> },
+  deps: { db: Db; github: GitHubClient; syncInstallations?: () => Promise<InstallationSync> },
   input: { userId: string; login: string },
 ): Promise<Listing> {
-  await deps.syncInstallations?.().catch((error: unknown) => {
+  const synced = await deps.syncInstallations?.().catch((error: unknown) => {
     console.error(describeSyncFailure(input.userId, error));
+    return undefined;
   });
   const installations = await deps.db
     .select({ id: installation.id })
@@ -88,5 +91,6 @@ async function fetchUserOpenPullRequests(
     pullRequests: pullRequests.toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     failures,
     installations: installations.length,
+    suspendedInstallations: synced?.suspended ?? 0,
   };
 }

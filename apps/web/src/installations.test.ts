@@ -178,7 +178,7 @@ describe("syncUserInstallations", () => {
     listUserInstallations.mockResolvedValueOnce([octo, sam]);
     await expect(
       syncUserInstallations(db, github, { userId: "u-link", token: "gho_x" }),
-    ).resolves.toEqual({ linked: 2, unlinked: 0 });
+    ).resolves.toEqual({ linked: 2, unlinked: 0, suspended: 0 });
     expect(listUserInstallations).toHaveBeenCalledWith("gho_x");
     expect(await readInstallation("501")).toMatchObject({ accountLogin: "sam", deletedAt: null });
     expect(await installationBelongsToUser(db, "500", "u-link")).toBe(true);
@@ -190,7 +190,7 @@ describe("syncUserInstallations", () => {
     await syncUserInstallations(db, github, { userId: "u-drop", token: "gho_x" });
     await expect(
       syncUserInstallations(db, github, { userId: "u-drop", token: "gho_x" }),
-    ).resolves.toEqual({ linked: 0, unlinked: 1 });
+    ).resolves.toEqual({ linked: 0, unlinked: 1, suspended: 0 });
     expect(await installationBelongsToUser(db, "500", "u-drop")).toBe(true);
     expect(await installationBelongsToUser(db, "501", "u-drop")).toBe(false);
     expect(await readInstallation("501")).toMatchObject({ deletedAt: null });
@@ -201,11 +201,11 @@ describe("syncUserInstallations", () => {
     await syncUserInstallations(db, github, { userId: "u-none", token: "gho_x" });
     await expect(
       syncUserInstallations(db, github, { userId: "u-none", token: "gho_x" }),
-    ).resolves.toEqual({ linked: 0, unlinked: 1 });
+    ).resolves.toEqual({ linked: 0, unlinked: 1, suspended: 0 });
     expect(await installationBelongsToUser(db, "500", "u-none")).toBe(false);
   });
 
-  it("treats a suspended installation as unreachable and leaves its row alone", async () => {
+  it("treats a suspended installation as unreachable, counts it and leaves its row alone", async () => {
     await recordInstallation(db, installationEvent("created", 777, 1));
     await recordInstallation(db, installationEvent("suspend", 777, 1));
     listUserInstallations.mockResolvedValueOnce([
@@ -219,7 +219,7 @@ describe("syncUserInstallations", () => {
     ]);
     await expect(
       syncUserInstallations(db, github, { userId: "u-suspended", token: "gho_x" }),
-    ).resolves.toEqual({ linked: 0, unlinked: 0 });
+    ).resolves.toEqual({ linked: 0, unlinked: 0, suspended: 1 });
     expect((await readInstallation("777"))?.deletedAt).not.toBeNull();
     expect(await installationBelongsToUser(db, "777", "u-suspended")).toBe(false);
   });

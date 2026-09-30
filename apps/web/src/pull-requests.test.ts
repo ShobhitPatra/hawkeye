@@ -202,7 +202,7 @@ describe("listUserOpenPullRequests", () => {
         .insert(schema.installation)
         .values({ id: "14", accountLogin: "fresh", accountType: "Organization" });
       await db.insert(schema.installationUser).values({ installationId: "14", userId: "user-3" });
-      return { linked: 1, unlinked: 0 };
+      return { linked: 1, unlinked: 0, suspended: 0 };
     });
     const found = await listUserOpenPullRequests(
       { db, github, syncInstallations, cache },
@@ -214,6 +214,19 @@ describe("listUserOpenPullRequests", () => {
       { userId: "user-3", login: "alice", now: 30_000 },
     );
     expect(syncInstallations).toHaveBeenCalledTimes(1);
+  });
+  it("reports the installations the sync found suspended, which are not linked", async () => {
+    const { github } = fakeGitHub({}, {});
+    const found = await listUserOpenPullRequests(
+      {
+        db,
+        github,
+        syncInstallations: async () => ({ linked: 0, unlinked: 0, suspended: 1 }),
+        cache: new Map(),
+      },
+      { userId: "user-without-installations", login: "alice" },
+    );
+    expect(found).toMatchObject({ installations: 0, suspendedInstallations: 1 });
   });
   it("lists the linked installations when the sync fails", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -258,7 +271,12 @@ describe("listUserOpenPullRequests", () => {
         { db, github, cache: new Map() },
         { userId: "ghost", login: "ghost" },
       ),
-    ).resolves.toEqual({ pullRequests: [], failures: [], installations: 0 });
+    ).resolves.toEqual({
+      pullRequests: [],
+      failures: [],
+      installations: 0,
+      suspendedInstallations: 0,
+    });
     expect(installationTokenById).not.toHaveBeenCalled();
   });
 
@@ -301,7 +319,12 @@ describe("forgetUserListings", () => {
         {
           at: 0,
           ttl: 60_000,
-          value: Promise.resolve({ pullRequests: [], failures: [], installations: 0 }),
+          value: Promise.resolve({
+            pullRequests: [],
+            failures: [],
+            installations: 0,
+            suspendedInstallations: 0,
+          }),
         },
       ],
       [
@@ -309,7 +332,12 @@ describe("forgetUserListings", () => {
         {
           at: 0,
           ttl: 60_000,
-          value: Promise.resolve({ pullRequests: [], failures: [], installations: 0 }),
+          value: Promise.resolve({
+            pullRequests: [],
+            failures: [],
+            installations: 0,
+            suspendedInstallations: 0,
+          }),
         },
       ],
     ]);

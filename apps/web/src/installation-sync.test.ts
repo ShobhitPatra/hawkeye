@@ -49,6 +49,7 @@ describe("syncInstallationsForUser", () => {
     await expect(syncInstallationsForUser(deps(), "u-1", headers)).resolves.toEqual({
       linked: 1,
       unlinked: 0,
+      suspended: 0,
     });
     expect(getAccessToken).toHaveBeenCalledWith({
       body: { accountId: "account-1", userId: "u-1" },

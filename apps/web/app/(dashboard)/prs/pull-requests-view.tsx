@@ -9,6 +9,7 @@ export function PullRequestsView({
   pullRequests,
   failures,
   installations,
+  suspendedInstallations,
   statuses,
   runner,
   now,
@@ -16,6 +17,7 @@ export function PullRequestsView({
   pullRequests: ListedPullRequest[];
   failures: InstallationFailure[];
   installations: number;
+  suspendedInstallations: number;
   statuses: Map<string, PullRequestStatus>;
   runner: RunnerStatus;
   now: number;
@@ -65,7 +67,16 @@ export function PullRequestsView({
 
       {pullRequests.length === 0 ? (
         <div className="hk-state">
-          {installations === 0 ? (
+          {installations === 0 && suspendedInstallations > 0 ? (
+            <>
+              <p>Hawkeye is suspended on every account where it is installed.</p>
+              <p>
+                Reviews are stopped until the App is resumed on GitHub.{" "}
+                <Link href="/settings#installed">Where Hawkeye is installed</Link> lists the
+                accounts.
+              </p>
+            </>
+          ) : installations === 0 ? (
             <>
               <p>Hawkeye is not installed on a repository you can reach yet.</p>
               <p>

@@ -30,29 +30,31 @@ export default async function PullRequestsPage() {
   const db = getDb();
   const github = createGitHubAppClient({ fetch });
   const requestHeaders = await headers();
-  const [{ pullRequests, failures, installations }, statuses, runner] = await Promise.all([
-    listUserOpenPullRequests(
-      {
-        db,
-        github,
-        syncInstallations: () =>
-          syncInstallationsForUser(
-            { auth: getAuth(), db, github },
-            session.user.id,
-            requestHeaders,
-          ),
-      },
-      { userId: session.user.id, login },
-    ),
-    listPullRequestStatuses(db, session.user.id),
-    requestRunnerStatus(session.user.id),
-  ]);
+  const [{ pullRequests, failures, installations, suspendedInstallations }, statuses, runner] =
+    await Promise.all([
+      listUserOpenPullRequests(
+        {
+          db,
+          github,
+          syncInstallations: () =>
+            syncInstallationsForUser(
+              { auth: getAuth(), db, github },
+              session.user.id,
+              requestHeaders,
+            ),
+        },
+        { userId: session.user.id, login },
+      ),
+      listPullRequestStatuses(db, session.user.id),
+      requestRunnerStatus(session.user.id),
+    ]);
 
   return (
     <PullRequestsView
       pullRequests={pullRequests}
       failures={failures}
       installations={installations}
+      suspendedInstallations={suspendedInstallations}
       statuses={statuses}
       runner={runner}
       now={Date.now()}
