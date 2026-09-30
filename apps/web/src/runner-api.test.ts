@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
+import { requeueStaleJobs } from "./job-queue";
 import { claimJob, heartbeat, recordEvents, recordResult } from "./runner-api";
 import { createRunnerToken } from "./runner-tokens";
 import { createTestDb, seedArmedPullRequest, queueJob } from "./test/pglite";
@@ -764,6 +765,30 @@ describe("heartbeat", () => {
     );
 
     expect(response.status).toBe(409);
+  });
+
+  it("takes the claim back for a runner whose job the sweep put back in the queue", async () => {
+    const queued = await enqueue();
+    const claimed = await claimJob(request("/api/runner/jobs"), claimDeps());
+    const runId = (await claimed.json()).job.runId as string;
+    await db
+      .update(schema.job)
+      .set({ heartbeatAt: new Date(now.getTime() - 3_600_000) })
+      .where(eq(schema.job.id, queued.id));
+    await requeueStaleJobs(db, { now });
+
+    const response = await heartbeat(
+      request(`/api/runner/jobs/${queued.id}/heartbeat`, { method: "POST" }),
+      { db },
+      queued.id,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, superseded: false });
+    const [jobRow] = await db.select().from(schema.job).where(eq(schema.job.id, queued.id));
+    expect(jobRow).toMatchObject({ state: "claimed", claimedByRunnerId: runnerId });
+    const [runRow] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
+    expect(runRow).toMatchObject({ status: "running", error: null, endedAt: null });
   });
 
   it("404s for a job that does not exist", async () => {
@@ -1650,6 +1675,34 @@ describe("recordResult", () => {
     expect(row).toMatchObject({ status: "running", result: null, turns: 0, endedAt: null });
     const [jobRow] = await db.select().from(schema.job).where(eq(schema.job.id, row!.jobId));
     expect(jobRow?.state).toBe("claimed");
+  });
+
+  it("posts a late result when the job the sweep requeued is still waiting", async () => {
+    const queued = await enqueue();
+    const claimed = await claimJob(request("/api/runner/jobs"), claimDeps());
+    const runId = (await claimed.json()).job.runId as string;
+    await db
+      .update(schema.job)
+      .set({ heartbeatAt: new Date(now.getTime() - 3_600_000) })
+      .where(eq(schema.job.id, queued.id));
+    await requeueStaleJobs(db, { now });
+
+    const response = await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, {
+        status: "ok",
+        turns: 5,
+        result: reviewResult,
+      }),
+      { db, github },
+      runId,
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).posted).toBe("posted");
+    const [runRow] = await db.select().from(schema.run).where(eq(schema.run.id, runId));
+    expect(runRow).toMatchObject({ status: "ok", error: null, turns: 5 });
+    const [jobRow] = await db.select().from(schema.job).where(eq(schema.job.id, queued.id));
+    expect(jobRow?.state).toBe("done");
   });
 
   it("409s on a late result once the job was requeued and reclaimed", async () => {

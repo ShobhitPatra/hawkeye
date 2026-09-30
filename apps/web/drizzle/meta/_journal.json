@@ -162,6 +162,13 @@
       "when": 1790476513953,
       "tag": "0022_curvy_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790783364353,
+      "tag": "0023_next_vector",
+      "breakpoints": true
     }
   ]
 }

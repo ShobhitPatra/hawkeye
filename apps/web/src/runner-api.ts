@@ -45,6 +45,7 @@ import {
   releaseJob,
   jobSuperseded,
   newerRunIsLive,
+  takeBackClaim,
   userHasReviewsOn,
 } from "./job-queue";
 import {
@@ -261,7 +262,8 @@ export async function heartbeat(
   const runner = await requireRunner(request, deps.db);
   if (runner instanceof Response) return runner;
 
-  const beat = await heartbeatJob(deps.db, { jobId, runnerId: runner.id, now: new Date() });
+  const claim = { jobId, runnerId: runner.id, now: new Date() };
+  const beat = (await heartbeatJob(deps.db, claim)) ?? (await takeBackClaim(deps.db, claim));
   if (!beat) {
     const [existing] = await deps.db.select().from(job).where(eq(job.id, jobId));
     if (!existing) return Response.json({ error: "job not found" }, { status: 404 });
@@ -388,7 +390,10 @@ export async function recordResult(
     .from(run)
     .where(and(eq(run.id, runId), eq(run.runnerId, runner.id)));
   if (!existing) return Response.json({ error: "run not found" }, { status: 404 });
-  if (existing.status !== "running")
+  if (
+    existing.status !== "running" &&
+    !(await takeBackClaim(deps.db, { runId, runnerId: runner.id, now: new Date() }))
+  )
     return Response.json({ error: "run is already complete" }, { status: 409 });
 
   const completed = await completeRun(deps.db, { runId, runnerId: runner.id, ...report });
