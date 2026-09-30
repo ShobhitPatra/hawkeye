@@ -912,6 +912,55 @@ describe("runRunnerLoop", () => {
       detail: expect.stringMatching(/^result not delivered: .+ · run kept in /),
     });
   });
+  it("ends a held result at once when told to stop while its request is still open", async () => {
+    let results = 0;
+    const controller = new AbortController();
+    const plane = await fakeControlPlane((received, response) => {
+      if (received.url === "/api/runner/jobs") return json(response, 200, claimedJob);
+      if (received.url.endsWith("/result")) {
+        results += 1;
+        if (results === 1) return void response.destroy();
+        return controller.abort();
+      }
+      return json(response, 200, { ok: true });
+    });
+    servers.push(plane.server);
+    const d = await deps(plane.baseUrl, { signal: controller.signal, sleep: async () => {} });
+    await runRunnerLoop(d);
+    expect(results).toBe(2);
+    expect(d.reported.filter((event) => event.state === "waiting")).toHaveLength(1);
+    expect(d.reported.at(-1)).toMatchObject({
+      state: "failed",
+      detail: expect.stringMatching(/^result not delivered: fetch failed · run kept in /),
+    });
+  });
+  it("ends a held result when told to stop while it retries an answer that was a 5xx", async () => {
+    let results = 0;
+    const controller = new AbortController();
+    const plane = await fakeControlPlane((received, response) => {
+      if (received.url === "/api/runner/jobs") return json(response, 200, claimedJob);
+      if (received.url.endsWith("/result")) {
+        results += 1;
+        if (results === 1) return void response.destroy();
+        return json(response, 503, { error: "down" });
+      }
+      return json(response, 200, { ok: true });
+    });
+    servers.push(plane.server);
+    const d = await deps(plane.baseUrl, {
+      signal: controller.signal,
+      resultRetryDelaysMs: [7, 7, 7],
+      sleep: async (milliseconds) => {
+        if (milliseconds === 7) controller.abort();
+      },
+    });
+    await runRunnerLoop(d);
+    expect(results).toBe(2);
+    expect(d.reported.at(-1)).toMatchObject({
+      state: "failed",
+      detail: expect.stringMatching(/^result not delivered: fetch failed · run kept in /),
+    });
+  });
   it("gives up with once on a result the control plane does not answer, after the same retries", async () => {
     let results = 0;
     const plane = await fakeControlPlane((received, response) => {

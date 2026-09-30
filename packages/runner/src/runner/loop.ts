@@ -234,9 +234,21 @@ async function deliverResult(
   const delays = deps.resultRetryDelaysMs ?? DEFAULT_RESULT_RETRY_DELAYS_MS;
   let retries = 0;
   let unanswered = 0;
+  let held: string | undefined;
+  const undelivered = (message: string) => {
+    deps.report({
+      state: "failed",
+      detail: `result not delivered: ${message}${keptIn(context.runDirectory)}`,
+    });
+    return "undelivered" as const;
+  };
   for (;;) {
     try {
-      const acknowledged = await deps.client.sendResult(runId, report);
+      const acknowledged = await deps.client.sendResult(
+        runId,
+        report,
+        held === undefined || deps.signal === undefined ? {} : { signal: deps.signal },
+      );
       reportAcknowledged(report, acknowledged.posted, context, deps);
       return "delivered";
     } catch (error) {
@@ -244,37 +256,32 @@ async function deliverResult(
         deps.report({ state: "failed", detail: "result dropped: the claim was lost" });
         return "dropped";
       }
+      if (held !== undefined && deps.signal?.aborted) return undelivered(held);
       const message = (error as Error).message;
-      const undelivered = () => {
-        deps.report({
-          state: "failed",
-          detail: `result not delivered: ${message}${keptIn(context.runDirectory)}`,
-        });
-        return "undelivered" as const;
-      };
       if (context.hold && !(error instanceof ControlPlaneRequestError) && !deps.signal?.aborted) {
-        if (unanswered === 0)
+        if (held === undefined)
           deps.report({
             state: "waiting",
             detail: `result not sent (${message}); holding it until the control plane answers`,
           });
+        held = message;
         const delay = Math.min(
           RESULT_HOLD_FIRST_DELAY_MS * 2 ** unanswered,
           RESULT_HOLD_DELAY_CAP_MS,
         );
         unanswered += 1;
         await sleep(delay, deps.signal);
-        if (deps.signal?.aborted) return undelivered();
-        continue;
+      } else {
+        const delay = delays[retries];
+        if (!isRetryable(error) || delay === undefined) return undelivered(message);
+        retries += 1;
+        deps.report({
+          state: "waiting",
+          detail: `result not sent (${message}); retrying in ${delay / 1000}s`,
+        });
+        await sleep(delay, held === undefined ? undefined : deps.signal);
       }
-      const delay = delays[retries];
-      if (!isRetryable(error) || delay === undefined) return undelivered();
-      retries += 1;
-      deps.report({
-        state: "waiting",
-        detail: `result not sent (${message}); retrying in ${delay / 1000}s`,
-      });
-      await sleep(delay);
+      if (held !== undefined && deps.signal?.aborted) return undelivered(held);
     }
   }
 }

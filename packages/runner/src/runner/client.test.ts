@@ -94,6 +94,19 @@ describe("createControlPlaneClient", () => {
     controller.abort();
     expect(passed.aborted).toBe(true);
   });
+  it("passes the abort signal through to the result report when given one", async () => {
+    const controller = new AbortController();
+    const { fetch, client: c } = client(() => Response.json({ ok: true }));
+    await c.sendResult(
+      "r1",
+      { status: "error", turns: 0, error: "x" },
+      { signal: controller.signal },
+    );
+    const passed = fetch.mock.calls[0]![1].signal as AbortSignal;
+    expect(passed.aborted).toBe(false);
+    controller.abort();
+    expect(passed.aborted).toBe(true);
+  });
   it("gives up on a request the control plane never answers", async () => {
     const fetch = vi.fn(
       (_url: string, init: RequestInit) =>
