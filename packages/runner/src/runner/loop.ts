@@ -15,6 +15,8 @@ export const DEFAULT_HEARTBEAT_INTERVAL_MS = 30_000;
 export const DEFAULT_RETRY_DELAY_MS = 5_000;
 export const DEFAULT_EMPTY_POLL_DELAY_MS = 1_000;
 export const DEFAULT_RESULT_RETRY_DELAYS_MS = [2_000, 4_000, 8_000];
+export const RESULT_HOLD_FIRST_DELAY_MS = 2_000;
+export const RESULT_HOLD_DELAY_CAP_MS = 60_000;
 export const ONCE_CLAIM_ATTEMPTS = 3;
 export const DEFAULT_CONCURRENCY = 1;
 export const PLAN_LIMIT_PAUSE_MS = 60_000;
@@ -220,14 +222,33 @@ function reportAcknowledged(
 async function deliverResult(
   runId: string,
   report: RunResultReport,
-  context: { headSha: string; durationMs: number; runDirectory: string | undefined },
+  context: {
+    headSha: string;
+    durationMs: number;
+    runDirectory: string | undefined;
+    hold: boolean;
+  },
   deps: RunnerLoopDependencies,
 ): Promise<"delivered" | "dropped" | "undelivered"> {
   const sleep = deps.sleep ?? sleepFor;
   const delays = deps.resultRetryDelaysMs ?? DEFAULT_RESULT_RETRY_DELAYS_MS;
-  for (let attempt = 0; ; attempt += 1) {
+  let retries = 0;
+  let unanswered = 0;
+  let held: string | undefined;
+  const undelivered = (message: string) => {
+    deps.report({
+      state: "failed",
+      detail: `result not delivered: ${message}${keptIn(context.runDirectory)}`,
+    });
+    return "undelivered" as const;
+  };
+  for (;;) {
     try {
-      const acknowledged = await deps.client.sendResult(runId, report);
+      const acknowledged = await deps.client.sendResult(
+        runId,
+        report,
+        held === undefined || deps.signal === undefined ? {} : { signal: deps.signal },
+      );
       reportAcknowledged(report, acknowledged.posted, context, deps);
       return "delivered";
     } catch (error) {
@@ -235,20 +256,32 @@ async function deliverResult(
         deps.report({ state: "failed", detail: "result dropped: the claim was lost" });
         return "dropped";
       }
+      if (held !== undefined && deps.signal?.aborted) return undelivered(held);
       const message = (error as Error).message;
-      const delay = delays[attempt];
-      if (!isRetryable(error) || delay === undefined) {
+      if (context.hold && !(error instanceof ControlPlaneRequestError) && !deps.signal?.aborted) {
+        if (held === undefined)
+          deps.report({
+            state: "waiting",
+            detail: `result not sent (${message}); holding it until the control plane answers`,
+          });
+        held = message;
+        const delay = Math.min(
+          RESULT_HOLD_FIRST_DELAY_MS * 2 ** unanswered,
+          RESULT_HOLD_DELAY_CAP_MS,
+        );
+        unanswered += 1;
+        await sleep(delay, deps.signal);
+      } else {
+        const delay = delays[retries];
+        if (!isRetryable(error) || delay === undefined) return undelivered(message);
+        retries += 1;
         deps.report({
-          state: "failed",
-          detail: `result not delivered: ${message}${keptIn(context.runDirectory)}`,
+          state: "waiting",
+          detail: `result not sent (${message}); retrying in ${delay / 1000}s`,
         });
-        return "undelivered";
+        await sleep(delay, held === undefined ? undefined : deps.signal);
       }
-      deps.report({
-        state: "waiting",
-        detail: `result not sent (${message}); retrying in ${delay / 1000}s`,
-      });
-      await sleep(delay);
+      if (held !== undefined && deps.signal?.aborted) return undelivered(held);
     }
   }
 }
@@ -256,7 +289,7 @@ async function deliverResult(
 export async function runJob(
   claimed: ClaimedJob,
   loopDeps: RunnerLoopDependencies,
-  options: { slot?: number; superseded?: AbortSignal } = {},
+  options: { slot?: number; superseded?: AbortSignal; holdResult?: boolean } = {},
 ): Promise<JobOutcome> {
   const { slot } = options;
   const deps: RunnerLoopDependencies =
@@ -310,7 +343,7 @@ export async function runJob(
   const delivery = await deliverResult(
     job.runId,
     report,
-    { headSha: job.headSha, durationMs, runDirectory },
+    { headSha: job.headSha, durationMs, runDirectory, hold: options.holdResult === true },
     deps,
   );
   const planLimit = report.status === "error" ? planLimitIn(report.error ?? "") : undefined;
@@ -416,6 +449,7 @@ export async function runRunnerLoop(
     const finished = runJob(claimed, deps, {
       ...(concurrency > 1 ? { slot } : {}),
       superseded: superseded.signal,
+      holdResult: true,
     })
       .then(settle)
       .finally(() => running.delete(slot));

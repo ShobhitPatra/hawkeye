@@ -850,6 +850,133 @@ describe("runRunnerLoop", () => {
       "the result was not delivered",
     );
   });
+  it("holds a result the control plane does not answer and delivers it once it does", async () => {
+    let claims = 0;
+    let results = 0;
+    const plane = await fakeControlPlane((received, response) => {
+      if (received.url === "/api/runner/jobs") {
+        claims += 1;
+        return claims === 1 ? json(response, 200, claimedJob) : json(response, 204);
+      }
+      if (received.url.endsWith("/result")) {
+        results += 1;
+        if (results <= 7) return void response.destroy();
+        return json(response, 200, { ok: true, posted: "posted" });
+      }
+      return json(response, 200, { ok: true });
+    });
+    servers.push(plane.server);
+    const controller = new AbortController();
+    const holds: number[] = [];
+    const d = await deps(plane.baseUrl, {
+      signal: controller.signal,
+      sleep: async (milliseconds) => {
+        if (milliseconds === 1) controller.abort();
+        else holds.push(milliseconds);
+      },
+    });
+    await runRunnerLoop(d);
+    expect(results).toBe(8);
+    expect(holds).toEqual([2_000, 4_000, 8_000, 16_000, 32_000, 60_000, 60_000]);
+    const waiting = d.reported.filter((event) => event.state === "waiting");
+    expect(waiting).toHaveLength(1);
+    expect(waiting[0]).toMatchObject({
+      detail: expect.stringMatching(
+        /^result not sent \(.+\); holding it until the control plane answers$/,
+      ),
+    });
+    expect(d.reported).toContainEqual(expect.objectContaining({ state: "posted", turns: 1 }));
+  });
+  it("stops holding a result when the daemon is told to stop", async () => {
+    let results = 0;
+    const plane = await fakeControlPlane((received, response) => {
+      if (received.url === "/api/runner/jobs") return json(response, 200, claimedJob);
+      if (received.url.endsWith("/result")) {
+        results += 1;
+        return void response.destroy();
+      }
+      return json(response, 200, { ok: true });
+    });
+    servers.push(plane.server);
+    const controller = new AbortController();
+    const d = await deps(plane.baseUrl, {
+      signal: controller.signal,
+      sleep: async (milliseconds) => {
+        if (milliseconds === 4_000) controller.abort();
+      },
+    });
+    await runRunnerLoop(d);
+    expect(results).toBe(2);
+    expect(d.reported.at(-1)).toMatchObject({
+      state: "failed",
+      detail: expect.stringMatching(/^result not delivered: .+ · run kept in /),
+    });
+  });
+  it("ends a held result at once when told to stop while its request is still open", async () => {
+    let results = 0;
+    const controller = new AbortController();
+    const plane = await fakeControlPlane((received, response) => {
+      if (received.url === "/api/runner/jobs") return json(response, 200, claimedJob);
+      if (received.url.endsWith("/result")) {
+        results += 1;
+        if (results === 1) return void response.destroy();
+        return controller.abort();
+      }
+      return json(response, 200, { ok: true });
+    });
+    servers.push(plane.server);
+    const d = await deps(plane.baseUrl, { signal: controller.signal, sleep: async () => {} });
+    await runRunnerLoop(d);
+    expect(results).toBe(2);
+    expect(d.reported.filter((event) => event.state === "waiting")).toHaveLength(1);
+    expect(d.reported.at(-1)).toMatchObject({
+      state: "failed",
+      detail: expect.stringMatching(/^result not delivered: fetch failed · run kept in /),
+    });
+  });
+  it("ends a held result when told to stop while it retries an answer that was a 5xx", async () => {
+    let results = 0;
+    const controller = new AbortController();
+    const plane = await fakeControlPlane((received, response) => {
+      if (received.url === "/api/runner/jobs") return json(response, 200, claimedJob);
+      if (received.url.endsWith("/result")) {
+        results += 1;
+        if (results === 1) return void response.destroy();
+        return json(response, 503, { error: "down" });
+      }
+      return json(response, 200, { ok: true });
+    });
+    servers.push(plane.server);
+    const d = await deps(plane.baseUrl, {
+      signal: controller.signal,
+      resultRetryDelaysMs: [7, 7, 7],
+      sleep: async (milliseconds) => {
+        if (milliseconds === 7) controller.abort();
+      },
+    });
+    await runRunnerLoop(d);
+    expect(results).toBe(2);
+    expect(d.reported.at(-1)).toMatchObject({
+      state: "failed",
+      detail: expect.stringMatching(/^result not delivered: fetch failed · run kept in /),
+    });
+  });
+  it("gives up with once on a result the control plane does not answer, after the same retries", async () => {
+    let results = 0;
+    const plane = await fakeControlPlane((received, response) => {
+      if (received.url === "/api/runner/jobs") return json(response, 200, claimedJob);
+      if (received.url.endsWith("/result")) {
+        results += 1;
+        return void response.destroy();
+      }
+      return json(response, 200, { ok: true });
+    });
+    servers.push(plane.server);
+    await expect(runRunnerLoop(await deps(plane.baseUrl), { once: true })).rejects.toThrow(
+      "the result was not delivered",
+    );
+    expect(results).toBe(4);
+  });
   it("does not retry a result the control plane rejects as invalid", async () => {
     const plane = await fakeControlPlane(scripted([claimedJob], [400]));
     servers.push(plane.server);

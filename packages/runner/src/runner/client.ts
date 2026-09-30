@@ -29,7 +29,11 @@ export type ControlPlaneClient = {
   claimJob(options?: { signal?: AbortSignal }): Promise<ClaimedJob | ClaimWait | undefined>;
   heartbeat(jobId: string): Promise<HeartbeatAcknowledgement>;
   sendEvents(runId: string, events: RunEvent[]): Promise<void>;
-  sendResult(runId: string, report: RunResultReport): Promise<ResultAcknowledgement>;
+  sendResult(
+    runId: string,
+    report: RunResultReport,
+    options?: { signal?: AbortSignal },
+  ): Promise<ResultAcknowledgement>;
 };
 
 function acknowledgement(payload: unknown): ResultAcknowledgement {
@@ -232,12 +236,12 @@ export function createControlPlaneClient(input: {
     async sendEvents(runId, events) {
       await send("POST", `/api/runner/runs/${encodeURIComponent(runId)}/events`, events);
     },
-    async sendResult(runId, report) {
+    async sendResult(runId, report, options = {}) {
       const { json } = await send(
         "POST",
         `/api/runner/runs/${encodeURIComponent(runId)}/result`,
         report,
-        undefined,
+        options.signal,
         {},
         resultRequestTimeoutMs,
       );
