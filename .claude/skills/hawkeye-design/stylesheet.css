@@ -1088,6 +1088,33 @@ html {
   background: var(--hk-bg-2);
 }
 
+/* Facts: a name beside what is true of it, one row each */
+
+.hk-facts {
+  display: grid;
+  grid-template-columns: fit-content(24ch) minmax(0, 1fr);
+  gap: var(--hk-space-3) var(--hk-space-5);
+  margin: 0;
+  font-size: var(--hk-type-compact);
+  line-height: var(--hk-leading-compact);
+}
+.hk-facts > div {
+  display: contents;
+}
+.hk-facts dt {
+  font-weight: var(--hk-weight-medium);
+  overflow-wrap: anywhere;
+}
+.hk-facts dd {
+  margin: 0;
+  max-width: var(--hk-measure);
+}
+.hk-facts .hk-unit {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
 /* Tables */
 
 .hk-table-header {

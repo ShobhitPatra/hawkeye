@@ -15,11 +15,11 @@ export function describeSyncFailure(userId: string, error: unknown): string {
   return `installations not synced for user ${userId}: ${error instanceof Error ? error.message : String(error)}`;
 }
 
-export async function syncInstallationsForUser(
-  deps: InstallationSyncDeps,
+export async function userGitHubToken(
+  deps: Pick<InstallationSyncDeps, "auth" | "db">,
   userId: string,
   headers?: Headers,
-): Promise<InstallationSync> {
+): Promise<string> {
   const [githubAccount] = await deps.db
     .select({ id: account.id })
     .from(account)
@@ -29,5 +29,16 @@ export async function syncInstallationsForUser(
     body: { accountId: githubAccount.id, userId },
     ...(headers ? { headers } : {}),
   });
-  return syncUserInstallations(deps.db, deps.github, { userId, token: accessToken });
+  return accessToken;
+}
+
+export async function syncInstallationsForUser(
+  deps: InstallationSyncDeps,
+  userId: string,
+  headers?: Headers,
+): Promise<InstallationSync> {
+  return syncUserInstallations(deps.db, deps.github, {
+    userId,
+    token: await userGitHubToken(deps, userId, headers),
+  });
 }

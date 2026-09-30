@@ -17,7 +17,11 @@ export interface InstallationFailure {
 export const PULL_REQUEST_LIST_TTL_MS = 60_000;
 export const FAILED_LIST_TTL_MS = 15_000;
 
-type Listing = { pullRequests: ListedPullRequest[]; failures: InstallationFailure[] };
+type Listing = {
+  pullRequests: ListedPullRequest[];
+  failures: InstallationFailure[];
+  installations: number;
+};
 const listings: HoldStore<Listing> = new Map();
 
 export function forgetUserListings(userId: string, cache: HoldStore<Listing> = listings) {
@@ -83,5 +87,6 @@ async function fetchUserOpenPullRequests(
   return {
     pullRequests: pullRequests.toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     failures,
+    installations: installations.length,
   };
 }

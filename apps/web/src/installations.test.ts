@@ -150,8 +150,20 @@ describe("installationForOwner", () => {
 describe("syncUserInstallations", () => {
   const listUserInstallations = vi.fn();
   const github = { listUserInstallations };
-  const octo = { id: "500", accountLogin: "octo", accountType: "Organization", suspended: false };
-  const sam = { id: "501", accountLogin: "sam", accountType: "User", suspended: false };
+  const octo = {
+    id: "500",
+    accountLogin: "octo",
+    accountType: "Organization",
+    suspended: false,
+    repositorySelection: "all" as const,
+  };
+  const sam = {
+    id: "501",
+    accountLogin: "sam",
+    accountType: "User",
+    suspended: false,
+    repositorySelection: "all" as const,
+  };
 
   beforeAll(async () => {
     await db.insert(schema.user).values([
@@ -197,7 +209,13 @@ describe("syncUserInstallations", () => {
     await recordInstallation(db, installationEvent("created", 777, 1));
     await recordInstallation(db, installationEvent("suspend", 777, 1));
     listUserInstallations.mockResolvedValueOnce([
-      { id: "777", accountLogin: "octo", accountType: "Organization", suspended: true },
+      {
+        id: "777",
+        accountLogin: "octo",
+        accountType: "Organization",
+        suspended: true,
+        repositorySelection: "all" as const,
+      },
     ]);
     await expect(
       syncUserInstallations(db, github, { userId: "u-suspended", token: "gho_x" }),

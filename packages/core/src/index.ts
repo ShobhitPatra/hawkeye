@@ -7,6 +7,7 @@ export { GitHubRequestError, fetchPullRequestDetails, fetchLinkedIssue } from ".
 export type {
   InstallationRepository,
   UserInstallation,
+  UserInstallationRepositories,
   LinkedIssue,
   OpenPullRequest,
   PullRequestDetails,

@@ -27,6 +27,12 @@ export type UserInstallation = {
   accountLogin: string;
   accountType: string;
   suspended: boolean;
+  repositorySelection: "all" | "selected";
+};
+
+export type UserInstallationRepositories = {
+  total: number;
+  repositories: InstallationRepository[];
 };
 
 export type InstallationRepository = {
@@ -111,6 +117,12 @@ export interface GitHubClient {
   ): Promise<void>;
   listInstallationRepositories(token: string): Promise<InstallationRepository[]>;
   listUserInstallations(userToken: string): Promise<UserInstallation[]>;
+  listUserInstallationRepositories(
+    userToken: string,
+    installationId: string,
+    limit: number,
+  ): Promise<UserInstallationRepositories>;
+  appSlug(): Promise<string>;
   listOpenPullRequestsByAuthor(
     token: string,
     repositories: { owner: string; name: string }[],
@@ -348,7 +360,23 @@ export function createGitHubClient(input: {
       }));
   }
 
-  let botLoginRequest: Promise<string> | undefined;
+  let appSlugRequest: Promise<string> | undefined;
+  const appSlug = () => {
+    appSlugRequest ??= request<{ slug?: unknown }>(
+      "GET",
+      "/app",
+      bearer(createAppJwt({ appId: input.appId, privateKeyPem: input.privateKeyPem })),
+    )
+      .then((app) => {
+        if (typeof app.slug !== "string") throw new Error("GitHub GET /app returned no slug");
+        return app.slug;
+      })
+      .catch((error: unknown) => {
+        appSlugRequest = undefined;
+        throw error;
+      });
+    return appSlugRequest;
+  };
 
   async function installationAccessToken(installationId: string): Promise<string> {
     if (!/^\d+$/.test(installationId))
@@ -387,21 +415,8 @@ export function createGitHubClient(input: {
     linkedIssue(reference, body, token) {
       return fetchLinkedIssue({ fetch: input.fetch, apiBase }, reference, body, token);
     },
-    botLogin() {
-      botLoginRequest ??= request<{ slug?: unknown }>(
-        "GET",
-        "/app",
-        bearer(createAppJwt({ appId: input.appId, privateKeyPem: input.privateKeyPem })),
-      )
-        .then((app) => {
-          if (typeof app.slug !== "string") throw new Error("GitHub GET /app returned no slug");
-          return `${app.slug}[bot]`;
-        })
-        .catch((error: unknown) => {
-          botLoginRequest = undefined;
-          throw error;
-        });
-      return botLoginRequest;
+    async botLogin() {
+      return `${await appSlug()}[bot]`;
     },
     async reviews(reference, token) {
       return paginate(`${pulls(reference)}/reviews`, token, (payload) =>
@@ -572,6 +587,7 @@ export function createGitHubClient(input: {
               id: number;
               account: { login: string; type: string };
               suspended_at: string | null;
+              repository_selection: string;
             }[];
           }
         ).installations.map((entry) => ({
@@ -579,9 +595,36 @@ export function createGitHubClient(input: {
           accountLogin: entry.account.login,
           accountType: entry.account.type,
           suspended: entry.suspended_at !== null,
+          repositorySelection: entry.repository_selection === "all" ? "all" : "selected",
         })),
       );
     },
+    async listUserInstallationRepositories(userToken, installationId, limit) {
+      const url = new URL(
+        `${apiBase}/user/installations/${encodeURIComponent(installationId)}/repositories`,
+      );
+      url.searchParams.set("per_page", String(limit));
+      const { payload } = await send("GET", url.toString(), bearer(userToken));
+      const page = payload as {
+        total_count: number;
+        repositories: {
+          name: string;
+          full_name: string;
+          private: boolean;
+          owner: { login: string };
+        }[];
+      };
+      return {
+        total: page.total_count,
+        repositories: page.repositories.map((repository) => ({
+          owner: repository.owner.login,
+          name: repository.name,
+          fullName: repository.full_name,
+          private: repository.private,
+        })),
+      };
+    },
+    appSlug,
     async listOpenPullRequestsByAuthor(token, repositories, login) {
       const collected: OpenPullRequest[][] = [];
       for (let start = 0; start < repositories.length; start += CONCURRENCY) {
