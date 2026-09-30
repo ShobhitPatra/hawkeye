@@ -559,7 +559,7 @@ describe("takeBackClaim", () => {
     });
   });
 
-  it("gives the claim back by job, to the runner's latest lost run", async () => {
+  it("gives the claim back by job when the lost run is the job's last", async () => {
     const lost = await lostClaim();
     const earlier = await createRun(db, { jobId: lost.jobId, runnerId: "runner-1" });
     await db
@@ -598,6 +598,45 @@ describe("takeBackClaim", () => {
       job: { state: "claimed", claimedByRunnerId: "runner-2" },
       run: untouched.run,
     });
+  });
+
+  it("refuses once another claim was released back to the queue", async () => {
+    const lost = await lostClaim();
+    await claim("runner-2");
+    const released = await createRun(db, { jobId: lost.jobId, runnerId: "runner-2" });
+    await db
+      .update(schema.run)
+      .set({ startedAt: new Date(Date.now() + 60_000) })
+      .where(eq(schema.run.id, released.id));
+    await releaseJob(db, {
+      jobId: lost.jobId,
+      runId: released.id,
+      runnerId: "runner-2",
+      error: "installation token",
+      now,
+    });
+
+    expect(
+      await takeBackClaim(db, { runId: lost.runId, runnerId: "runner-1", now }),
+    ).toBeUndefined();
+    expect(
+      await takeBackClaim(db, { jobId: lost.jobId, runnerId: "runner-1", now }),
+    ).toBeUndefined();
+    expect(await rows(lost)).toMatchObject(untouched);
+  });
+
+  it("refuses an earlier lost run once the same runner lost a later one", async () => {
+    const lost = await lostClaim();
+    const earlier = await createRun(db, { jobId: lost.jobId, runnerId: "runner-1" });
+    await db
+      .update(schema.run)
+      .set({ status: "error", error: "heartbeat lost", startedAt: minutesBefore(60) })
+      .where(eq(schema.run.id, earlier.id));
+
+    expect(
+      await takeBackClaim(db, { runId: earlier.id, runnerId: "runner-1", now }),
+    ).toBeUndefined();
+    expect(await rows(lost)).toMatchObject(untouched);
   });
 
   it("refuses once a push moved the waiting job to a newer head", async () => {

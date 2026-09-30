@@ -1,5 +1,5 @@
 import type { ReviewResult, RunResultStatus } from "@hawkeye/core";
-import { and, desc, eq, inArray, isNull, ne, sql, type SQLWrapper } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, sql, type SQLWrapper } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import { armedPr, job, run } from "./db/schema";
@@ -186,7 +186,8 @@ export async function requeueStaleJobs(
 }
 
 // A push, or a review from scratch asked for while the job waits, rewrites the queued row in place,
-// so the claim comes back only while the row still holds the head the lost run was reviewing.
+// so the claim comes back only while the row still holds the head the lost run was reviewing. A
+// claim that was released leaves the job queued as well, so the lost run must be the job's last.
 export async function takeBackClaim(
   db: Db,
   input: { runnerId: string; now: Date } & ({ runId: string } | { jobId: string }),
@@ -204,10 +205,12 @@ export async function takeBackClaim(
           eq(run.status, "error"),
           eq(run.error, HEARTBEAT_LOST),
           isNull(armedPr.disarmedAt),
+          sql`not exists (select 1
+                          from ${run} later
+                          where later.job_id = ${run.jobId}
+                            and (later.started_at, later.id) > (${run.startedAt}, ${run.id}))`,
         ),
-      )
-      .orderBy(desc(run.startedAt))
-      .limit(1);
+      );
     if (!lost?.headSha) return undefined;
     const [taken] = await tx
       .update(job)
