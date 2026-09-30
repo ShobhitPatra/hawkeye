@@ -214,7 +214,7 @@ The prompt is repo-agnostic: *discover the repo's layout and conventions, don't 
 | `Installation` | App install, account |
 | `ArmedPR` | repo, number, armed_by, quiet-window override |
 | `Job` | armed_pr, head_sha, base_sha, head_current_at, not_before, state queued/claimed/done/failed |
-| `Run` | job, runner, started/ended, turns, status, error |
+| `Run` | job, runner, head_sha, started/ended, turns, status, error |
 | `Finding` | armed_pr, stable_id, detail, severity, first_seen_sha, resolved_sha?, github_comment_id |
 | `ReviewPosted` | run, armed_pr, head_sha, github_review_id? — null while a round's review is in flight; the earliest filled row per pull request is the living review |
 | `UserSettings` | prompt override, max-turns, wall clock, quiet window |
@@ -419,11 +419,13 @@ With a runner token:
 | Endpoint | Behaviour |
 |---|---|
 | `GET /api/runner/jobs` | When the user has no pull request with reviews on and the daemon sent `X-Hawkeye-Honors-Retry-After: 1` (0.7.0 and later), answers 204 at once with `Retry-After: 60`; a daemon that does not send it is held as before, since it would ask again a second later. Otherwise long-polls for up to 25 s, checking the queue every 5 s. Returns the claimed job with a fresh installation token, the pull request coordinates, the user's review settings and — from the second round of an arm on — the previous round (the last posted round's findings with stable ids, plus the arm's still-open findings), or 204 when nothing is queued |
-| `POST /api/runner/jobs/<id>/heartbeat` | Keeps the claim alive (a claim without a heartbeat for 5 minutes goes back to the queue) and answers `{ ok, superseded }`, true once a newer job exists for the same arm |
+| `POST /api/runner/jobs/<id>/heartbeat` | Keeps the claim alive (a claim without a heartbeat for 5 minutes goes back to the queue) and answers `{ ok, superseded }`, true once a newer job exists for the same arm. From the runner whose claim went back to the queue, it takes the claim back while the job still waits there |
 | `POST /api/runner/runs/<id>/events` | Accepts `{ type, at, data }` entries and counts the `turn` ones |
-| `POST /api/runner/runs/<id>/result` | Posts `{ status, turns, result?, error?, commentable? }`, storing the review result and closing the run and the job |
+| `POST /api/runner/runs/<id>/result` | Posts `{ status, turns, result?, error?, commentable? }`, storing the review result and closing the run and the job. A result for a run the sweep ended takes the claim back first, while the job still waits in the queue |
 
 With `CRON_SECRET` as a bearer token, `GET` or `POST /api/internal/sweep` requeues the jobs whose runner went silent for five minutes (failing one that a newer job for the same pull request has overtaken: a queued one, or one on a different head in any state, the same rule the heartbeat uses to call a job superseded) and answers `{ ok, swept }`; without the secret it answers 401. A job it fails will never send a result, so the sweep closes it on the pull request the way a failed result would: the commit status becomes success "Review did not complete" and the reviewing line is replaced by the sentence that says so (left alone when a newer run owns the living review's block). A requeued job is left as it is, since the next claim marks both again. These writes are best effort: a GitHub failure is logged and the sweep still completes. The claim endpoint runs the same step for the asking user's jobs only, at the start of each call and inside its hold, so the schedule matters only for a runner that never comes back.
+
+**Taking a claim back.** A runner that was only cut off (no network, a machine that slept) comes back to a run the sweep ended as `heartbeat lost` and a job back in the queue. Its next heartbeat or its result takes the claim back, in one transaction that locks the job row before it reads anything (a claim and its release both write that row, so neither lands between the check and the update): the job is claimed by that runner again and the run is running again, so the review it already paid for is posted instead of redone. It applies only while the job is as the run left it: still queued, with no run opened on it since (a claim released for want of an installation token leaves the job queued too), on the head the run recorded when it opened (`run.head_sha`; a push rewrites the queued row in place), not asked to review from scratch meanwhile, and its pull request still has reviews on. Once any runner claimed the job again, or the sweep failed it, the answer is 409 as before. A run opened before runs recorded their head cannot be taken back.
 
 ### Posting a review
 

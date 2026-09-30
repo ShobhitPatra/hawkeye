@@ -8,6 +8,7 @@ import type { Job } from "./jobs";
 export type Run = typeof run.$inferSelect;
 
 export const DEFAULT_STALE_AFTER_SECONDS = 300;
+export const HEARTBEAT_LOST = "heartbeat lost";
 
 const queuedSibling = sql`exists (select 1
                                   from ${job} waiting
@@ -138,7 +139,7 @@ export async function requeueStaleJobs(
     if (requeued.length === 0) return { swept: requeued, ended: [] };
     const abandoned = await tx
       .update(run)
-      .set({ status: "error", error: "heartbeat lost", endedAt: input.now })
+      .set({ status: "error", error: HEARTBEAT_LOST, endedAt: input.now })
       .where(
         and(
           inArray(
@@ -184,6 +185,67 @@ export async function requeueStaleJobs(
   return { swept: swept.length, failed };
 }
 
+// A push, or a review from scratch asked for while the job waits, rewrites the queued row in place,
+// so the claim comes back only while the row still holds the head the lost run was reviewing. A
+// claim that was released leaves the job queued as well, so the lost run must be the job's last.
+// The job row is locked before any of it is read: a claim and its release both write that row, so
+// neither can land between the check and the update.
+export async function takeBackClaim(
+  db: Db,
+  input: { runnerId: string; now: Date } & ({ runId: string } | { jobId: string }),
+): Promise<Job | undefined> {
+  return db.transaction(async (tx) => {
+    const [locked] = await tx
+      .select({ id: job.id })
+      .from(job)
+      .where(
+        "runId" in input
+          ? eq(job.id, sql`(select ${run.jobId} from ${run} where ${run.id} = ${input.runId})`)
+          : eq(job.id, input.jobId),
+      )
+      .for("update");
+    if (!locked) return undefined;
+    const [lost] = await tx
+      .select({ id: run.id })
+      .from(run)
+      .innerJoin(job, eq(job.id, run.jobId))
+      .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
+      .where(
+        and(
+          eq(run.jobId, locked.id),
+          "runId" in input ? eq(run.id, input.runId) : undefined,
+          eq(run.runnerId, input.runnerId),
+          eq(run.status, "error"),
+          eq(run.error, HEARTBEAT_LOST),
+          eq(job.state, "queued"),
+          eq(job.headSha, run.headSha),
+          eq(job.fromScratch, false),
+          isNull(armedPr.disarmedAt),
+          sql`not exists (select 1
+                          from ${run} later
+                          where later.job_id = ${run.jobId}
+                            and (later.started_at, later.id) > (${run.startedAt}, ${run.id}))`,
+        ),
+      );
+    if (!lost) return undefined;
+    const [taken] = await tx
+      .update(job)
+      .set({
+        state: "claimed",
+        claimedByRunnerId: input.runnerId,
+        claimedAt: input.now,
+        heartbeatAt: input.now,
+      })
+      .where(eq(job.id, locked.id))
+      .returning();
+    await tx
+      .update(run)
+      .set({ status: "running", error: null, endedAt: null })
+      .where(eq(run.id, lost.id));
+    return taken;
+  });
+}
+
 export async function releaseJob(
   db: Db,
   input: { jobId: string; runId: string; runnerId: string; error: string; now: Date },
@@ -214,7 +276,11 @@ export async function releaseJob(
 export async function createRun(db: Db, input: { jobId: string; runnerId: string }): Promise<Run> {
   const [created] = await db
     .insert(run)
-    .values({ jobId: input.jobId, runnerId: input.runnerId })
+    .values({
+      jobId: input.jobId,
+      runnerId: input.runnerId,
+      headSha: sql`(select ${job.headSha} from ${job} where ${job.id} = ${input.jobId})`,
+    })
     .returning();
   if (!created) throw new Error(`failed to create a run for job ${input.jobId}`);
   return created;

@@ -1,0 +1,1 @@
+ALTER TABLE "run" ADD COLUMN "head_sha" text;
