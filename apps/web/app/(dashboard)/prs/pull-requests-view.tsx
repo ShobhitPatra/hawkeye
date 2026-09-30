@@ -10,6 +10,7 @@ export function PullRequestsView({
   failures,
   installations,
   suspendedInstallations,
+  syncFailed,
   statuses,
   runner,
   now,
@@ -18,6 +19,7 @@ export function PullRequestsView({
   failures: InstallationFailure[];
   installations: number;
   suspendedInstallations: number;
+  syncFailed: boolean;
   statuses: Map<string, PullRequestStatus>;
   runner: RunnerStatus;
   now: number;
@@ -67,7 +69,15 @@ export function PullRequestsView({
 
       {pullRequests.length === 0 ? (
         <div className="hk-state">
-          {installations === 0 && suspendedInstallations > 0 ? (
+          {installations === 0 && syncFailed ? (
+            <>
+              <p>GitHub did not answer.</p>
+              <p>
+                Hawkeye could not check where it is installed, so your pull requests may be missing
+                from this list. It checks again within a minute.
+              </p>
+            </>
+          ) : installations === 0 && suspendedInstallations > 0 ? (
             <>
               <p>Hawkeye is suspended on every account where it is installed.</p>
               <p>

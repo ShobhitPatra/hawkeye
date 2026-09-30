@@ -226,7 +226,11 @@ describe("listUserOpenPullRequests", () => {
       },
       { userId: "user-without-installations", login: "alice" },
     );
-    expect(found).toMatchObject({ installations: 0, suspendedInstallations: 1 });
+    expect(found).toMatchObject({
+      installations: 0,
+      suspendedInstallations: 1,
+      syncFailed: false,
+    });
   });
   it("lists the linked installations when the sync fails", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -246,8 +250,24 @@ describe("listUserOpenPullRequests", () => {
       { userId: "user-1", login: "octocat" },
     );
     expect(found.pullRequests.map((pr) => pr.number)).toEqual([1]);
+    expect(found.syncFailed).toBe(true);
     expect(installationTokenById).toHaveBeenCalled();
     expect(error).toHaveBeenCalledWith("installations not synced for user user-1: token expired");
+    error.mockRestore();
+  });
+  it("holds a listing whose installation sync failed only briefly", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const cache = new Map();
+    const { github } = fakeGitHub({}, {});
+    const syncInstallations = vi.fn(async () => {
+      throw new Error("token expired");
+    });
+    const deps = { db, github, syncInstallations, cache };
+    await listUserOpenPullRequests(deps, { userId: "user-2", login: "hubot", now: 0 });
+    await listUserOpenPullRequests(deps, { userId: "user-2", login: "hubot", now: 10_000 });
+    expect(syncInstallations).toHaveBeenCalledTimes(1);
+    await listUserOpenPullRequests(deps, { userId: "user-2", login: "hubot", now: 16_000 });
+    expect(syncInstallations).toHaveBeenCalledTimes(2);
     error.mockRestore();
   });
   it("evicts listings older than a minute when a new one is stored", async () => {
@@ -276,6 +296,7 @@ describe("listUserOpenPullRequests", () => {
       failures: [],
       installations: 0,
       suspendedInstallations: 0,
+      syncFailed: false,
     });
     expect(installationTokenById).not.toHaveBeenCalled();
   });
@@ -324,6 +345,7 @@ describe("forgetUserListings", () => {
             failures: [],
             installations: 0,
             suspendedInstallations: 0,
+            syncFailed: false,
           }),
         },
       ],
@@ -337,6 +359,7 @@ describe("forgetUserListings", () => {
             failures: [],
             installations: 0,
             suspendedInstallations: 0,
+            syncFailed: false,
           }),
         },
       ],

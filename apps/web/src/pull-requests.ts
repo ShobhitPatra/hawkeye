@@ -23,6 +23,7 @@ type Listing = {
   failures: InstallationFailure[];
   installations: number;
   suspendedInstallations: number;
+  syncFailed: boolean;
 };
 const listings: HoldStore<Listing> = new Map();
 
@@ -46,7 +47,9 @@ export async function listUserOpenPullRequests(
       now: input.now ?? Date.now(),
       ttlMs: PULL_REQUEST_LIST_TTL_MS,
       ttlAfter: (listing) =>
-        listing.failures.length > 0 ? FAILED_LIST_TTL_MS : PULL_REQUEST_LIST_TTL_MS,
+        listing.failures.length > 0 || listing.syncFailed
+          ? FAILED_LIST_TTL_MS
+          : PULL_REQUEST_LIST_TTL_MS,
     },
     () => fetchUserOpenPullRequests(deps, input),
   );
@@ -58,7 +61,7 @@ async function fetchUserOpenPullRequests(
 ): Promise<Listing> {
   const synced = await deps.syncInstallations?.().catch((error: unknown) => {
     console.error(describeSyncFailure(input.userId, error));
-    return undefined;
+    return "failed" as const;
   });
   const installations = await deps.db
     .select({ id: installation.id })
@@ -91,6 +94,7 @@ async function fetchUserOpenPullRequests(
     pullRequests: pullRequests.toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     failures,
     installations: installations.length,
-    suspendedInstallations: synced?.suspended ?? 0,
+    suspendedInstallations: synced === "failed" ? 0 : (synced?.suspended ?? 0),
+    syncFailed: synced === "failed",
   };
 }
