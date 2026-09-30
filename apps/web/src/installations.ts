@@ -62,16 +62,15 @@ export async function recordInstallation(db: Db, event: InstallationEvent) {
   await linkInstallationToUser(db, id, event.sender.id);
 }
 
-export type InstallationSync = { linked: number; unlinked: number };
+export type InstallationSync = { linked: number; unlinked: number; suspended: number };
 
 export async function syncUserInstallations(
   db: Db,
   github: Pick<GitHubClient, "listUserInstallations">,
   input: { userId: string; token: string },
 ): Promise<InstallationSync> {
-  const accessible = (await github.listUserInstallations(input.token)).filter(
-    (entry) => !entry.suspended,
-  );
+  const reachable = await github.listUserInstallations(input.token);
+  const accessible = reachable.filter((entry) => !entry.suspended);
   const ids = accessible.map((entry) => entry.id);
   return db.transaction(async (tx) => {
     for (const entry of accessible) {
@@ -109,7 +108,11 @@ export async function syncUserInstallations(
         ),
       )
       .returning({ installationId: installationUser.installationId });
-    return { linked: linked.length, unlinked: unlinked.length };
+    return {
+      linked: linked.length,
+      unlinked: unlinked.length,
+      suspended: reachable.length - accessible.length,
+    };
   });
 }
 

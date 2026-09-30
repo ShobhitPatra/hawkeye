@@ -54,6 +54,8 @@ function createGitHub(): GitHubClient {
     createCommitStatus: vi.fn(async () => {}),
     listInstallationRepositories: unsupported(),
     listUserInstallations: unsupported(),
+    listUserInstallationRepositories: unsupported(),
+    appSlug: unsupported(),
     botLogin: vi.fn(async () => "hawkeye-review[bot]"),
     reviewComments: unsupported(),
     replyToReviewComment: unsupported(),

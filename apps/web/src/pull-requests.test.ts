@@ -46,6 +46,8 @@ function fakeGitHub(
     installationTokenById,
     listInstallationRepositories,
     listUserInstallations: vi.fn(async () => []),
+    listUserInstallationRepositories: vi.fn(async () => ({ total: 0, repositories: [] })),
+    appSlug: vi.fn(async () => "hawkeye-test"),
     botLogin: unsupported(),
     reviewComments: unsupported(),
     replyToReviewComment: unsupported(),
@@ -120,6 +122,7 @@ describe("listUserOpenPullRequests", () => {
     expect(found.pullRequests.map((pr) => pr.number)).toEqual([2, 3, 1]);
     expect(found.pullRequests.map((pr) => pr.installationId)).toEqual(["11", "11", "10"]);
     expect(found.failures).toEqual([]);
+    expect(found.installations).toBe(2);
     expect(installationTokenById.mock.calls).toEqual([["10"], ["11"]]);
     expect(listInstallationRepositories.mock.calls).toEqual([["token-10"], ["token-11"]]);
     expect(listOpenPullRequestsByAuthor.mock.calls).toEqual([
@@ -199,7 +202,7 @@ describe("listUserOpenPullRequests", () => {
         .insert(schema.installation)
         .values({ id: "14", accountLogin: "fresh", accountType: "Organization" });
       await db.insert(schema.installationUser).values({ installationId: "14", userId: "user-3" });
-      return { linked: 1, unlinked: 0 };
+      return { linked: 1, unlinked: 0, suspended: 0 };
     });
     const found = await listUserOpenPullRequests(
       { db, github, syncInstallations, cache },
@@ -211,6 +214,23 @@ describe("listUserOpenPullRequests", () => {
       { userId: "user-3", login: "alice", now: 30_000 },
     );
     expect(syncInstallations).toHaveBeenCalledTimes(1);
+  });
+  it("reports the installations the sync found suspended, which are not linked", async () => {
+    const { github } = fakeGitHub({}, {});
+    const found = await listUserOpenPullRequests(
+      {
+        db,
+        github,
+        syncInstallations: async () => ({ linked: 0, unlinked: 0, suspended: 1 }),
+        cache: new Map(),
+      },
+      { userId: "user-without-installations", login: "alice" },
+    );
+    expect(found).toMatchObject({
+      installations: 0,
+      suspendedInstallations: 1,
+      syncFailed: false,
+    });
   });
   it("lists the linked installations when the sync fails", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -230,8 +250,24 @@ describe("listUserOpenPullRequests", () => {
       { userId: "user-1", login: "octocat" },
     );
     expect(found.pullRequests.map((pr) => pr.number)).toEqual([1]);
+    expect(found.syncFailed).toBe(true);
     expect(installationTokenById).toHaveBeenCalled();
     expect(error).toHaveBeenCalledWith("installations not synced for user user-1: token expired");
+    error.mockRestore();
+  });
+  it("holds a listing whose installation sync failed only briefly", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const cache = new Map();
+    const { github } = fakeGitHub({}, {});
+    const syncInstallations = vi.fn(async () => {
+      throw new Error("token expired");
+    });
+    const deps = { db, github, syncInstallations, cache };
+    await listUserOpenPullRequests(deps, { userId: "user-2", login: "hubot", now: 0 });
+    await listUserOpenPullRequests(deps, { userId: "user-2", login: "hubot", now: 10_000 });
+    expect(syncInstallations).toHaveBeenCalledTimes(1);
+    await listUserOpenPullRequests(deps, { userId: "user-2", login: "hubot", now: 16_000 });
+    expect(syncInstallations).toHaveBeenCalledTimes(2);
     error.mockRestore();
   });
   it("evicts listings older than a minute when a new one is stored", async () => {
@@ -255,7 +291,13 @@ describe("listUserOpenPullRequests", () => {
         { db, github, cache: new Map() },
         { userId: "ghost", login: "ghost" },
       ),
-    ).resolves.toEqual({ pullRequests: [], failures: [] });
+    ).resolves.toEqual({
+      pullRequests: [],
+      failures: [],
+      installations: 0,
+      suspendedInstallations: 0,
+      syncFailed: false,
+    });
     expect(installationTokenById).not.toHaveBeenCalled();
   });
 
@@ -295,11 +337,31 @@ describe("forgetUserListings", () => {
     const cache = new Map([
       [
         "u-1:octocat",
-        { at: 0, ttl: 60_000, value: Promise.resolve({ pullRequests: [], failures: [] }) },
+        {
+          at: 0,
+          ttl: 60_000,
+          value: Promise.resolve({
+            pullRequests: [],
+            failures: [],
+            installations: 0,
+            suspendedInstallations: 0,
+            syncFailed: false,
+          }),
+        },
       ],
       [
         "u-2:hubot",
-        { at: 0, ttl: 60_000, value: Promise.resolve({ pullRequests: [], failures: [] }) },
+        {
+          at: 0,
+          ttl: 60_000,
+          value: Promise.resolve({
+            pullRequests: [],
+            failures: [],
+            installations: 0,
+            suspendedInstallations: 0,
+            syncFailed: false,
+          }),
+        },
       ],
     ]);
     forgetUserListings("u-1", cache);

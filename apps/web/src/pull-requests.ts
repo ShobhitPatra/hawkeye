@@ -3,6 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { hold, type HoldStore } from "./hold";
 import { describeSyncFailure } from "./installation-sync";
+import type { InstallationSync } from "./installations";
 import { installation, installationUser } from "./db/schema";
 
 export interface ListedPullRequest extends OpenPullRequest {
@@ -17,7 +18,13 @@ export interface InstallationFailure {
 export const PULL_REQUEST_LIST_TTL_MS = 60_000;
 export const FAILED_LIST_TTL_MS = 15_000;
 
-type Listing = { pullRequests: ListedPullRequest[]; failures: InstallationFailure[] };
+type Listing = {
+  pullRequests: ListedPullRequest[];
+  failures: InstallationFailure[];
+  installations: number;
+  suspendedInstallations: number;
+  syncFailed: boolean;
+};
 const listings: HoldStore<Listing> = new Map();
 
 export function forgetUserListings(userId: string, cache: HoldStore<Listing> = listings) {
@@ -28,7 +35,7 @@ export async function listUserOpenPullRequests(
   deps: {
     db: Db;
     github: GitHubClient;
-    syncInstallations?: () => Promise<unknown>;
+    syncInstallations?: () => Promise<InstallationSync>;
     cache?: HoldStore<Listing>;
   },
   input: { userId: string; login: string; now?: number },
@@ -40,18 +47,21 @@ export async function listUserOpenPullRequests(
       now: input.now ?? Date.now(),
       ttlMs: PULL_REQUEST_LIST_TTL_MS,
       ttlAfter: (listing) =>
-        listing.failures.length > 0 ? FAILED_LIST_TTL_MS : PULL_REQUEST_LIST_TTL_MS,
+        listing.failures.length > 0 || listing.syncFailed
+          ? FAILED_LIST_TTL_MS
+          : PULL_REQUEST_LIST_TTL_MS,
     },
     () => fetchUserOpenPullRequests(deps, input),
   );
 }
 
 async function fetchUserOpenPullRequests(
-  deps: { db: Db; github: GitHubClient; syncInstallations?: () => Promise<unknown> },
+  deps: { db: Db; github: GitHubClient; syncInstallations?: () => Promise<InstallationSync> },
   input: { userId: string; login: string },
 ): Promise<Listing> {
-  await deps.syncInstallations?.().catch((error: unknown) => {
+  const synced = await deps.syncInstallations?.().catch((error: unknown) => {
     console.error(describeSyncFailure(input.userId, error));
+    return "failed" as const;
   });
   const installations = await deps.db
     .select({ id: installation.id })
@@ -83,5 +93,8 @@ async function fetchUserOpenPullRequests(
   return {
     pullRequests: pullRequests.toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     failures,
+    installations: installations.length,
+    suspendedInstallations: synced === "failed" ? 0 : (synced?.suspended ?? 0),
+    syncFailed: synced === "failed",
   };
 }

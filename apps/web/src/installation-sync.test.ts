@@ -8,7 +8,13 @@ import { createTestDb } from "./test/pglite";
 let db: Db;
 const getAccessToken = vi.fn(async () => ({ accessToken: "gho_fresh" }));
 const listUserInstallations = vi.fn(async () => [
-  { id: "900", accountLogin: "octo", accountType: "Organization", suspended: false },
+  {
+    id: "900",
+    accountLogin: "octo",
+    accountType: "Organization",
+    suspended: false,
+    repositorySelection: "all" as const,
+  },
 ]);
 const deps = () => ({
   auth: { api: { getAccessToken } } as unknown as Parameters<
@@ -43,6 +49,7 @@ describe("syncInstallationsForUser", () => {
     await expect(syncInstallationsForUser(deps(), "u-1", headers)).resolves.toEqual({
       linked: 1,
       unlinked: 0,
+      suspended: 0,
     });
     expect(getAccessToken).toHaveBeenCalledWith({
       body: { accountId: "account-1", userId: "u-1" },

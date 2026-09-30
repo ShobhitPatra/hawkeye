@@ -29,6 +29,8 @@ function deps(
     installationTokenById: vi.fn(async () => "ghs_t"),
     listInstallationRepositories: vi.fn(async () => []),
     listUserInstallations: vi.fn(async () => []),
+    listUserInstallationRepositories: vi.fn(async () => ({ total: 0, repositories: [] })),
+    appSlug: vi.fn(async () => "hawkeye-test"),
     botLogin: vi.fn(),
     reviewComments: vi.fn(),
     replyToReviewComment: vi.fn(),

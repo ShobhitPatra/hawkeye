@@ -1,6 +1,14 @@
 import type { ReactNode } from "react";
 
-export function SettingsView({ reviews, runner }: { reviews: ReactNode; runner: ReactNode }) {
+export function SettingsView({
+  reviews,
+  runner,
+  installed,
+}: {
+  reviews: ReactNode;
+  runner: ReactNode;
+  installed: ReactNode;
+}) {
   return (
     <main className="hk-page">
       <div className="hk-header">
@@ -26,6 +34,17 @@ export function SettingsView({ reviews, runner }: { reviews: ReactNode; runner: 
           your own login; the control plane never sees it.
         </p>
         {runner}
+      </section>
+      <hr className="hk-rule" />
+      <section className="hk-section" aria-labelledby="installed-heading" id="installed">
+        <h2 className="hk-heading" id="installed-heading">
+          Where Hawkeye is installed
+        </h2>
+        <p className="hk-compact hk-muted hk-prose">
+          The bot posts reviews on these repositories, and the pull requests you open there appear
+          on the pull requests page.
+        </p>
+        {installed}
       </section>
     </main>
   );

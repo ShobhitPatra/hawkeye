@@ -78,11 +78,17 @@ describe("createGitHubClient", () => {
         json: {
           total_count: 2,
           installations: [
-            { id: 155, account: { login: "octo", type: "Organization" }, suspended_at: null },
+            {
+              id: 155,
+              account: { login: "octo", type: "Organization" },
+              suspended_at: null,
+              repository_selection: "selected",
+            },
             {
               id: 9,
               account: { login: "hubot", type: "User" },
               suspended_at: "2026-09-01T00:00:00Z",
+              repository_selection: "all",
             },
           ],
         },
@@ -90,13 +96,52 @@ describe("createGitHubClient", () => {
     });
     const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
     await expect(client.listUserInstallations("gho_user")).resolves.toEqual([
-      { id: "155", accountLogin: "octo", accountType: "Organization", suspended: false },
-      { id: "9", accountLogin: "hubot", accountType: "User", suspended: true },
+      {
+        id: "155",
+        accountLogin: "octo",
+        accountType: "Organization",
+        suspended: false,
+        repositorySelection: "selected",
+      },
+      {
+        id: "9",
+        accountLogin: "hubot",
+        accountType: "User",
+        suspended: true,
+        repositorySelection: "all",
+      },
     ]);
     expect((calls[0]!.init.headers as Record<string, string>).Authorization).toBe(
       "Bearer gho_user",
     );
     expect(calls[0]!.url).toContain("per_page=100");
+  });
+
+  it("lists an installation's repositories as the user sees them, one page with the total", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      "GET /user/installations/155/repositories": () => ({
+        json: {
+          total_count: 11,
+          repositories: [
+            { name: "api", full_name: "octo/api", private: true, owner: { login: "octo" } },
+            { name: "web", full_name: "octo/web", private: false, owner: { login: "octo" } },
+          ],
+        },
+      }),
+    });
+    const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
+    await expect(client.listUserInstallationRepositories("gho_user", "155", 8)).resolves.toEqual({
+      total: 11,
+      repositories: [
+        { owner: "octo", name: "api", fullName: "octo/api", private: true },
+        { owner: "octo", name: "web", fullName: "octo/web", private: false },
+      ],
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url).toContain("per_page=8");
+    expect((calls[0]!.init.headers as Record<string, string>).Authorization).toBe(
+      "Bearer gho_user",
+    );
   });
 
   it("maps pull request fields", async () => {
@@ -227,6 +272,7 @@ describe("createGitHubClient", () => {
     const client = createGitHubClient({ appId: "1", privateKeyPem: pem, fetch: fetchImpl });
     await expect(client.botLogin()).resolves.toBe("hawkeye-review[bot]");
     await expect(client.botLogin()).resolves.toBe("hawkeye-review[bot]");
+    await expect(client.appSlug()).resolves.toBe("hawkeye-review");
     expect(calls).toHaveLength(1);
   });
   it("asks again after a failed lookup, and refuses an answer without a slug", async () => {

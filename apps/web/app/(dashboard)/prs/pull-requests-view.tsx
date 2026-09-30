@@ -8,12 +8,18 @@ import { PullRequestTable } from "./pull-request-table";
 export function PullRequestsView({
   pullRequests,
   failures,
+  installations,
+  suspendedInstallations,
+  syncFailed,
   statuses,
   runner,
   now,
 }: {
   pullRequests: ListedPullRequest[];
   failures: InstallationFailure[];
+  installations: number;
+  suspendedInstallations: number;
+  syncFailed: boolean;
   statuses: Map<string, PullRequestStatus>;
   runner: RunnerStatus;
   now: number;
@@ -63,13 +69,40 @@ export function PullRequestsView({
 
       {pullRequests.length === 0 ? (
         <div className="hk-state">
-          <p>No open pull requests of yours in the repositories this app is installed on.</p>
-          <p>
-            <a href="https://github.com/settings/installations">
-              Install the GitHub App on another repository
-            </a>
-            ; its pull requests appear here within a minute.
-          </p>
+          {installations === 0 && syncFailed ? (
+            <>
+              <p>GitHub did not answer.</p>
+              <p>
+                Hawkeye could not check where it is installed, so your pull requests may be missing
+                from this list. It checks again within a minute.
+              </p>
+            </>
+          ) : installations === 0 && suspendedInstallations > 0 ? (
+            <>
+              <p>Hawkeye is suspended on every account where it is installed.</p>
+              <p>
+                Reviews are stopped until the App is resumed on GitHub.{" "}
+                <Link href="/settings#installed">Where Hawkeye is installed</Link> lists the
+                accounts.
+              </p>
+            </>
+          ) : installations === 0 ? (
+            <>
+              <p>Hawkeye is not installed on a repository you can reach yet.</p>
+              <p>
+                <Link href="/settings#installed">Install the GitHub App</Link> from Settings; the
+                pull requests you open there appear here within a minute.
+              </p>
+            </>
+          ) : (
+            <>
+              <p>No open pull requests of yours in the repositories Hawkeye is installed on.</p>
+              <p>
+                <Link href="/settings#installed">Where Hawkeye is installed</Link> lists them; a
+                pull request you open there appears here within a minute.
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <PullRequestTable

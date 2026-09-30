@@ -69,7 +69,7 @@ A runner that dies mid-review leaves its job claimed. When any runner of the sam
 
 ## 4. Sign in and install the App
 
-Open the deployment, sign in with GitHub, and install the App on the repositories you want reviewed. Today the dashboard lists installations made by the signed-in account; other members of an organization see them once [#48](https://github.com/ShobhitPatra/hawkeye/issues/48) lands.
+Open the deployment, sign in with GitHub, and install the App on the repositories you want reviewed. Settings lists every installation your account can reach, including an organisation's that someone else installed, with the repositories each one covers.
 
 ## 5. Connect a runner
 
