@@ -188,22 +188,38 @@ export async function requeueStaleJobs(
 // A push, or a review from scratch asked for while the job waits, rewrites the queued row in place,
 // so the claim comes back only while the row still holds the head the lost run was reviewing. A
 // claim that was released leaves the job queued as well, so the lost run must be the job's last.
+// The job row is locked before any of it is read: a claim and its release both write that row, so
+// neither can land between the check and the update.
 export async function takeBackClaim(
   db: Db,
   input: { runnerId: string; now: Date } & ({ runId: string } | { jobId: string }),
 ): Promise<Job | undefined> {
   return db.transaction(async (tx) => {
+    const [locked] = await tx
+      .select({ id: job.id })
+      .from(job)
+      .where(
+        "runId" in input
+          ? eq(job.id, sql`(select ${run.jobId} from ${run} where ${run.id} = ${input.runId})`)
+          : eq(job.id, input.jobId),
+      )
+      .for("update");
+    if (!locked) return undefined;
     const [lost] = await tx
-      .select({ id: run.id, jobId: run.jobId, headSha: run.headSha })
+      .select({ id: run.id })
       .from(run)
       .innerJoin(job, eq(job.id, run.jobId))
       .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
       .where(
         and(
-          "runId" in input ? eq(run.id, input.runId) : eq(run.jobId, input.jobId),
+          eq(run.jobId, locked.id),
+          "runId" in input ? eq(run.id, input.runId) : undefined,
           eq(run.runnerId, input.runnerId),
           eq(run.status, "error"),
           eq(run.error, HEARTBEAT_LOST),
+          eq(job.state, "queued"),
+          eq(job.headSha, run.headSha),
+          eq(job.fromScratch, false),
           isNull(armedPr.disarmedAt),
           sql`not exists (select 1
                           from ${run} later
@@ -211,7 +227,7 @@ export async function takeBackClaim(
                             and (later.started_at, later.id) > (${run.startedAt}, ${run.id}))`,
         ),
       );
-    if (!lost?.headSha) return undefined;
+    if (!lost) return undefined;
     const [taken] = await tx
       .update(job)
       .set({
@@ -220,16 +236,8 @@ export async function takeBackClaim(
         claimedAt: input.now,
         heartbeatAt: input.now,
       })
-      .where(
-        and(
-          eq(job.id, lost.jobId),
-          eq(job.state, "queued"),
-          eq(job.headSha, lost.headSha),
-          eq(job.fromScratch, false),
-        ),
-      )
+      .where(eq(job.id, locked.id))
       .returning();
-    if (!taken) return undefined;
     await tx
       .update(run)
       .set({ status: "running", error: null, endedAt: null })
