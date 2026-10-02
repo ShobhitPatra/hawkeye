@@ -85,6 +85,37 @@ describe("runnerStatus", () => {
     expect((await runnerStatus(db, "user-1", now)).waitingJobs).toBe(1);
     expect((await runnerStatus(db, "user-2", now)).waitingJobs).toBe(1);
   });
+  it("counts a job held by a runner that stopped heartbeating as waiting", async () => {
+    await seedArmedPullRequest(db, { armedPrId: "armed-1", userId: "user-1", number: 1 });
+    await seedArmedPullRequest(db, { armedPrId: "armed-2", userId: "user-1", number: 2 });
+    for (const [armedPrId, heartbeatAt] of [
+      ["armed-1", new Date(now.getTime() - RUNNER_ONLINE_WINDOW_MS - 1)],
+      ["armed-2", new Date(now.getTime() - 10_000)],
+    ] as const) {
+      const queued = await queueJob(db, {
+        headCurrentAt: new Date(),
+        armedPrId,
+        headSha: "h",
+        baseSha: "b",
+        notBefore: now,
+      });
+      await db
+        .update(schema.job)
+        .set({ state: "claimed", heartbeatAt })
+        .where(eq(schema.job.id, queued.id));
+    }
+
+    expect((await runnerStatus(db, "user-1", now)).waitingJobs).toBe(1);
+
+    await queueJob(db, {
+      headCurrentAt: new Date(),
+      armedPrId: "armed-1",
+      headSha: "newer",
+      baseSha: "b",
+      notBefore: now,
+    });
+    expect((await runnerStatus(db, "user-1", now)).waitingJobs).toBe(1);
+  });
 });
 
 describe("reviewingByRunner", () => {

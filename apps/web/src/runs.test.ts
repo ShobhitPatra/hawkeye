@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
 import { createRunnerToken } from "./runner-tokens";
-import { findArmedPullRequest, listFindingsForPullRequest, listRunsForPullRequest } from "./runs";
+import {
+  findArmedPullRequest,
+  jobWaitingFor,
+  listFindingsForPullRequest,
+  listRunsForPullRequest,
+} from "./runs";
 import { createTestDb, seedArmedPullRequest } from "./test/pglite";
 
 const coordinates = { userId: "user-1", owner: "octo", repo: "repo", number: 7 };
@@ -129,6 +134,30 @@ describe("listRunsForPullRequest", () => {
     expect(row).not.toHaveProperty("lenses");
   });
 
+  it("carries the claim's heartbeat for a running run and marks a run the sweep ended", async () => {
+    const heartbeatAt = new Date("2026-08-01T10:04:00Z");
+    const running = await seedRun(
+      (await seedJob("armed-1", { state: "claimed", heartbeatAt })).id,
+      { startedAt: new Date("2026-08-01T10:00:00Z") },
+    );
+    const lost = await seedRun(
+      (await seedJob("armed-1", { state: "queued", headSha: "c".repeat(40) })).id,
+      { status: "error", error: "heartbeat lost", startedAt: new Date("2026-08-01T09:00:00Z") },
+    );
+    const failed = await seedRun((await seedJob("armed-1", { headSha: "d".repeat(40) })).id, {
+      status: "error",
+      error: "boom",
+      startedAt: new Date("2026-08-01T08:00:00Z"),
+    });
+
+    const runs = await listRunsForPullRequest(db, coordinates);
+    expect(runs.find((r) => r.id === running.id)).toMatchObject({ heartbeatAt });
+    expect(runs.find((r) => r.id === running.id)).not.toHaveProperty("interrupted");
+    expect(runs.find((r) => r.id === lost.id)).toMatchObject({ interrupted: true });
+    expect(runs.find((r) => r.id === lost.id)).not.toHaveProperty("heartbeatAt");
+    expect(runs.find((r) => r.id === failed.id)).not.toHaveProperty("interrupted");
+  });
+
   it("composes the review url only when a review was posted", async () => {
     const jobId = (await seedJob("armed-1")).id;
     const posted = await seedRun(jobId, { status: "ok", result });
@@ -213,6 +242,19 @@ describe("listFindingsForPullRequest", () => {
       firstSeenSha: headSha,
       resolvedSha: null,
     });
+  });
+});
+
+describe("jobWaitingFor", () => {
+  it("is true only while a job for the user's pull request is queued", async () => {
+    expect(await jobWaitingFor(db, coordinates)).toBe(false);
+    await seedJob("armed-1", { state: "claimed" });
+    expect(await jobWaitingFor(db, coordinates)).toBe(false);
+    await db.update(schema.job).set({ state: "queued" });
+    expect(await jobWaitingFor(db, coordinates)).toBe(true);
+    expect(await jobWaitingFor(db, { ...coordinates, userId: "user-2" })).toBe(false);
+    await db.update(schema.armedPr).set({ disarmedAt: new Date() });
+    expect(await jobWaitingFor(db, coordinates)).toBe(false);
   });
 });
 

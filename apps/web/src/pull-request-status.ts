@@ -3,6 +3,7 @@ import { and, count, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { armedPullRequestKey } from "./arming";
 import type { Db } from "./db/client";
 import { armedPr, finding, job, reviewPosted, run } from "./db/schema";
+import { heartbeatStale } from "./runner-status";
 import { userArmsOf } from "./runs";
 
 export type LastReview = {
@@ -14,7 +15,7 @@ export type LastReview = {
 
 export type PullRequestStatus =
   | { kind: "armed" }
-  | { kind: "queued" | "reviewing" | "failed"; last?: LastReview }
+  | { kind: "queued" | "reviewing" | "stalled" | "failed"; last?: LastReview }
   | { kind: "reviewed"; last: LastReview };
 
 type Arm = { id: string; userId: string; owner: string; repo: string; number: number };
@@ -22,6 +23,7 @@ type Arm = { id: string; userId: string; owner: string; repo: string; number: nu
 export async function listPullRequestStatuses(
   db: Db,
   userId: string,
+  now = new Date(),
 ): Promise<Map<string, PullRequestStatus>> {
   const arms = await db
     .select({
@@ -34,15 +36,15 @@ export async function listPullRequestStatuses(
     .from(armedPr)
     .where(and(eq(armedPr.userId, userId), isNull(armedPr.disarmedAt)));
   const entries = await Promise.all(
-    arms.map(async (arm) => [armedPullRequestKey(arm), await statusOf(db, arm)] as const),
+    arms.map(async (arm) => [armedPullRequestKey(arm), await statusOf(db, arm, now)] as const),
   );
   return new Map(entries);
 }
 
-async function statusOf(db: Db, arm: Arm): Promise<PullRequestStatus> {
+async function statusOf(db: Db, arm: Arm, now: Date): Promise<PullRequestStatus> {
   const [openJobs, lastReview, latestRun] = await Promise.all([
     db
-      .select({ state: job.state })
+      .select({ state: job.state, heartbeatAt: job.heartbeatAt })
       .from(job)
       .where(and(eq(job.armedPrId, arm.id), inArray(job.state, ["queued", "claimed"]))),
     lastReviewOf(db, arm),
@@ -56,7 +58,13 @@ async function statusOf(db: Db, arm: Arm): Promise<PullRequestStatus> {
       .limit(1),
   ]);
   const last = lastReview ? { last: lastReview } : {};
-  if (openJobs.some((row) => row.state === "claimed")) return { kind: "reviewing", ...last };
+  const claimed = openJobs.find((row) => row.state === "claimed");
+  if (claimed)
+    return {
+      kind:
+        claimed.heartbeatAt && heartbeatStale(claimed.heartbeatAt, now) ? "stalled" : "reviewing",
+      ...last,
+    };
   if (openJobs.length > 0) return { kind: "queued", ...last };
   const latest = latestRun[0];
   if (!latest) return { kind: "armed" };

@@ -8,7 +8,13 @@ import {
   PullRequestRefusedError,
 } from "@/arm-guard";
 import { installationForOwner } from "@/installations";
-import { findArmedPullRequest, listFindingsForPullRequest, listRunsForPullRequest } from "@/runs";
+import { requestRunnerStatus } from "@/request-runner-status";
+import {
+  findArmedPullRequest,
+  jobWaitingFor,
+  listFindingsForPullRequest,
+  listRunsForPullRequest,
+} from "@/runs";
 import { fillTitles } from "@/pull-request-titles";
 import { requireSession } from "@/session";
 import { PullRequestView } from "./pull-request-view";
@@ -35,9 +41,11 @@ export default async function PullRequestPage({
   if (installationId === undefined) notFound();
   const github = createGitHubAppClient({ fetch });
 
-  const [runs, findings, title] = await Promise.all([
+  const [runs, findings, queued, runner, title] = await Promise.all([
     listRunsForPullRequest(db, coordinates),
     listFindingsForPullRequest(db, coordinates),
+    jobWaitingFor(db, coordinates),
+    requestRunnerStatus(session.user.id),
     arm
       ? fillTitles(db, github, [
           {
@@ -58,6 +66,8 @@ export default async function PullRequestPage({
       armed={arm?.armed ?? false}
       runs={runs}
       findings={findings}
+      queued={queued}
+      runnerOnline={runner.online}
       now={Date.now()}
     />
   );

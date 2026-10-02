@@ -1,7 +1,8 @@
 import { SEVERITIES, type ReviewResult, type Severity, type Verdict } from "@hawkeye/core";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { armedPr, finding, job, reviewPosted, run, runner } from "./db/schema";
+import { HEARTBEAT_LOST } from "./job-queue";
 
 export type PullRequestCoordinates = {
   userId: string;
@@ -25,6 +26,8 @@ export type PullRequestRun = {
   lenses?: ReviewResult["lenses"];
   runnerName?: string;
   refusedModel?: string;
+  heartbeatAt?: Date;
+  interrupted?: true;
 };
 
 export type PullRequestFinding = {
@@ -62,6 +65,7 @@ export async function listRunsForPullRequest(
       result: run.result,
       refusedModel: run.refusedModel,
       headSha: job.headSha,
+      heartbeatAt: job.heartbeatAt,
       githubReviewId: reviewPosted.githubReviewId,
       runnerName: runner.name,
     })
@@ -87,6 +91,10 @@ export async function listRunsForPullRequest(
     ...(row.endedAt ? { endedAt: row.endedAt } : {}),
     ...(row.error ? { error: row.error } : {}),
     ...(row.refusedModel ? { refusedModel: row.refusedModel } : {}),
+    ...(row.status === "running" && row.heartbeatAt ? { heartbeatAt: row.heartbeatAt } : {}),
+    ...(row.status === "error" && row.error === HEARTBEAT_LOST
+      ? { interrupted: true as const }
+      : {}),
     ...(row.githubReviewId
       ? {
           reviewUrl: `https://github.com/${input.owner}/${input.repo}/pull/${input.number}#pullrequestreview-${row.githubReviewId}`,
@@ -133,6 +141,16 @@ export async function listFindingsForPullRequest(
       SEVERITIES.indexOf(a.severity) - SEVERITIES.indexOf(b.severity) ||
       a.claim.localeCompare(b.claim),
   );
+}
+
+export async function jobWaitingFor(db: Db, input: PullRequestCoordinates): Promise<boolean> {
+  const [waiting] = await db
+    .select({ id: job.id })
+    .from(job)
+    .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
+    .where(and(userArmsOf(input), isNull(armedPr.disarmedAt), eq(job.state, "queued")))
+    .limit(1);
+  return waiting !== undefined;
 }
 
 export type ArmedPullRequestSummary = {

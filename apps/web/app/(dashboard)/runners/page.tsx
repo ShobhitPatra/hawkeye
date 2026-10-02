@@ -25,8 +25,8 @@ export default async function RunnersPage() {
     return {
       id: runner.id,
       name: runner.name,
-      state: runner.revokedAt ? "revoked" : current ? "reviewing" : online ? "online" : "offline",
-      ...(current ? { reviewing: `${current.owner}/${current.repo} #${current.number}` } : {}),
+      state: runner.revokedAt ? "revoked" : online ? (current ? "reviewing" : "online") : "offline",
+      ...(current ? { pullRequest: `${current.owner}/${current.repo} #${current.number}` } : {}),
       lastSeen: runner.lastSeenAt ? formatUpdated(runner.lastSeenAt.toISOString(), now) : "never",
       created: formatUpdated(runner.createdAt.toISOString(), now),
     };
