@@ -1,5 +1,5 @@
 import type { PullRequestReference } from "@hawkeye/core";
-import { and, count, desc, eq, isNotNull, isNull, lt, or } from "drizzle-orm";
+import { and, countDistinct, desc, eq, isNotNull, isNull, lt, or } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { armedPr, job, runner } from "./db/schema";
 
@@ -23,7 +23,7 @@ export async function runnerStatus(
     .orderBy(desc(runner.lastSeenAt))
     .limit(1);
   const [waiting] = await db
-    .select({ waitingJobs: count() })
+    .select({ waitingJobs: countDistinct(job.armedPrId) })
     .from(job)
     .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
     .where(

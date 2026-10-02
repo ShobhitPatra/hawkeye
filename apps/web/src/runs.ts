@@ -1,5 +1,5 @@
 import { SEVERITIES, type ReviewResult, type Severity, type Verdict } from "@hawkeye/core";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { armedPr, finding, job, reviewPosted, run, runner } from "./db/schema";
 import { HEARTBEAT_LOST } from "./job-queue";
@@ -148,7 +148,7 @@ export async function jobWaitingFor(db: Db, input: PullRequestCoordinates): Prom
     .select({ id: job.id })
     .from(job)
     .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
-    .where(and(userArmsOf(input), eq(job.state, "queued")))
+    .where(and(userArmsOf(input), isNull(armedPr.disarmedAt), eq(job.state, "queued")))
     .limit(1);
   return waiting !== undefined;
 }

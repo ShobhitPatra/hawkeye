@@ -253,6 +253,8 @@ describe("jobWaitingFor", () => {
     await db.update(schema.job).set({ state: "queued" });
     expect(await jobWaitingFor(db, coordinates)).toBe(true);
     expect(await jobWaitingFor(db, { ...coordinates, userId: "user-2" })).toBe(false);
+    await db.update(schema.armedPr).set({ disarmedAt: new Date() });
+    expect(await jobWaitingFor(db, coordinates)).toBe(false);
   });
 });
 

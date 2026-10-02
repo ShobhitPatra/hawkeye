@@ -106,6 +106,15 @@ describe("runnerStatus", () => {
     }
 
     expect((await runnerStatus(db, "user-1", now)).waitingJobs).toBe(1);
+
+    await queueJob(db, {
+      headCurrentAt: new Date(),
+      armedPrId: "armed-1",
+      headSha: "newer",
+      baseSha: "b",
+      notBefore: now,
+    });
+    expect((await runnerStatus(db, "user-1", now)).waitingJobs).toBe(1);
   });
 });
 

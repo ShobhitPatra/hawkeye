@@ -175,7 +175,11 @@ export function PullRequestView({
           </p>
           <p>
             {!queued ? (
-              "The next push queues a new review."
+              armed ? (
+                "The next push queues a new review."
+              ) : (
+                "Reviews are paused for this pull request; turning them on reviews it again."
+              )
             ) : runnerOnline ? (
               "The pull request is reviewed again as soon as the runner picks it up."
             ) : (
