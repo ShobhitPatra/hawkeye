@@ -25,7 +25,7 @@ export type RunnerRowData = {
   id: string;
   name: string;
   state: "online" | "offline" | "revoked" | "reviewing";
-  reviewing?: string;
+  pullRequest?: string;
   lastSeen: string;
   created: string;
 };
@@ -69,14 +69,22 @@ export function RunnerRow({ runner }: { runner: RunnerRowData }) {
             <span className="hk-status" data-state="running">
               Reviewing
             </span>{" "}
-            <span className="hk-metadata">{runner.reviewing}</span>
+            <span className="hk-metadata">{runner.pullRequest}</span>
           </>
         ) : runner.state === "online" ? (
           <span className="hk-status">Online</span>
         ) : runner.state === "offline" ? (
-          <span className="hk-status" data-state="attention">
-            Offline
-          </span>
+          <>
+            <span className="hk-status" data-state="attention">
+              Offline
+            </span>
+            {runner.pullRequest && (
+              <>
+                {" "}
+                <span className="hk-metadata">holding {runner.pullRequest}</span>
+              </>
+            )}
+          </>
         ) : (
           <span className="hk-status">Revoked</span>
         )}

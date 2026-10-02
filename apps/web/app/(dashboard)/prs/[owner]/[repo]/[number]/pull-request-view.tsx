@@ -3,6 +3,7 @@ import Link from "next/link";
 import { formatUpdated } from "@/format-updated";
 import { postingNote } from "@/posting-note";
 import { formatDuration, formatError, runFailureLabel, shortSha, verdictLabel } from "@/run-format";
+import { heartbeatStale } from "@/runner-status";
 import type { PullRequestFinding, PullRequestRun } from "@/runs";
 import { ReviewToggle } from "../../../review-toggle";
 import { ReviewFromScratch } from "../../../review-from-scratch";
@@ -30,6 +31,8 @@ export function PullRequestView({
   armed,
   runs,
   findings,
+  queued,
+  runnerOnline,
   now,
 }: {
   reference: PullRequestReference;
@@ -38,11 +41,15 @@ export function PullRequestView({
   armed: boolean;
   runs: PullRequestRun[];
   findings: PullRequestFinding[];
+  queued: boolean;
+  runnerOnline: boolean;
   now: number;
 }) {
   const htmlUrl = `https://github.com/${reference.owner}/${reference.repo}/pull/${reference.number}`;
   const latest = runs[0];
   const note = postingNote(latest?.error);
+  const offlineSince =
+    latest?.heartbeatAt && heartbeatStale(latest.heartbeatAt, now) ? latest.heartbeatAt : undefined;
   const posted = runs.filter((run) => run.status === "ok" && run.reviewUrl).toReversed();
   const lastReview = posted.at(-1);
   const roundOf = (run: PullRequestRun) => posted.indexOf(run) + 1;
@@ -122,7 +129,7 @@ export function PullRequestView({
         </div>
       )}
 
-      {latest?.status === "running" && (
+      {latest?.status === "running" && !offlineSince && (
         <div className="hk-state hk-arrive">
           <p>
             <span className="hk-status" data-state="running">
@@ -134,7 +141,54 @@ export function PullRequestView({
         </div>
       )}
 
-      {latest && latest.status !== "running" && latest.status !== "ok" && (
+      {latest && offlineSince && (
+        <div key="offline" className="hk-state hk-arrive">
+          <p>
+            <span className="hk-status" data-state="attention">
+              Runner offline
+            </span>{" "}
+            {latest.runnerName ?? "Your runner"} stopped answering{" "}
+            {formatUpdated(offlineSince.toISOString(), now)}, during the review it started{" "}
+            {formatUpdated(latest.startedAt.toISOString(), now)}.
+          </p>
+          <p>
+            The review continues when it reconnects. <Link href="/connect">Start the runner</Link>{" "}
+            if it stopped.
+          </p>
+        </div>
+      )}
+
+      {latest?.interrupted && (
+        <div key="interrupted" className="hk-state hk-arrive">
+          <p>
+            {!queued ? (
+              <span className="hk-status">Interrupted</span>
+            ) : runnerOnline ? (
+              <span className="hk-status">Queued</span>
+            ) : (
+              <span className="hk-status" data-state="attention">
+                Waiting, runner offline
+              </span>
+            )}{" "}
+            {latest.runnerName ?? "Your runner"} went offline during the review it started{" "}
+            {formatUpdated(latest.startedAt.toISOString(), now)}.
+          </p>
+          <p>
+            {!queued ? (
+              "The next push queues a new review."
+            ) : runnerOnline ? (
+              "The pull request is reviewed again as soon as the runner picks it up."
+            ) : (
+              <>
+                The pull request is reviewed again when a runner connects.{" "}
+                <Link href="/connect">Start the runner</Link>
+              </>
+            )}
+          </p>
+        </div>
+      )}
+
+      {latest && latest.status !== "running" && latest.status !== "ok" && !latest.interrupted && (
         <div className="hk-state hk-arrive">
           <p>
             <span className="hk-status" data-state="failed">
@@ -234,7 +288,7 @@ export function PullRequestView({
                   <td className="hk-numeric">{roundOf(run) || ""}</td>
                   <td className="hk-mono">{shortSha(run.headSha)}</td>
                   <td>
-                    <RunResult run={run} />
+                    <RunResult run={run} now={now} />
                     {run.refusedModel && (
                       <span className="hk-muted">
                         {" "}
@@ -243,7 +297,9 @@ export function PullRequestView({
                     )}
                   </td>
                   <td className="hk-numeric">{run.turns}</td>
-                  <td className="hk-numeric hk-mono">{formatDuration(run)}</td>
+                  <td className="hk-numeric hk-mono">
+                    {run.interrupted ? "" : formatDuration(run)}
+                  </td>
                   <td>{formatUpdated(run.startedAt.toISOString(), now)}</td>
                   <td>{run.reviewUrl && <a href={run.reviewUrl}>Review</a>}</td>
                 </tr>
@@ -280,13 +336,20 @@ export function PullRequestView({
   );
 }
 
-function RunResult({ run }: { run: PullRequestRun }) {
+function RunResult({ run, now }: { run: PullRequestRun; now: number }) {
+  if (run.status === "running" && run.heartbeatAt && heartbeatStale(run.heartbeatAt, now))
+    return (
+      <span className="hk-status" data-state="attention">
+        Runner offline
+      </span>
+    );
   if (run.status === "running")
     return (
       <span className="hk-status" data-state="running">
         In review
       </span>
     );
+  if (run.interrupted) return <span className="hk-status">Interrupted</span>;
   if (run.status !== "ok" || !run.verdict)
     return (
       <span className="hk-status" data-state="failed">

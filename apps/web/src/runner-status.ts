@@ -1,9 +1,13 @@
 import type { PullRequestReference } from "@hawkeye/core";
-import { and, count, desc, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull, isNull, lt, or } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { armedPr, job, runner } from "./db/schema";
 
 export const RUNNER_ONLINE_WINDOW_MS = 90 * 1000;
+
+export function heartbeatStale(heartbeatAt: Date, now: Date | number): boolean {
+  return new Date(now).getTime() - heartbeatAt.getTime() > RUNNER_ONLINE_WINDOW_MS;
+}
 
 export type RunnerStatus = { online: boolean; lastSeenAt?: Date; waitingJobs: number };
 
@@ -22,7 +26,19 @@ export async function runnerStatus(
     .select({ waitingJobs: count() })
     .from(job)
     .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
-    .where(and(eq(armedPr.userId, userId), isNull(armedPr.disarmedAt), eq(job.state, "queued")));
+    .where(
+      and(
+        eq(armedPr.userId, userId),
+        isNull(armedPr.disarmedAt),
+        or(
+          eq(job.state, "queued"),
+          and(
+            eq(job.state, "claimed"),
+            lt(job.heartbeatAt, new Date(now.getTime() - RUNNER_ONLINE_WINDOW_MS)),
+          ),
+        ),
+      ),
+    );
 
   const lastSeenAt = latest?.lastSeenAt ?? undefined;
   return {

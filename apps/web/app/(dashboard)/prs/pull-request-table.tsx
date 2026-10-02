@@ -35,6 +35,12 @@ function StatusWord({
           In review
         </span>
       );
+    case "stalled":
+      return (
+        <span key="waiting" className="hk-status hk-arrive" data-state="attention">
+          Waiting, runner offline
+        </span>
+      );
     case "failed":
       return (
         <span key="failed" className="hk-status hk-arrive" data-state="failed">

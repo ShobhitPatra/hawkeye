@@ -1,4 +1,5 @@
 import type { ReviewResult } from "@hawkeye/core";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "./db/client";
 import * as schema from "./db/schema";
@@ -90,6 +91,25 @@ describe("listPullRequestStatuses", () => {
     expect(await statusOf()).toEqual({ kind: "queued" });
     await db.update(schema.job).set({ state: "claimed" });
     expect(await statusOf()).toEqual({ kind: "reviewing" });
+  });
+
+  it("reports a claim whose runner stopped heartbeating as stalled", async () => {
+    const now = new Date();
+    const claimed = await seedJob({
+      state: "claimed",
+      heartbeatAt: new Date(now.getTime() - 10_000),
+    });
+    expect((await listPullRequestStatuses(db, "user-1", now)).get(key)).toEqual({
+      kind: "reviewing",
+    });
+
+    await db
+      .update(schema.job)
+      .set({ heartbeatAt: new Date(now.getTime() - 91_000) })
+      .where(eq(schema.job.id, claimed.id));
+    expect((await listPullRequestStatuses(db, "user-1", now)).get(key)).toEqual({
+      kind: "stalled",
+    });
   });
 
   it("prefers a job queued during a review over the finished review", async () => {
