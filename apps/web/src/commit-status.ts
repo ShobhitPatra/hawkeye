@@ -1,5 +1,6 @@
 import {
   type GitHubClient,
+  type PlanLimit,
   type PullRequestReference,
   type ReviewResult,
   VERDICT_LABELS,
@@ -24,6 +25,14 @@ export function reviewedDescription(result: Pick<ReviewResult, "verdict" | "find
 }
 
 export const NOT_COMPLETED_DESCRIPTION = "Review did not complete";
+const PLAN_LIMIT_DESCRIPTIONS: Record<PlanLimit, string> = {
+  "rate limit": "Review did not complete: usage limit reached",
+  overload: "Review did not complete: model at capacity",
+};
+
+export function notCompletedDescription(planLimit: PlanLimit | undefined): string {
+  return planLimit ? PLAN_LIMIT_DESCRIPTIONS[planLimit] : NOT_COMPLETED_DESCRIPTION;
+}
 export const SUPERSEDED_DESCRIPTION = "Superseded by a newer push";
 
 export async function setCommitStatus(

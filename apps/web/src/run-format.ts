@@ -1,4 +1,4 @@
-import type { Verdict } from "@hawkeye/core";
+import { type PlanLimit, planLimitIn, type Verdict } from "@hawkeye/core";
 import type { PullRequestRun } from "./runs";
 
 const MAX_ERROR_LENGTH = 120;
@@ -38,7 +38,29 @@ const RUN_FAILURE_LABELS: Record<Exclude<PullRequestRun["status"], "running" | "
   superseded: "was superseded by a newer push",
 };
 
-export function runFailureLabel(status: PullRequestRun["status"]): string {
+const PLAN_LIMIT_LABELS: Record<PlanLimit, string> = {
+  "rate limit": "hit the plan's usage limit",
+  overload: "the model was at capacity",
+};
+
+export function runFailureLabel(status: PullRequestRun["status"], error?: string): string {
   if (status === "running" || status === "ok") throw new Error(`${status} is not a failure`);
-  return RUN_FAILURE_LABELS[status];
+  const planLimit = runPlanLimit(status, error);
+  return planLimit ? PLAN_LIMIT_LABELS[planLimit] : RUN_FAILURE_LABELS[status];
+}
+
+export function runPlanLimit(
+  status: PullRequestRun["status"],
+  error: string | null | undefined,
+): PlanLimit | undefined {
+  return status === "error" && error ? planLimitIn(error) : undefined;
+}
+
+const PLAN_LIMIT_NOTES: Record<PlanLimit, string> = {
+  "rate limit": "Usage limit",
+  overload: "Model at capacity",
+};
+
+export function planLimitNote(planLimit: PlanLimit): string {
+  return PLAN_LIMIT_NOTES[planLimit];
 }

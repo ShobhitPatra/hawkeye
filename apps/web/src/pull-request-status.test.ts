@@ -187,6 +187,16 @@ describe("listPullRequestStatuses", () => {
     expect(await statusOf()).toEqual({ kind: "failed" });
   });
 
+  it("names the plan limit that failed the latest run", async () => {
+    const failed = await seedJob({ state: "failed" });
+    await seedRun(failed.id, {
+      status: "error",
+      error: "codex exited with 1: Selected model is at capacity. Please try a different model.",
+      endedAt: new Date(),
+    });
+    expect(await statusOf()).toEqual({ kind: "failed", planLimit: "overload" });
+  });
+
   it("ignores disarmed pull requests and other users", async () => {
     await db
       .insert(schema.user)

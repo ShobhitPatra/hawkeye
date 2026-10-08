@@ -3,7 +3,7 @@ import { armedPullRequestKey } from "@/arming";
 import { formatUpdated } from "@/format-updated";
 import type { ListedPullRequest } from "@/pull-requests";
 import type { PullRequestStatus } from "@/pull-request-status";
-import { verdictLabel } from "@/run-format";
+import { planLimitNote, verdictLabel } from "@/run-format";
 
 function StatusWord({
   status,
@@ -43,9 +43,16 @@ function StatusWord({
       );
     case "failed":
       return (
-        <span key="failed" className="hk-status hk-arrive" data-state="failed">
-          Run failed
-        </span>
+        <div key="failed" className="hk-cell-stack">
+          <span className="hk-status hk-arrive" data-state="failed">
+            Run failed
+          </span>
+          {status.planLimit && (
+            <span key={status.planLimit} className="hk-metadata hk-arrive">
+              {planLimitNote(status.planLimit)}
+            </span>
+          )}
+        </div>
       );
     case "reviewed": {
       const { verdict } = status.last;
