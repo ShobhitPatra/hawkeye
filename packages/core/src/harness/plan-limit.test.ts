@@ -56,5 +56,8 @@ describe("planLimitIn", () => {
   it("reads nothing from other failures", () => {
     expect(planLimitIn("claude exited with 1: line 429 of file.ts")).toBeUndefined();
     expect(planLimitIn("stopped without a message")).toBeUndefined();
+    expect(
+      planLimitIn("EDQUOT: disk quota exceeded, mkdir '/home/u/.cache/hawkeye/runs/x'"),
+    ).toBeUndefined();
   });
 });
