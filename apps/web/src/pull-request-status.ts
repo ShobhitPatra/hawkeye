@@ -1,8 +1,9 @@
-import type { Verdict } from "@hawkeye/core";
+import type { PlanLimit, Verdict } from "@hawkeye/core";
 import { and, count, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { armedPullRequestKey } from "./arming";
 import type { Db } from "./db/client";
 import { armedPr, finding, job, reviewPosted, run } from "./db/schema";
+import { runPlanLimit } from "./run-format";
 import { heartbeatStale } from "./runner-status";
 import { userArmsOf } from "./runs";
 
@@ -15,7 +16,8 @@ export type LastReview = {
 
 export type PullRequestStatus =
   | { kind: "armed" }
-  | { kind: "queued" | "reviewing" | "stalled" | "failed"; last?: LastReview }
+  | { kind: "queued" | "reviewing" | "stalled"; last?: LastReview }
+  | { kind: "failed"; last?: LastReview; planLimit?: PlanLimit }
   | { kind: "reviewed"; last: LastReview };
 
 type Arm = { id: string; userId: string; owner: string; repo: string; number: number };
@@ -49,7 +51,7 @@ async function statusOf(db: Db, arm: Arm, now: Date): Promise<PullRequestStatus>
       .where(and(eq(job.armedPrId, arm.id), inArray(job.state, ["queued", "claimed"]))),
     lastReviewOf(db, arm),
     db
-      .select({ status: run.status })
+      .select({ status: run.status, error: run.error })
       .from(run)
       .innerJoin(job, eq(job.id, run.jobId))
       .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
@@ -69,7 +71,10 @@ async function statusOf(db: Db, arm: Arm, now: Date): Promise<PullRequestStatus>
   const latest = latestRun[0];
   if (!latest) return { kind: "armed" };
   if (latest.status === "running") return { kind: "reviewing", ...last };
-  if (latest.status !== "ok" || !lastReview) return { kind: "failed", ...last };
+  if (latest.status !== "ok" || !lastReview) {
+    const planLimit = runPlanLimit(latest.status, latest.error);
+    return { kind: "failed", ...last, ...(planLimit === undefined ? {} : { planLimit }) };
+  }
   return { kind: "reviewed", last: lastReview };
 }
 

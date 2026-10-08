@@ -2,7 +2,14 @@ import { type Lens, type PullRequestReference, SEVERITIES, type Severity } from 
 import Link from "next/link";
 import { formatUpdated } from "@/format-updated";
 import { postingNote } from "@/posting-note";
-import { formatDuration, formatError, runFailureLabel, shortSha, verdictLabel } from "@/run-format";
+import {
+  formatDuration,
+  formatError,
+  runFailureLabel,
+  runPlanLimit,
+  shortSha,
+  verdictLabel,
+} from "@/run-format";
 import { heartbeatStale } from "@/runner-status";
 import type { PullRequestFinding, PullRequestRun } from "@/runs";
 import { ReviewToggle } from "../../../review-toggle";
@@ -198,10 +205,20 @@ export function PullRequestView({
             <span className="hk-status" data-state="failed">
               Run failed
             </span>{" "}
-            {formatUpdated(latest.startedAt.toISOString(), now)}: {runFailureLabel(latest.status)}
+            {formatUpdated(latest.startedAt.toISOString(), now)}:{" "}
+            {runFailureLabel(latest.status, latest.error)}
             {latest.error ? `. ${formatError(latest.error)}` : "."}
           </p>
-          <p>The pull request was not touched. The next push queues a new review.</p>
+          <p>
+            The pull request was not touched. The next push queues a new review.
+            {runPlanLimit(latest.status, latest.error) === "overload" && (
+              <>
+                {" "}
+                If the model stays at capacity, choose another in{" "}
+                <Link href="/settings">Settings</Link>.
+              </>
+            )}
+          </p>
         </div>
       )}
 

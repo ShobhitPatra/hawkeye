@@ -1572,6 +1572,37 @@ describe("recordResult", () => {
     );
   });
 
+  it("names a plan limit in the commit status and the closing sentence", async () => {
+    const runId = await claimedRunId();
+
+    await recordResult(
+      jsonRequest(`/api/runner/runs/${runId}/result`, {
+        status: "error",
+        turns: 12,
+        error: "codex exited with 1: You've hit your usage limit. Try again at 3:42 PM.",
+      }),
+      { db, github },
+      runId,
+    );
+
+    expect(github.createCommitStatus).toHaveBeenCalledWith(
+      { owner: "octo", repo: "a", number: 1 },
+      "a".repeat(40),
+      {
+        state: "success",
+        description: "Review did not complete: usage limit reached",
+        context: "hawkeye",
+      },
+      "ghs_token",
+    );
+    expect(github.updateReview).toHaveBeenCalledWith(
+      { owner: "octo", repo: "a", number: 1 },
+      "9",
+      "The review did not complete because it hit a usage limit. The next push queues a new one.",
+      "ghs_token",
+    );
+  });
+
   it("fails the job for a non-ok status", async () => {
     const runId = await claimedRunId();
 

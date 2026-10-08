@@ -1,4 +1,4 @@
-import type { GitHubClient, PullRequestReference } from "@hawkeye/core";
+import type { GitHubClient, PlanLimit, PullRequestReference } from "@hawkeye/core";
 import { eq } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { run } from "./db/schema";
@@ -30,6 +30,16 @@ export function hasReviewingBlock(body: string): boolean {
 }
 
 export const NOT_COMPLETED_BODY = "The review did not complete. The next push queues a new one.";
+const PLAN_LIMIT_BODIES: Record<PlanLimit, string> = {
+  "rate limit":
+    "The review did not complete because it hit a usage limit. The next push queues a new one.",
+  overload:
+    "The review did not complete because the model was at capacity. The next push queues a new one.",
+};
+
+export function notCompletedBody(planLimit: PlanLimit | undefined): string {
+  return planLimit ? PLAN_LIMIT_BODIES[planLimit] : NOT_COMPLETED_BODY;
+}
 export const SUPERSEDED_BODY = "Superseded by a newer push; its review follows.";
 export const ALREADY_POSTED_BODY =
   "Another run reviewed this push; its review is on this pull request.";

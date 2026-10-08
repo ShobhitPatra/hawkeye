@@ -6,6 +6,7 @@ import {
   type PriorFinding,
   RUN_RESULT_STATUSES,
   parseReviewResult,
+  planLimitIn,
   type RunEvent,
   type RunResultReport,
   type RunResultStatus,
@@ -29,6 +30,7 @@ import {
 } from "./db/schema";
 import {
   NOT_COMPLETED_DESCRIPTION,
+  notCompletedDescription,
   reviewedDescription,
   reviewingDescription,
   setCommitStatus,
@@ -57,7 +59,7 @@ import {
 import {
   clearReviewing,
   markReviewing,
-  NOT_COMPLETED_BODY,
+  notCompletedBody,
   reviewingBlock,
   SUPERSEDED_BODY,
 } from "./reviewing-line";
@@ -416,11 +418,13 @@ export async function recordResult(
   const { result } = report;
   if (report.status !== "ok" || !result) {
     const superseded = report.status === "superseded";
+    const planLimit =
+      report.status === "error" && report.error ? planLimitIn(report.error) : undefined;
     await setCommitStatus(
       deps.github,
       statusTarget,
       "success",
-      superseded ? SUPERSEDED_DESCRIPTION : NOT_COMPLETED_DESCRIPTION,
+      superseded ? SUPERSEDED_DESCRIPTION : notCompletedDescription(planLimit),
       deps.log,
     );
     try {
@@ -432,7 +436,7 @@ export async function recordResult(
         runId,
         livingReviewId: living?.githubReviewId,
         placeholderReviewId: existing.placeholderReviewId,
-        closing: superseded ? SUPERSEDED_BODY : NOT_COMPLETED_BODY,
+        closing: superseded ? SUPERSEDED_BODY : notCompletedBody(planLimit),
         livingBlockBelongsToNewerRun: () =>
           newerRunIsLive(deps.db, { jobId: completed.jobId, armedPrId: target.armedPr.id }),
       });
