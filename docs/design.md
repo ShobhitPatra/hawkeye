@@ -191,7 +191,7 @@ The prompt is repo-agnostic: *discover the repo's layout and conventions, don't 
 
 **On open.** A pull request `opened` by a signed-in user in an installation linked to them turns reviews on and queues the first review, unless the user turned automatic review off (`user_settings.auto_review`, default on, the first checkbox on `/settings`). Nothing is armed retroactively, and a pull request the user paused stays paused. Turning on from the dashboard reviews now.
 
-**On push.** Every `pull_request.synchronize` and `ready_for_review` to the armed PR reviews again. `reopened` does not trigger (head unchanged).
+**On push.** Every `pull_request.synchronize` and `ready_for_review` to the armed PR reviews again, unless the head already has a posted review (a draft reviewed before it was marked ready keeps that review). `reopened` does not trigger (head unchanged).
 
 **On close.** `closed` / `merged` auto-disarms.
 
