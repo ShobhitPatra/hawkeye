@@ -5,6 +5,7 @@ import type { Db } from "./db/client";
 import * as schema from "./db/schema";
 import { createRun } from "./job-queue";
 import { postReviewForRun } from "./review-posting";
+import { reviewingBlock } from "./reviewing-line";
 import { createRunnerToken } from "./runner-tokens";
 import { createTestDb, seedArmedPullRequest, queueJob } from "./test/pglite";
 
@@ -433,7 +434,10 @@ describe("postReviewForRun", () => {
     expect(github.postReview).not.toHaveBeenCalled();
   });
 
-  it("skips GitHub entirely when the head was already posted", async () => {
+  it("clears its reviewing badge from the living review when the head was already posted", async () => {
+    const badge = reviewingBlock({ controlPlaneUrl: "https://hawkeye.test", runnerName: "laptop" });
+    github.review = vi.fn(async () => ({ body: `${badge}### Ship\n` }));
+    github.updateReview = vi.fn(async () => {});
     await db.insert(schema.reviewPosted).values({
       runId,
       armedPrId: armedPr.id,
@@ -442,8 +446,39 @@ describe("postReviewForRun", () => {
     });
 
     await expect(post()).resolves.toBe("already-posted");
-    expect(github.installationTokenById).not.toHaveBeenCalled();
+    expect(github.updateReview).toHaveBeenCalledWith(
+      { owner: "octo", repo: "repo", number: 7 },
+      "1",
+      "### Ship\n",
+      "ghs_token",
+    );
     expect(github.postReview).not.toHaveBeenCalled();
+  });
+
+  it("leaves the living review's badge to a newer run that is reviewing", async () => {
+    github.review = unsupported();
+    github.updateReview = unsupported();
+    await db.insert(schema.reviewPosted).values({
+      runId,
+      armedPrId: armedPr.id,
+      headSha,
+      githubReviewId: "1",
+    });
+    const [newer] = await db
+      .insert(schema.job)
+      .values({
+        armedPrId: armedPr.id,
+        headSha: "d".repeat(40),
+        baseSha: "b".repeat(40),
+        notBefore: new Date(),
+        state: "claimed",
+      })
+      .returning({ id: schema.job.id });
+    await createRun(db, { jobId: newer!.id, runnerId });
+
+    await expect(post()).resolves.toBe("already-posted");
+    expect(github.review).not.toHaveBeenCalled();
+    expect(github.updateReview).not.toHaveBeenCalled();
   });
 
   it("skips a head another arm of the same pull request already posted", async () => {
