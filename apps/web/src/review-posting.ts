@@ -279,6 +279,12 @@ async function postedForHeadSinceJob(
   return row !== undefined;
 }
 
+function lockPullRequest(db: Db, armedPr: ReviewPostingInput["armedPr"]) {
+  return db.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`${armedPr.owner}/${armedPr.repo}#${armedPr.number}`}, 0))`,
+  );
+}
+
 async function newerHeadStarted(
   db: Db,
   armedPr: ReviewPostingInput["armedPr"],
@@ -332,9 +338,7 @@ export async function postReviewForRun(
     .where(eq(job.id, input.jobId));
   const fromScratch = ownJob?.fromScratch === true;
   const reservation = await db.transaction(async (tx) => {
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtextextended(${`${armedPr.owner}/${armedPr.repo}#${armedPr.number}`}, 0))`,
-    );
+    await lockPullRequest(tx, armedPr);
     await tx
       .delete(reviewPosted)
       .where(
@@ -452,7 +456,7 @@ export async function postReviewForRun(
       : db
           .update(reviewPosted)
           .set({ runId: replacedRunId })
-          .where(eq(reviewPosted.id, reservation.id));
+          .where(and(eq(reviewPosted.id, reservation.id), eq(reviewPosted.runId, input.runId)));
 
   const ownPlaceholderId = async () =>
     living.kind === "placeholder"
@@ -530,29 +534,50 @@ export async function postReviewForRun(
       if (living.kind !== "living") await clear(token, SUPERSEDED_BODY);
       return "superseded";
     }
-    try {
-      await github.updateReview(reference, living.githubReviewId, finalBody, token);
-    } catch (error) {
-      if (!(error instanceof GitHubRequestError && error.status === 422)) throw error;
-      log(`living body refused for run ${input.runId} (${error.message}); posting the short form`);
-      await github.updateReview(
-        reference,
-        living.githubReviewId,
-        renderMinimalLivingReview({
-          result: input.result,
-          headSha,
-          repositoryUrl: HAWKEYE_REPOSITORY_URL,
-          rounds,
-        }),
-        token,
+    const writeBody = async (bodyToken: string) => {
+      try {
+        await github.updateReview(reference, living.githubReviewId, finalBody, bodyToken);
+        return undefined;
+      } catch (error) {
+        if (!(error instanceof GitHubRequestError && error.status === 422)) throw error;
+        log(
+          `living body refused for run ${input.runId} (${error.message}); posting the short form`,
+        );
+        await github.updateReview(
+          reference,
+          living.githubReviewId,
+          renderMinimalLivingReview({
+            result: input.result,
+            headSha,
+            repositoryUrl: HAWKEYE_REPOSITORY_URL,
+            rounds,
+          }),
+          bodyToken,
+        );
+        return shortFormNote(error.message);
+      }
+    };
+    const writeWhileHeld = (bodyToken: string) =>
+      db.transaction(async (tx) => {
+        await lockPullRequest(tx, armedPr);
+        const [held] = await tx
+          .select({ id: reviewPosted.id })
+          .from(reviewPosted)
+          .where(and(eq(reviewPosted.id, reservation.id), eq(reviewPosted.runId, input.runId)));
+        return held ? { shortForm: await writeBody(bodyToken) } : undefined;
+      });
+    const written =
+      replacedRunId === undefined
+        ? { shortForm: await writeBody(token) }
+        : await writeWhileHeld(token);
+    if (!written) {
+      log(
+        `living body not patched for run ${input.runId}: a newer round from scratch took the head`,
       );
-      await db
-        .update(run)
-        .set({
-          error: shortFormNote(error.message),
-        })
-        .where(eq(run.id, input.runId));
+      return githubWrote ? "posted" : "superseded";
     }
+    if (written.shortForm !== undefined)
+      await db.update(run).set({ error: written.shortForm }).where(eq(run.id, input.runId));
     githubWrote = true;
     if (!supplementalPosted || living.kind !== "living") await record(living.githubReviewId);
     if (living.kind === "adopted") await closePlaceholder(deps, input, ALREADY_POSTED_BODY);

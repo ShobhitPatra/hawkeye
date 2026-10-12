@@ -124,6 +124,24 @@ async function seedLivingReview(previousResult: ReviewResult, reviewedHead = pre
   return previousRun!.id;
 }
 
+async function seedNewerRoundFromScratch() {
+  const [newerJob] = await db
+    .insert(schema.job)
+    .values({
+      armedPrId: armedPr.id,
+      headSha,
+      baseSha: "b".repeat(40),
+      notBefore: new Date(),
+      state: "done",
+      fromScratch: true,
+      createdAt: new Date(Date.now() + 60_000),
+    })
+    .returning({ id: schema.job.id });
+  const { id } = await createRun(db, { jobId: newerJob!.id, runnerId });
+  await db.update(schema.run).set({ status: "ok", result }).where(eq(schema.run.id, id));
+  return id;
+}
+
 const post = (commentable: Record<string, number[]> = { "a.txt": [1, 2] }, turns?: number) =>
   postReviewForRun(
     { db, github },
@@ -614,6 +632,38 @@ describe("postReviewForRun", () => {
     await expect(post({})).resolves.toBe("failed");
     expect(await db.select().from(schema.reviewPosted)).toEqual([
       expect.objectContaining({ runId: earlierRunId, headSha, githubReviewId: "5" }),
+    ]);
+  });
+
+  it("leaves the living review to a newer round from scratch that took the head first", async () => {
+    github.updateReview = vi.fn(async () => {});
+    await seedLivingReview(result, headSha);
+    await db.update(schema.job).set({ fromScratch: true }).where(eq(schema.job.id, jobId));
+    const newerRunId = await seedNewerRoundFromScratch();
+    github.installationTokenById = vi.fn(async () => {
+      await db.update(schema.reviewPosted).set({ runId: newerRunId });
+      return "ghs_token";
+    });
+
+    await expect(post({})).resolves.toBe("superseded");
+    expect(github.updateReview).not.toHaveBeenCalled();
+    expect(await db.select().from(schema.reviewPosted)).toEqual([
+      expect.objectContaining({ runId: newerRunId, headSha, githubReviewId: "5" }),
+    ]);
+  });
+
+  it("keeps the head with a newer round from scratch when this one fails to post", async () => {
+    await seedLivingReview(result, headSha);
+    await db.update(schema.job).set({ fromScratch: true }).where(eq(schema.job.id, jobId));
+    const newerRunId = await seedNewerRoundFromScratch();
+    github.postReview = vi.fn(async () => {
+      await db.update(schema.reviewPosted).set({ runId: newerRunId });
+      throw new Error("GitHub is down");
+    });
+
+    await expect(post()).resolves.toBe("failed");
+    expect(await db.select().from(schema.reviewPosted)).toEqual([
+      expect.objectContaining({ runId: newerRunId, headSha, githubReviewId: "5" }),
     ]);
   });
 
