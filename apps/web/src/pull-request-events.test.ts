@@ -5,6 +5,7 @@ import type { Db } from "./db/client";
 import * as schema from "./db/schema";
 import type { PullRequestEvent } from "./github/webhook-events";
 import { handlePullRequestEvent } from "./pull-request-events";
+import { createRunnerToken } from "./runner-tokens";
 import { createTestDb, seedArmedPullRequest } from "./test/pglite";
 
 function unsupported() {
@@ -289,6 +290,46 @@ describe("handlePullRequestEvent", () => {
       event({ action: "ready_for_review" }),
     );
     expect(result).toEqual({ armed: 0, enqueued: 1, disarmed: 0, cancelled: 0 });
+  });
+
+  it("queues nothing on ready_for_review when the draft's head was already reviewed", async () => {
+    const armed = await seedArmedPullRequest(db);
+    const { runner } = await createRunnerToken(db, { userId: armed.userId, name: "laptop" });
+    const [reviewed] = await db
+      .insert(schema.job)
+      .values({
+        armedPrId: armed.armedPrId,
+        headSha: "h".repeat(40),
+        baseSha: "b".repeat(40),
+        notBefore: new Date(),
+        state: "done",
+      })
+      .returning();
+    const [run] = await db
+      .insert(schema.run)
+      .values({ jobId: reviewed!.id, runnerId: runner.id, status: "ok" })
+      .returning();
+    await db.insert(schema.reviewPosted).values({
+      runId: run!.id,
+      armedPrId: armed.armedPrId,
+      headSha: "h".repeat(40),
+      githubReviewId: "5",
+    });
+
+    const github = fakeGitHub();
+    const result = await handlePullRequestEvent(
+      { db, github },
+      event({ action: "ready_for_review" }),
+    );
+    expect(result).toEqual({
+      armed: 0,
+      enqueued: 0,
+      disarmed: 0,
+      cancelled: 0,
+      ignored: "head already reviewed",
+    });
+    expect(await jobs()).toHaveLength(1);
+    expect(github.installationTokenById).not.toHaveBeenCalled();
   });
 
   it("queues one job per armed row when two users armed the pull request", async () => {
