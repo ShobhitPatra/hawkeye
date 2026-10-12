@@ -15,7 +15,7 @@ import {
 import { and, asc, desc, eq, gte, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
-import { newerRunIsLive } from "./job-queue";
+import { otherRunIsLive } from "./job-queue";
 import { failedPostNote, shortFormNote } from "./posting-note";
 import { armedPr as armedPrTable, job, reviewPosted, run } from "./db/schema";
 import {
@@ -134,7 +134,7 @@ async function closeReviewing(
       placeholderReviewId: placeholder?.githubReviewId ?? null,
       closing,
       livingBlockBelongsToNewerRun: () =>
-        newerRunIsLive(db, { jobId: input.jobId, armedPrId: armedPr.id }),
+        otherRunIsLive(db, { jobId: input.jobId, armedPrId: armedPr.id }),
     });
   } catch (error) {
     deps.log?.(

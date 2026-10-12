@@ -362,7 +362,7 @@ export async function userHasReviewsOn(db: Db, userId: string): Promise<boolean>
   return armed !== undefined;
 }
 
-export async function newerRunIsLive(
+export async function otherRunIsLive(
   db: Db,
   current: { jobId: string; armedPrId: string },
 ): Promise<boolean> {

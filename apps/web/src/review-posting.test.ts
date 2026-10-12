@@ -483,6 +483,35 @@ describe("postReviewForRun", () => {
     expect(github.updateReview).not.toHaveBeenCalled();
   });
 
+  it("keeps the badge while an older run on the pull request is still reviewing", async () => {
+    github.review = unsupported();
+    github.updateReview = unsupported();
+    await db.insert(schema.reviewPosted).values({
+      runId,
+      armedPrId: armedPr.id,
+      headSha,
+      githubReviewId: "1",
+    });
+    await db.insert(schema.user).values({ id: "user-2", name: "hubot", email: "h@example.com" });
+    await seedArmedPullRequest(db, { armedPrId: "armed-2", userId: "user-2" });
+    const [older] = await db
+      .insert(schema.job)
+      .values({
+        armedPrId: "armed-2",
+        headSha: "d".repeat(40),
+        baseSha: "b".repeat(40),
+        notBefore: new Date(0),
+        createdAt: new Date(0),
+        state: "claimed",
+      })
+      .returning({ id: schema.job.id });
+    await createRun(db, { jobId: older!.id, runnerId });
+
+    await expect(post()).resolves.toBe("already-posted");
+    expect(github.review).not.toHaveBeenCalled();
+    expect(github.updateReview).not.toHaveBeenCalled();
+  });
+
   it("leaves the living review's badge to a newer run that is reviewing", async () => {
     github.review = unsupported();
     github.updateReview = unsupported();

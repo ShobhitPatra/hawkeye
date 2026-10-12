@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import type { GitHubClient } from "@hawkeye/core";
 import { NOT_COMPLETED_DESCRIPTION, setCommitStatus } from "./commit-status";
 import type { Db } from "./db/client";
-import { type FailedStaleJob, newerRunIsLive, requeueStaleJobs } from "./job-queue";
+import { type FailedStaleJob, otherRunIsLive, requeueStaleJobs } from "./job-queue";
 import { livingReviewFor } from "./review-posting";
 import { clearReviewing, NOT_COMPLETED_BODY } from "./reviewing-line";
 
@@ -64,7 +64,7 @@ async function closeOnGitHub(deps: StaleSweepDeps, failed: FailedStaleJob): Prom
       placeholderReviewId: failed.placeholderReviewId,
       closing: NOT_COMPLETED_BODY,
       livingBlockBelongsToNewerRun: () =>
-        newerRunIsLive(deps.db, { jobId: failed.jobId, armedPrId: failed.armedPr.id }),
+        otherRunIsLive(deps.db, { jobId: failed.jobId, armedPrId: failed.armedPr.id }),
     });
   } catch (error) {
     deps.log?.(
