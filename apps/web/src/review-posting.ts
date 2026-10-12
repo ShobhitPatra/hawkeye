@@ -165,6 +165,7 @@ async function previousRoundFindings(
   db: Db,
   armedPr: ReviewPostingInput["armedPr"],
   start: Date | undefined,
+  currentRunId: string,
 ): Promise<{ previousIds: Set<string>; priorClaims: Record<string, string> }> {
   const [latest] = await db
     .select({ result: run.result })
@@ -176,6 +177,7 @@ async function previousRoundFindings(
       and(
         samePullRequest(armedPr),
         isNotNull(reviewPosted.githubReviewId),
+        ne(run.id, currentRunId),
         ...(start === undefined ? [] : [gte(job.createdAt, start)]),
       ),
     )
@@ -249,6 +251,34 @@ async function postedForHead(
   return row !== undefined;
 }
 
+async function postedForHeadSinceJob(
+  db: Db,
+  armedPr: ReviewPostingInput["armedPr"],
+  headSha: string,
+  jobId: string,
+): Promise<boolean> {
+  const own = alias(job, "own");
+  const [row] = await db
+    .select({ id: reviewPosted.id })
+    .from(reviewPosted)
+    .innerJoin(armedPrTable, eq(armedPrTable.id, reviewPosted.armedPrId))
+    .innerJoin(run, eq(run.id, reviewPosted.runId))
+    .innerJoin(job, eq(job.id, run.jobId))
+    .innerJoin(own, eq(own.id, jobId))
+    .where(
+      and(
+        samePullRequest(armedPr),
+        eq(reviewPosted.headSha, headSha),
+        or(
+          isNull(reviewPosted.githubReviewId),
+          sql`(${job.createdAt}, ${job.id}) >= (${own.createdAt}, ${own.id})`,
+        ),
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
+}
+
 async function newerHeadStarted(
   db: Db,
   armedPr: ReviewPostingInput["armedPr"],
@@ -296,6 +326,11 @@ export async function postReviewForRun(
       return failRun(deps, input.runId, error instanceof Error ? error.message : String(error));
     }
   }
+  const [ownJob] = await db
+    .select({ fromScratch: job.fromScratch })
+    .from(job)
+    .where(eq(job.id, input.jobId));
+  const fromScratch = ownJob?.fromScratch === true;
   const reservation = await db.transaction(async (tx) => {
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtextextended(${`${armedPr.owner}/${armedPr.repo}#${armedPr.number}`}, 0))`,
@@ -309,7 +344,12 @@ export async function postReviewForRun(
           lt(reviewPosted.postedAt, new Date(Date.now() - STALE_RESERVATION_MS)),
         ),
       );
-    if (await postedForHead(tx, armedPr, headSha)) return "already-posted" as const;
+    if (
+      fromScratch
+        ? await postedForHeadSinceJob(tx, armedPr, headSha, input.jobId)
+        : await postedForHead(tx, armedPr, headSha)
+    )
+      return "already-posted" as const;
     if (await newerHeadStarted(tx, armedPr, input.jobId)) return "superseded" as const;
     const known = await livingReviewFor(tx, armedPr);
     let living: Living | undefined = known ? { ...known, kind: "living" } : undefined;
@@ -332,6 +372,19 @@ export async function postReviewForRun(
       if (own) living = { githubReviewId: own.githubReviewId, kind: "placeholder" };
     }
     if (living) {
+      const [earlier] = fromScratch
+        ? await tx
+            .select({ id: reviewPosted.id, runId: reviewPosted.runId })
+            .from(reviewPosted)
+            .where(and(eq(reviewPosted.armedPrId, armedPr.id), eq(reviewPosted.headSha, headSha)))
+        : [];
+      if (earlier) {
+        await tx
+          .update(reviewPosted)
+          .set({ runId: input.runId })
+          .where(eq(reviewPosted.id, earlier.id));
+        return { id: earlier.id, living, replacedRunId: earlier.runId };
+      }
       const [inserted] = await tx
         .insert(reviewPosted)
         .values({ runId: input.runId, armedPrId: armedPr.id, headSha, githubReviewId: null })
@@ -385,9 +438,21 @@ export async function postReviewForRun(
   if (typeof reservation === "string") return reservation;
   if ("failed" in reservation) return failRun(deps, input.runId, reservation.failed);
   const { living } = reservation;
-  const record = (githubReviewId: string) =>
-    db.update(reviewPosted).set({ githubReviewId }).where(eq(reviewPosted.id, reservation.id));
-  const release = () => db.delete(reviewPosted).where(eq(reviewPosted.id, reservation.id));
+  const replacedRunId = "replacedRunId" in reservation ? reservation.replacedRunId : undefined;
+  const record = async (githubReviewId: string) => {
+    if (replacedRunId !== undefined) return;
+    await db
+      .update(reviewPosted)
+      .set({ githubReviewId })
+      .where(eq(reviewPosted.id, reservation.id));
+  };
+  const release = () =>
+    replacedRunId === undefined
+      ? db.delete(reviewPosted).where(eq(reviewPosted.id, reservation.id))
+      : db
+          .update(reviewPosted)
+          .set({ runId: replacedRunId })
+          .where(eq(reviewPosted.id, reservation.id));
 
   const ownPlaceholderId = async () =>
     living.kind === "placeholder"
@@ -413,7 +478,7 @@ export async function postReviewForRun(
     const historyStart = await historyStartFor(db, armedPr, input.runId);
     const { previousIds, priorClaims } =
       living.kind === "living"
-        ? await previousRoundFindings(db, armedPr, historyStart)
+        ? await previousRoundFindings(db, armedPr, historyStart, input.runId)
         : { previousIds: new Set<string>(), priorClaims: {} };
     const rounds = await roundsFor(db, armedPr, input.runId, { start: historyStart });
     const render = (map: Map<string, Set<number>>) =>

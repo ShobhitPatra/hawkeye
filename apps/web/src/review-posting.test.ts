@@ -88,12 +88,12 @@ beforeEach(async () => {
   github = createGitHub();
 });
 
-async function seedLivingReview(previousResult: ReviewResult) {
+async function seedLivingReview(previousResult: ReviewResult, reviewedHead = previousHead) {
   const [previousJob] = await db
     .insert(schema.job)
     .values({
       armedPrId: armedPr.id,
-      headSha: previousHead,
+      headSha: reviewedHead,
       baseSha: "b".repeat(40),
       notBefore: new Date(),
       state: "done",
@@ -113,7 +113,7 @@ async function seedLivingReview(previousResult: ReviewResult) {
   await db.insert(schema.reviewPosted).values({
     runId: previousRun!.id,
     armedPrId: armedPr.id,
-    headSha: previousHead,
+    headSha: reviewedHead,
     githubReviewId: "5",
     postedAt: new Date("2026-01-01T00:00:00Z"),
   });
@@ -121,6 +121,7 @@ async function seedLivingReview(previousResult: ReviewResult) {
     .update(schema.run)
     .set({ status: "ok", result, startedAt: new Date("2026-01-02T00:00:00Z") })
     .where(eq(schema.run.id, runId));
+  return previousRun!.id;
 }
 
 const post = (commentable: Record<string, number[]> = { "a.txt": [1, 2] }, turns?: number) =>
@@ -584,6 +585,36 @@ describe("postReviewForRun", () => {
       githubReviewId: "9",
     });
     expect(rows.find((row) => row.headSha === previousHead)?.githubReviewId).toBe("5");
+  });
+
+  it("posts a round from scratch on the head the living review already covers", async () => {
+    github.updateReview = vi.fn(async () => {});
+    await seedLivingReview(result, headSha);
+    await db.update(schema.job).set({ fromScratch: true }).where(eq(schema.job.id, jobId));
+
+    await expect(post()).resolves.toBe("posted");
+    const [, reviewId, body] = (github.updateReview as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(reviewId).toBe("5");
+    expect(body).toContain(`| 1 | \`${"a".repeat(7)}\` | Changes needed |`);
+    expect(body).not.toContain("| 2 |");
+    expect(await db.select().from(schema.reviewPosted)).toEqual([
+      expect.objectContaining({ runId, headSha, githubReviewId: "5" }),
+    ]);
+
+    await expect(post()).resolves.toBe("already-posted");
+  });
+
+  it("gives the head back to the earlier round when a round from scratch fails to post", async () => {
+    github.updateReview = vi.fn(async () => {
+      throw new Error("GitHub is down");
+    });
+    const earlierRunId = await seedLivingReview(result, headSha);
+    await db.update(schema.job).set({ fromScratch: true }).where(eq(schema.job.id, jobId));
+
+    await expect(post({})).resolves.toBe("failed");
+    expect(await db.select().from(schema.reviewPosted)).toEqual([
+      expect.objectContaining({ runId: earlierRunId, headSha, githubReviewId: "5" }),
+    ]);
   });
 
   it("starts the history over on a round from scratch and counts from it afterwards", async () => {
