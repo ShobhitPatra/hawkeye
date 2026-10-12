@@ -44,7 +44,9 @@ function toCommentableMap(commentable: Record<string, number[]>): Map<string, Se
   return new Map(Object.entries(commentable).map(([path, lines]) => [path, new Set(lines)]));
 }
 
-function samePullRequest(armedPr: ReviewPostingInput["armedPr"]) {
+function samePullRequest(
+  armedPr: Pick<ReviewPostingInput["armedPr"], "owner" | "repo" | "number">,
+) {
   return and(
     eq(armedPrTable.owner, armedPr.owner),
     eq(armedPrTable.repo, armedPr.repo),
@@ -240,9 +242,9 @@ export async function roundsFor(
   });
 }
 
-async function postedForHead(
+export async function postedForHead(
   db: Db,
-  armedPr: ReviewPostingInput["armedPr"],
+  armedPr: Pick<ReviewPostingInput["armedPr"], "owner" | "repo" | "number">,
   headSha: string,
 ): Promise<boolean> {
   const [row] = await db
