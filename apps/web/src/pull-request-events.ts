@@ -6,6 +6,7 @@ import type { PullRequestEvent } from "./github/webhook-events";
 import { armForAuthor } from "./auto-review";
 import { enqueueJob } from "./jobs";
 import { quietWindowSeconds } from "./quiet-window";
+import { postedForHead } from "./review-posting";
 import { resolveReviewTarget, type ReviewTarget } from "./review-target";
 
 export type PullRequestEventResult = {
@@ -86,6 +87,14 @@ export async function handlePullRequestEvent(
     repo: event.repository.name,
     number: event.number,
   };
+  if (await postedForHead(db, reference, event.headSha))
+    return {
+      armed: armedCount,
+      enqueued: 0,
+      disarmed: 0,
+      cancelled: 0,
+      ignored: "head already reviewed",
+    };
   const token = await github.installationTokenById(event.installationId);
   const current = await github.pullRequest(reference, token);
   if (current.headSha !== event.headSha) {
