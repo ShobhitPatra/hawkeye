@@ -2,6 +2,7 @@ import type { GitHubClient, PlanLimit, PullRequestReference } from "@hawkeye/cor
 import { eq } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { run } from "./db/schema";
+import { lockPullRequest } from "./posting-lock";
 
 const OPEN = "<!-- hawkeye: reviewing -->";
 const CLOSE = "<!-- /hawkeye: reviewing -->";
@@ -85,38 +86,38 @@ export async function markReviewing(
 ): Promise<void> {
   const { github } = deps;
   try {
-    if (input.closedPlaceholderId) {
-      await github.updateReview(
+    await deps.db.transaction(async (tx) => {
+      await lockPullRequest(tx, input.reference);
+      if (input.closedPlaceholderId) {
+        await github.updateReview(
+          input.reference,
+          input.closedPlaceholderId,
+          input.block,
+          input.token,
+        );
+        await tx
+          .update(run)
+          .set({ placeholderReviewId: input.closedPlaceholderId })
+          .where(eq(run.id, input.runId));
+        return;
+      }
+      if (input.livingReviewId) {
+        const { body } = await github.review(input.reference, input.livingReviewId, input.token);
+        await github.updateReview(
+          input.reference,
+          input.livingReviewId,
+          input.block + stripReviewingBlock(body),
+          input.token,
+        );
+        return;
+      }
+      const posted = await github.postReview(
         input.reference,
-        input.closedPlaceholderId,
-        input.block,
+        { event: "COMMENT", commit_id: input.headSha, body: input.block, comments: [] },
         input.token,
       );
-      await deps.db
-        .update(run)
-        .set({ placeholderReviewId: input.closedPlaceholderId })
-        .where(eq(run.id, input.runId));
-      return;
-    }
-    if (input.livingReviewId) {
-      const { body } = await github.review(input.reference, input.livingReviewId, input.token);
-      await github.updateReview(
-        input.reference,
-        input.livingReviewId,
-        input.block + stripReviewingBlock(body),
-        input.token,
-      );
-      return;
-    }
-    const posted = await github.postReview(
-      input.reference,
-      { event: "COMMENT", commit_id: input.headSha, body: input.block, comments: [] },
-      input.token,
-    );
-    await deps.db
-      .update(run)
-      .set({ placeholderReviewId: posted.id })
-      .where(eq(run.id, input.runId));
+      await tx.update(run).set({ placeholderReviewId: posted.id }).where(eq(run.id, input.runId));
+    });
   } catch (error) {
     deps.log?.(
       `reviewing line not written for run ${input.runId}: ${error instanceof Error ? error.message : String(error)}`,
@@ -131,12 +132,13 @@ export async function clearReviewing(
     livingReviewId: string | undefined;
     placeholderReviewId: string | null;
     closing: string;
-    livingBlockBelongsToNewerRun?: () => Promise<boolean>;
+    livingBlockBelongsToNewerRun?: (db: Db) => Promise<boolean>;
   },
 ): Promise<void> {
   const { github } = deps;
+  const { livingReviewId } = input;
   try {
-    if (input.placeholderReviewId && input.placeholderReviewId !== input.livingReviewId) {
+    if (input.placeholderReviewId && input.placeholderReviewId !== livingReviewId) {
       await github.updateReview(
         input.reference,
         input.placeholderReviewId,
@@ -145,16 +147,19 @@ export async function clearReviewing(
       );
       return;
     }
-    if (!input.livingReviewId) return;
-    if (await input.livingBlockBelongsToNewerRun?.()) return;
-    const { body } = await github.review(input.reference, input.livingReviewId, input.token);
-    if (!hasReviewingBlock(body)) return;
-    await github.updateReview(
-      input.reference,
-      input.livingReviewId,
-      stripReviewingBlock(body),
-      input.token,
-    );
+    if (!livingReviewId) return;
+    await deps.db.transaction(async (tx) => {
+      await lockPullRequest(tx, input.reference);
+      if (await input.livingBlockBelongsToNewerRun?.(tx)) return;
+      const { body } = await github.review(input.reference, livingReviewId, input.token);
+      if (!hasReviewingBlock(body)) return;
+      await github.updateReview(
+        input.reference,
+        livingReviewId,
+        stripReviewingBlock(body),
+        input.token,
+      );
+    });
   } catch (error) {
     deps.log?.(
       `reviewing line not cleared for run ${input.runId}: ${error instanceof Error ? error.message : String(error)}`,

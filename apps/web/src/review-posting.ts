@@ -16,6 +16,7 @@ import { and, asc, desc, eq, gte, isNotNull, isNull, lt, ne, or, sql } from "dri
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import { otherRunIsLive } from "./job-queue";
+import { lockPullRequest } from "./posting-lock";
 import { failedPostNote, shortFormNote } from "./posting-note";
 import { armedPr as armedPrTable, job, reviewPosted, run } from "./db/schema";
 import {
@@ -135,8 +136,8 @@ async function closeReviewing(
       livingReviewId: living?.githubReviewId,
       placeholderReviewId: placeholder?.githubReviewId ?? null,
       closing,
-      livingBlockBelongsToNewerRun: () =>
-        otherRunIsLive(db, { jobId: input.jobId, armedPrId: armedPr.id }),
+      livingBlockBelongsToNewerRun: (tx) =>
+        otherRunIsLive(tx, { jobId: input.jobId, armedPrId: armedPr.id }),
     });
   } catch (error) {
     deps.log?.(
@@ -284,12 +285,6 @@ async function postedForHeadSinceJob(
     )
     .limit(1);
   return row !== undefined;
-}
-
-function lockPullRequest(db: Db, armedPr: ReviewPostingInput["armedPr"]) {
-  return db.execute(
-    sql`select pg_advisory_xact_lock(hashtextextended(${`${armedPr.owner}/${armedPr.repo}#${armedPr.number}`}, 0))`,
-  );
 }
 
 async function newerHeadStarted(
@@ -532,41 +527,40 @@ export async function postReviewForRun(
       if (living.kind !== "living") await clear(token, SUPERSEDED_BODY);
       return "superseded";
     }
-    const writeBody = async (bodyToken: string) => {
-      try {
-        await github.updateReview(reference, living.githubReviewId, finalBody, bodyToken);
-        return undefined;
-      } catch (error) {
-        if (!(error instanceof GitHubRequestError && error.status === 422)) throw error;
-        log(
-          `living body refused for run ${input.runId} (${error.message}); posting the short form`,
-        );
-        await github.updateReview(
-          reference,
-          living.githubReviewId,
-          renderMinimalLivingReview({
-            result: input.result,
-            headSha,
-            repositoryUrl: HAWKEYE_REPOSITORY_URL,
-            rounds,
-          }),
-          bodyToken,
-        );
-        return shortFormNote(error.message);
-      }
-    };
-    const takeOver = (bodyToken: string) =>
+    const writeBody = (bodyToken: string) =>
       db.transaction(async (tx) => {
         await lockPullRequest(tx, armedPr);
-        if (await postedForHeadSinceJob(tx, armedPr, headSha, input.jobId)) return undefined;
-        const shortForm = await writeBody(bodyToken);
-        await tx
-          .update(reviewPosted)
-          .set({ runId: input.runId })
-          .where(eq(reviewPosted.id, reservation.id));
+        if (takeover && (await postedForHeadSinceJob(tx, armedPr, headSha, input.jobId)))
+          return undefined;
+        let shortForm: string | undefined;
+        try {
+          await github.updateReview(reference, living.githubReviewId, finalBody, bodyToken);
+        } catch (error) {
+          if (!(error instanceof GitHubRequestError && error.status === 422)) throw error;
+          log(
+            `living body refused for run ${input.runId} (${error.message}); posting the short form`,
+          );
+          await github.updateReview(
+            reference,
+            living.githubReviewId,
+            renderMinimalLivingReview({
+              result: input.result,
+              headSha,
+              repositoryUrl: HAWKEYE_REPOSITORY_URL,
+              rounds,
+            }),
+            bodyToken,
+          );
+          shortForm = shortFormNote(error.message);
+        }
+        if (takeover)
+          await tx
+            .update(reviewPosted)
+            .set({ runId: input.runId })
+            .where(eq(reviewPosted.id, reservation.id));
         return { shortForm };
       });
-    const written = takeover ? await takeOver(token) : { shortForm: await writeBody(token) };
+    const written = await writeBody(token);
     if (!written) {
       log(
         `living body not patched for run ${input.runId}: a newer round from scratch reviewed the head`,
