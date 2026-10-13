@@ -1,6 +1,6 @@
 import { type Finding, type ReviewResult, SEVERITIES } from "../contract/schema.js";
 import { findingId } from "./finding-id.js";
-import { indentLines, LENS_LABELS, SEVERITY_LABELS, VERDICT_LABELS } from "./format.js";
+import { indentLines, SEVERITY_LABELS, VERDICT_LABELS } from "./format.js";
 import { encodeFindingMarker, encodeMarker } from "./marker.js";
 
 export type ReviewComment = { path: string; line: number; side: "RIGHT" | "LEFT"; body: string };
@@ -21,10 +21,6 @@ export type RenderInput = {
 
 export function oneLine(text: string): string {
   return text.replace(/\r?\n/g, " ");
-}
-
-function tableCell(text: string): string {
-  return oneLine(text).replaceAll("|", "\\|");
 }
 
 function collapsible(summary: string, content: string, indent: string): string[] {
@@ -124,21 +120,6 @@ export function renderReviewSections({
   return { lines, comments };
 }
 
-export function lensTableLines(result: Pick<ReviewResult, "lenses">): string[] {
-  const lines = [
-    "",
-    "<details>",
-    "<summary>Review lenses</summary>",
-    "",
-    "| Lens | Assessment |",
-    "|---|---|",
-  ];
-  for (const lens of result.lenses)
-    lines.push(`| ${LENS_LABELS[lens.name]} | ${tableCell(lens.assessment)} |`);
-  lines.push("", "</details>");
-  return lines;
-}
-
 export function footerLines(repositoryUrl: string, meta: FooterMeta = {}): string[] {
   const facts = [
     `Reviewed by [Hawkeye](${repositoryUrl}) on the author's own plan`,
@@ -159,7 +140,6 @@ export function renderReview({
   footer,
 }: RenderInput): RenderedReview {
   const { lines, comments } = renderReviewSections({ result, headSha, commentable });
-  lines.push(...lensTableLines(result));
   lines.push(...footerLines(repositoryUrl, footer));
   return { event: "COMMENT", commit_id: headSha, body: lines.join("\n"), comments };
 }

@@ -4,7 +4,6 @@ import type { RoundSummary } from "./render-text.js";
 import { SEVERITY_LABELS, VERDICT_LABELS } from "./format.js";
 import {
   footerLines,
-  lensTableLines,
   oneLine,
   renderReviewSections,
   type ReviewComment,
@@ -28,7 +27,6 @@ export type RenderedLivingReview = { body: string; comments: ReviewComment[]; tr
 type Trim = {
   keepRounds?: number;
   dropClosedPriors?: boolean;
-  dropLenses?: boolean;
   claimOnly?: ReadonlySet<Finding["severity"]>;
 };
 
@@ -36,13 +34,11 @@ const TRIM_LADDER: { note: string; trim: Trim }[] = [
   { note: "older rounds", trim: { keepRounds: 10 } },
   { note: "closed prior findings", trim: { keepRounds: 10, dropClosedPriors: true } },
   { note: "all but the current round", trim: { keepRounds: 1, dropClosedPriors: true } },
-  { note: "the lens table", trim: { keepRounds: 1, dropClosedPriors: true, dropLenses: true } },
   {
     note: "optional finding detail",
     trim: {
       keepRounds: 1,
       dropClosedPriors: true,
-      dropLenses: true,
       claimOnly: new Set(["optional"]),
     },
   },
@@ -51,7 +47,6 @@ const TRIM_LADDER: { note: string; trim: Trim }[] = [
     trim: {
       keepRounds: 1,
       dropClosedPriors: true,
-      dropLenses: true,
       claimOnly: new Set(["optional", "should_fix"]),
     },
   },
@@ -60,7 +55,6 @@ const TRIM_LADDER: { note: string; trim: Trim }[] = [
     trim: {
       keepRounds: 1,
       dropClosedPriors: true,
-      dropLenses: true,
       claimOnly: new Set(["optional", "should_fix", "inherited", "must_fix"]),
     },
   },
@@ -135,7 +129,6 @@ function renderWith(input: RenderLivingReviewInput, trim: Trim) {
   });
   lines.push(...priorFindingLines(input.result, input.priorClaims, trim.dropClosedPriors ?? false));
   lines.push(...roundLines(input.rounds, trim.keepRounds));
-  if (!trim.dropLenses) lines.push(...lensTableLines(input.result));
   lines.push(...footerFor(input));
   return { body: lines.join("\n"), comments };
 }
