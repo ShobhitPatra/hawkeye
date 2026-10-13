@@ -41,7 +41,7 @@ Three findings from Hawkeye's reviews of Hawkeye, each fixed before merge. [Ever
 
 ## A real review
 
-The first round on this repository's own [pull request #87](https://github.com/ShobhitPatra/hawkeye/pull/87) is a review the bot posted: a verdict, one line per finding with the file and line, the lenses behind a disclosure, and the round in the footer. The [landing page](https://hawkeye.reviews) replays it from open to posted.
+The first round on this repository's own [pull request #87](https://github.com/ShobhitPatra/hawkeye/pull/87) is a review the bot posted: a verdict, one line per finding with the file and line, and the round in the footer. The [landing page](https://hawkeye.reviews) replays it from open to posted.
 
 ## What happens when you open a pull request
 

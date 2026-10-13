@@ -58,26 +58,20 @@ describe("renderReview", () => {
       expect(/^### (.+)$/m.exec(renderReview(i).body)?.[1]).toBe(labels[verdict]);
     }
   });
-  it("orders marker, verdict, findings, lens details and footer", () => {
+  it("orders marker, verdict, findings and footer", () => {
     const r = renderReview(input());
     const marker = r.body.indexOf("<!-- hawkeye:");
     const verdict = r.body.indexOf("### Changes needed");
     const findings = r.body.indexOf("#### Must fix");
-    const details = r.body.indexOf("<details>\n<summary>Review lenses</summary>");
     const footer = r.body.indexOf("Reviewed by [Hawkeye]");
     expect(marker).toBeLessThan(verdict);
     expect(verdict).toBeLessThan(findings);
-    expect(findings).toBeLessThan(details);
-    expect(details).toBeLessThan(footer);
+    expect(findings).toBeLessThan(footer);
   });
-  it("collapses the lens table inside a details block", () => {
+  it("leaves the lens assessments out of the comment", () => {
     const r = renderReview(input());
-    expect(r.body).toContain(
-      "<details>\n<summary>Review lenses</summary>\n\n| Lens | Assessment |\n|---|---|",
-    );
-    expect(r.body).toContain("\n\n</details>");
-    expect(r.body).toContain("| Blast radius | blast_radius ok |");
-    expect(r.body).not.toContain("`intent`");
+    expect(r.body).not.toContain("Review lenses");
+    expect(r.body).not.toContain("blast_radius ok");
   });
   it("groups body findings by severity under human labels in contract order", () => {
     const r = renderReview(input());
@@ -210,17 +204,5 @@ describe("renderReview", () => {
     expect(footerLines("https://x", { round: 1, refusedModel: "claude-fable-5-1" }).at(-1)).toBe(
       "Reviewed by [Hawkeye](https://x) on the author's own plan · round 1 · reviewed on the default model because claude-fable-5-1 was refused",
     );
-  });
-  it("keeps the lens table on one row per lens", () => {
-    const i = input();
-    i.result.lenses = i.result.lenses.map((l) =>
-      l.name === "intent" ? { ...l, assessment: "line one\nline two | pipe" } : l,
-    );
-    const r = renderReview(i);
-    expect(r.body).toContain("| Intent | line one line two \\| pipe |");
-    const lensRows = r.body
-      .split("\n")
-      .filter((line) => line.startsWith("| ") && line !== "| Lens | Assessment |");
-    expect(lensRows).toHaveLength(LENSES.length);
   });
 });

@@ -131,10 +131,10 @@ describe("renderLivingReview", () => {
     i.rounds = [];
     expect(renderLivingReview(i).body.trimEnd().endsWith("on the author's own plan")).toBe(true);
   });
-  it("keeps the collapsed lens table in the living body", () => {
+  it("leaves the lens assessments out of the living body", () => {
     const { body } = renderLivingReview(input());
-    expect(body).toContain("<summary>Review lenses</summary>");
-    expect(body.indexOf("Review lenses")).toBeLessThan(body.indexOf("Reviewed by"));
+    expect(body).not.toContain("Review lenses");
+    expect(body).not.toContain("blast_radius ok");
   });
 
   it("reports nothing trimmed for a body within the budget", () => {
@@ -170,7 +170,6 @@ describe("renderLivingReview", () => {
     expect(rendered.body).toContain("301 closed prior findings not shown.");
     expect(rendered.body).toContain("still unaddressed");
     expect(rendered.body).toContain("### Changes needed");
-    expect(rendered.body).toContain("Review lenses");
     expect(rendered.body).toContain("round 400");
   });
 
@@ -195,10 +194,9 @@ describe("renderLivingReview", () => {
     expect(rendered.body).toContain("**Should claim**");
     expect(rendered.body).toContain(long);
     expect(rendered.body.match(/x{3000}/g)).toHaveLength(1);
-    expect(rendered.body).not.toContain("Review lenses");
   });
 
-  it("walks each later rung alone: the current round, the lens table, then every detail", () => {
+  it("walks each later rung alone: the current round, then every detail", () => {
     const base = input(new Set());
     const many: RoundSummary[] = Array.from({ length: 12 }, (_, index) => ({
       round: index + 1,
@@ -221,12 +219,6 @@ describe("renderLivingReview", () => {
     const currentOnly = sized("short", full - 3 * rowLength);
     expect(currentOnly.trimmed.at(-1)).toBe("all but the current round");
     expect(currentOnly.body).toContain("| 11 earlier rounds | | | |");
-    expect(currentOnly.body).toContain("Review lenses");
-
-    const noLenses = sized("short", currentOnly.body.length - 1);
-    expect(noLenses.trimmed.at(-1)).toBe("the lens table");
-    expect(noLenses.body).not.toContain("Review lenses");
-    expect(noLenses.body).toContain("  short");
 
     const long = "y".repeat(4_000);
     const claimsOnly = sized(long, 3_000);
@@ -264,11 +256,7 @@ describe("renderLivingReview", () => {
       },
       maxBodyLength: 3_000,
     });
-    expect(rendered.trimmed).toEqual([
-      "all but the current round",
-      "the lens table",
-      "optional finding detail",
-    ]);
+    expect(rendered.trimmed).toEqual(["all but the current round", "optional finding detail"]);
   });
 
   it("uses the singular for one earlier round and one closed prior finding", () => {
