@@ -6,6 +6,7 @@ import { createDb } from "./db/client";
 import * as schema from "./db/schema";
 import { createRun } from "./job-queue";
 import { postReviewForRun } from "./review-posting";
+import { clearReviewing, NOT_COMPLETED_BODY } from "./reviewing-line";
 import { createRunnerToken } from "./runner-tokens";
 import { queueJob } from "./test/pglite";
 import { gate, holdingCommit, migrateOnce } from "./test/postgres";
@@ -65,6 +66,8 @@ const armedPr = {
   repo: "repo",
   number: 7,
 };
+const cleared = { ...armedPr, id: `armed-cleared-${suffix}`, number: 8 };
+const armedIds = [armedPr.id, cleared.id];
 
 describe.skipIf(!databaseUrl)("the posting lock against two Postgres connections", () => {
   let first: ReturnType<typeof createDb>;
@@ -80,11 +83,11 @@ describe.skipIf(!databaseUrl)("the posting lock against two Postgres connections
     const jobs = first
       .select({ id: schema.job.id })
       .from(schema.job)
-      .where(eq(schema.job.armedPrId, armedPr.id));
-    await first.delete(schema.reviewPosted).where(eq(schema.reviewPosted.armedPrId, armedPr.id));
+      .where(inArray(schema.job.armedPrId, armedIds));
+    await first.delete(schema.reviewPosted).where(inArray(schema.reviewPosted.armedPrId, armedIds));
     await first.delete(schema.run).where(inArray(schema.run.jobId, jobs));
-    await first.delete(schema.job).where(eq(schema.job.armedPrId, armedPr.id));
-    await first.delete(schema.armedPr).where(eq(schema.armedPr.id, armedPr.id));
+    await first.delete(schema.job).where(inArray(schema.job.armedPrId, armedIds));
+    await first.delete(schema.armedPr).where(inArray(schema.armedPr.id, armedIds));
     await first.delete(schema.runner).where(eq(schema.runner.userId, armedPr.userId));
     await first
       .delete(schema.installation)
@@ -146,5 +149,95 @@ describe.skipIf(!databaseUrl)("the posting lock against two Postgres connections
     await expect(holder).resolves.toBe("posted");
     await expect(contender).resolves.toBe("already-posted");
     expect(github.postReview).toHaveBeenCalledTimes(1);
+  });
+  it("keeps a round that lands while another run clears the badge", async () => {
+    await first
+      .insert(schema.user)
+      .values({ id: armedPr.userId, name: "octocat", email: `${suffix}@example.com` })
+      .onConflictDoNothing();
+    await first
+      .insert(schema.installation)
+      .values({ id: armedPr.installationId, accountLogin: armedPr.owner, accountType: "User" })
+      .onConflictDoNothing();
+    await first.insert(schema.armedPr).values(cleared);
+    const { runner } = await createRunnerToken(first, { userId: armedPr.userId, name: "desktop" });
+    const [previousJob] = await first
+      .insert(schema.job)
+      .values({
+        armedPrId: cleared.id,
+        headSha: "d".repeat(40),
+        baseSha: "b".repeat(40),
+        notBefore: new Date(),
+        state: "done",
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+      })
+      .returning({ id: schema.job.id });
+    const previousRun = await createRun(first, { jobId: previousJob!.id, runnerId: runner.id });
+    await first
+      .update(schema.run)
+      .set({ status: "ok", result })
+      .where(eq(schema.run.id, previousRun.id));
+    await first.insert(schema.reviewPosted).values({
+      runId: previousRun.id,
+      armedPrId: cleared.id,
+      headSha: "d".repeat(40),
+      githubReviewId: "5",
+    });
+    const headSha = "c".repeat(40);
+    const queued = await queueJob(first, {
+      armedPrId: cleared.id,
+      headSha,
+      baseSha: "b".repeat(40),
+      headCurrentAt: new Date(),
+      notBefore: new Date(),
+    });
+    const ownRun = await createRun(first, { jobId: queued.id, runnerId: runner.id });
+    await first
+      .update(schema.run)
+      .set({ status: "ok", result })
+      .where(eq(schema.run.id, ownRun.id));
+
+    let body =
+      "<!-- hawkeye: reviewing -->\n![Reviewing on laptop](badge)\n<!-- /hawkeye: reviewing -->\n\nthe previous round";
+    const read = gate();
+    const resume = gate();
+    const github = createGitHub();
+    github.review = vi.fn(async () => {
+      const seen = body;
+      read.open();
+      await resume.opened;
+      return { body: seen };
+    }) as GitHubClient["review"];
+    github.updateReview = vi.fn(async (_reference, _reviewId, next: string) => {
+      body = next;
+    });
+    let clearing: Promise<void> | undefined;
+    github.installationTokenById = vi.fn(async () => {
+      clearing ??= clearReviewing(
+        { db: second, github },
+        {
+          reference: { owner: cleared.owner, repo: cleared.repo, number: cleared.number },
+          headSha,
+          token: "ghs_token",
+          runId: previousRun.id,
+          livingReviewId: "5",
+          placeholderReviewId: null,
+          closing: NOT_COMPLETED_BODY,
+        },
+      );
+      await read.opened;
+      setTimeout(resume.open, 300);
+      return "ghs_token";
+    });
+
+    await expect(
+      postReviewForRun(
+        { db: first, github },
+        { runId: ownRun.id, jobId: queued.id, armedPr: cleared, headSha, result, commentable: {} },
+      ),
+    ).resolves.toBe("posted");
+    await clearing;
+    expect(body).toContain(`<!-- hawkeye: head=${headSha} -->`);
+    expect(body).not.toContain("the previous round");
   });
 });

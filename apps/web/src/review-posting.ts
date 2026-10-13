@@ -16,6 +16,7 @@ import { and, asc, desc, eq, gte, isNotNull, isNull, lt, ne, or, sql } from "dri
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
 import { otherRunIsLive } from "./job-queue";
+import { lockPullRequest } from "./posting-lock";
 import { failedPostNote, shortFormNote } from "./posting-note";
 import { armedPr as armedPrTable, job, reviewPosted, run } from "./db/schema";
 import {
@@ -135,8 +136,8 @@ async function closeReviewing(
       livingReviewId: living?.githubReviewId,
       placeholderReviewId: placeholder?.githubReviewId ?? null,
       closing,
-      livingBlockBelongsToNewerRun: () =>
-        otherRunIsLive(db, { jobId: input.jobId, armedPrId: armedPr.id }),
+      livingBlockBelongsToNewerRun: (tx) =>
+        otherRunIsLive(tx, { jobId: input.jobId, armedPrId: armedPr.id }),
     });
   } catch (error) {
     deps.log?.(
@@ -304,9 +305,7 @@ export async function postReviewForRun(
     }
   }
   const reservation = await db.transaction(async (tx) => {
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtextextended(${`${armedPr.owner}/${armedPr.repo}#${armedPr.number}`}, 0))`,
-    );
+    await lockPullRequest(tx, armedPr);
     await tx
       .delete(reviewPosted)
       .where(
@@ -472,29 +471,34 @@ export async function postReviewForRun(
       if (living.kind !== "living") await clear(token, SUPERSEDED_BODY);
       return "superseded";
     }
-    try {
-      await github.updateReview(reference, living.githubReviewId, finalBody, token);
-    } catch (error) {
-      if (!(error instanceof GitHubRequestError && error.status === 422)) throw error;
-      log(`living body refused for run ${input.runId} (${error.message}); posting the short form`);
-      await github.updateReview(
-        reference,
-        living.githubReviewId,
-        renderMinimalLivingReview({
-          result: input.result,
-          headSha,
-          repositoryUrl: HAWKEYE_REPOSITORY_URL,
-          rounds,
-        }),
-        token,
-      );
-      await db
-        .update(run)
-        .set({
-          error: shortFormNote(error.message),
-        })
-        .where(eq(run.id, input.runId));
-    }
+    const writeBody = (bodyToken: string) =>
+      db.transaction(async (tx) => {
+        await lockPullRequest(tx, armedPr);
+        try {
+          await github.updateReview(reference, living.githubReviewId, finalBody, bodyToken);
+          return undefined;
+        } catch (error) {
+          if (!(error instanceof GitHubRequestError && error.status === 422)) throw error;
+          log(
+            `living body refused for run ${input.runId} (${error.message}); posting the short form`,
+          );
+          await github.updateReview(
+            reference,
+            living.githubReviewId,
+            renderMinimalLivingReview({
+              result: input.result,
+              headSha,
+              repositoryUrl: HAWKEYE_REPOSITORY_URL,
+              rounds,
+            }),
+            bodyToken,
+          );
+          return shortFormNote(error.message);
+        }
+      });
+    const shortForm = await writeBody(token);
+    if (shortForm !== undefined)
+      await db.update(run).set({ error: shortForm }).where(eq(run.id, input.runId));
     githubWrote = true;
     if (!supplementalPosted || living.kind !== "living") await record(living.githubReviewId);
     if (living.kind === "adopted") await closeReviewing(deps, input, ALREADY_POSTED_BODY);

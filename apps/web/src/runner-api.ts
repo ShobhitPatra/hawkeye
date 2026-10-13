@@ -437,8 +437,8 @@ export async function recordResult(
         livingReviewId: living?.githubReviewId,
         placeholderReviewId: existing.placeholderReviewId,
         closing: superseded ? SUPERSEDED_BODY : notCompletedBody(planLimit),
-        livingBlockBelongsToNewerRun: () =>
-          otherRunIsLive(deps.db, { jobId: completed.jobId, armedPrId: target.armedPr.id }),
+        livingBlockBelongsToNewerRun: (tx) =>
+          otherRunIsLive(tx, { jobId: completed.jobId, armedPrId: target.armedPr.id }),
       });
     } catch (error) {
       deps.log?.(

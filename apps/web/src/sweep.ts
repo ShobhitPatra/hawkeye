@@ -63,8 +63,8 @@ async function closeOnGitHub(deps: StaleSweepDeps, failed: FailedStaleJob): Prom
       livingReviewId: living?.githubReviewId,
       placeholderReviewId: failed.placeholderReviewId,
       closing: NOT_COMPLETED_BODY,
-      livingBlockBelongsToNewerRun: () =>
-        otherRunIsLive(deps.db, { jobId: failed.jobId, armedPrId: failed.armedPr.id }),
+      livingBlockBelongsToNewerRun: (tx) =>
+        otherRunIsLive(tx, { jobId: failed.jobId, armedPrId: failed.armedPr.id }),
     });
   } catch (error) {
     deps.log?.(
