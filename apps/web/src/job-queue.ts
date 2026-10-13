@@ -362,21 +362,26 @@ export async function userHasReviewsOn(db: Db, userId: string): Promise<boolean>
   return armed !== undefined;
 }
 
-export async function newerRunIsLive(
+export async function otherRunIsLive(
   db: Db,
   current: { jobId: string; armedPrId: string },
 ): Promise<boolean> {
+  const own = alias(armedPr, "own");
   const [live] = await db
     .select({ id: run.id })
     .from(run)
     .innerJoin(job, eq(job.id, run.jobId))
-    .where(
+    .innerJoin(armedPr, eq(armedPr.id, job.armedPrId))
+    .innerJoin(
+      own,
       and(
-        eq(job.armedPrId, current.armedPrId),
-        ne(job.id, current.jobId),
-        eq(run.status, "running"),
+        eq(own.id, current.armedPrId),
+        eq(own.owner, armedPr.owner),
+        eq(own.repo, armedPr.repo),
+        eq(own.number, armedPr.number),
       ),
     )
+    .where(and(ne(job.id, current.jobId), eq(run.status, "running")))
     .limit(1);
   return live !== undefined;
 }

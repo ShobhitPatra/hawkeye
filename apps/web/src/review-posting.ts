@@ -15,6 +15,7 @@ import {
 import { and, asc, desc, eq, gte, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./db/client";
+import { otherRunIsLive } from "./job-queue";
 import { failedPostNote, shortFormNote } from "./posting-note";
 import { armedPr as armedPrTable, job, reviewPosted, run } from "./db/schema";
 import {
@@ -43,7 +44,9 @@ function toCommentableMap(commentable: Record<string, number[]>): Map<string, Se
   return new Map(Object.entries(commentable).map(([path, lines]) => [path, new Set(lines)]));
 }
 
-function samePullRequest(armedPr: ReviewPostingInput["armedPr"]) {
+function samePullRequest(
+  armedPr: Pick<ReviewPostingInput["armedPr"], "owner" | "repo" | "number">,
+) {
   return and(
     eq(armedPrTable.owner, armedPr.owner),
     eq(armedPrTable.repo, armedPr.repo),
@@ -113,23 +116,27 @@ export async function closedPlaceholderFor(
   return { githubReviewId: row.placeholderReviewId };
 }
 
-async function closePlaceholder(
+async function closeReviewing(
   deps: ReviewPostingDeps,
   input: ReviewPostingInput,
   closing: string,
 ): Promise<void> {
-  const placeholder = await placeholderFor(deps.db, input.runId);
-  if (!placeholder) return;
+  const { db } = deps;
   const { armedPr, headSha } = input;
+  const placeholder = await placeholderFor(db, input.runId);
+  const living = await livingReviewFor(db, armedPr);
+  if (!placeholder && !living) return;
   try {
     await clearReviewing(deps, {
       reference: { owner: armedPr.owner, repo: armedPr.repo, number: armedPr.number },
       headSha,
       token: await deps.github.installationTokenById(armedPr.installationId),
       runId: input.runId,
-      livingReviewId: (await livingReviewFor(deps.db, armedPr))?.githubReviewId,
-      placeholderReviewId: placeholder.githubReviewId,
+      livingReviewId: living?.githubReviewId,
+      placeholderReviewId: placeholder?.githubReviewId ?? null,
       closing,
+      livingBlockBelongsToNewerRun: () =>
+        otherRunIsLive(db, { jobId: input.jobId, armedPrId: armedPr.id }),
     });
   } catch (error) {
     deps.log?.(
@@ -237,9 +244,9 @@ export async function roundsFor(
   });
 }
 
-async function postedForHead(
+export async function postedForHead(
   db: Db,
-  armedPr: ReviewPostingInput["armedPr"],
+  armedPr: Pick<ReviewPostingInput["armedPr"], "owner" | "repo" | "number">,
   headSha: string,
 ): Promise<boolean> {
   const [row] = await db
@@ -422,7 +429,7 @@ export async function postReviewForRun(
     }
   });
   if (reservation === "superseded" || reservation === "already-posted") {
-    await closePlaceholder(
+    await closeReviewing(
       deps,
       input,
       reservation === "superseded" ? SUPERSEDED_BODY : ALREADY_POSTED_BODY,
@@ -430,7 +437,7 @@ export async function postReviewForRun(
     return reservation;
   }
   if (reservation === "adopted") {
-    await closePlaceholder(deps, input, ALREADY_POSTED_BODY);
+    await closeReviewing(deps, input, ALREADY_POSTED_BODY);
     return "posted";
   }
   if (typeof reservation === "string") return reservation;
@@ -570,7 +577,7 @@ export async function postReviewForRun(
       await db.update(run).set({ error: written.shortForm }).where(eq(run.id, input.runId));
     githubWrote = true;
     if (!supplementalPosted || living.kind !== "living") await record(living.githubReviewId);
-    if (living.kind === "adopted") await closePlaceholder(deps, input, ALREADY_POSTED_BODY);
+    if (living.kind === "adopted") await closeReviewing(deps, input, ALREADY_POSTED_BODY);
     return "posted";
   } catch (error) {
     if (!githubWrote) await release();

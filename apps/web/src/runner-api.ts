@@ -46,7 +46,7 @@ import {
   holdsJobClaim,
   releaseJob,
   jobSuperseded,
-  newerRunIsLive,
+  otherRunIsLive,
   takeBackClaim,
   userHasReviewsOn,
 } from "./job-queue";
@@ -438,7 +438,7 @@ export async function recordResult(
         placeholderReviewId: existing.placeholderReviewId,
         closing: superseded ? SUPERSEDED_BODY : notCompletedBody(planLimit),
         livingBlockBelongsToNewerRun: () =>
-          newerRunIsLive(deps.db, { jobId: completed.jobId, armedPrId: target.armedPr.id }),
+          otherRunIsLive(deps.db, { jobId: completed.jobId, armedPrId: target.armedPr.id }),
       });
     } catch (error) {
       deps.log?.(
