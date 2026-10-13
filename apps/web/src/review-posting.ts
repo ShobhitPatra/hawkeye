@@ -147,7 +147,7 @@ async function historyStartFor(
     .select({ createdAt: job.createdAt })
     .from(job)
     .innerJoin(run, eq(run.jobId, job.id))
-    .innerJoin(reviewPosted, eq(reviewPosted.runId, run.id))
+    .leftJoin(reviewPosted, eq(reviewPosted.runId, run.id))
     .innerJoin(armedPrTable, eq(armedPrTable.id, job.armedPrId))
     .where(
       and(
@@ -213,7 +213,7 @@ export async function roundsFor(
     })
     .from(run)
     .innerJoin(job, eq(job.id, run.jobId))
-    .innerJoin(reviewPosted, eq(reviewPosted.runId, run.id))
+    .leftJoin(reviewPosted, eq(reviewPosted.runId, run.id))
     .innerJoin(armedPrTable, eq(armedPrTable.id, job.armedPrId))
     .where(
       and(
@@ -378,17 +378,11 @@ export async function postReviewForRun(
     if (living) {
       const [earlier] = fromScratch
         ? await tx
-            .select({ id: reviewPosted.id, runId: reviewPosted.runId })
+            .select({ id: reviewPosted.id })
             .from(reviewPosted)
             .where(and(eq(reviewPosted.armedPrId, armedPr.id), eq(reviewPosted.headSha, headSha)))
         : [];
-      if (earlier) {
-        await tx
-          .update(reviewPosted)
-          .set({ runId: input.runId })
-          .where(eq(reviewPosted.id, earlier.id));
-        return { id: earlier.id, living, replacedRunId: earlier.runId };
-      }
+      if (earlier) return { id: earlier.id, living, takeover: true };
       const [inserted] = await tx
         .insert(reviewPosted)
         .values({ runId: input.runId, armedPrId: armedPr.id, headSha, githubReviewId: null })
@@ -442,21 +436,18 @@ export async function postReviewForRun(
   if (typeof reservation === "string") return reservation;
   if ("failed" in reservation) return failRun(deps, input.runId, reservation.failed);
   const { living } = reservation;
-  const replacedRunId = "replacedRunId" in reservation ? reservation.replacedRunId : undefined;
+  const takeover = "takeover" in reservation;
   const record = async (githubReviewId: string) => {
-    if (replacedRunId !== undefined) return;
+    if (takeover) return;
     await db
       .update(reviewPosted)
       .set({ githubReviewId })
       .where(eq(reviewPosted.id, reservation.id));
   };
-  const release = () =>
-    replacedRunId === undefined
-      ? db.delete(reviewPosted).where(eq(reviewPosted.id, reservation.id))
-      : db
-          .update(reviewPosted)
-          .set({ runId: replacedRunId })
-          .where(and(eq(reviewPosted.id, reservation.id), eq(reviewPosted.runId, input.runId)));
+  const release = async () => {
+    if (takeover) return;
+    await db.delete(reviewPosted).where(eq(reviewPosted.id, reservation.id));
+  };
 
   const ownPlaceholderId = async () =>
     living.kind === "placeholder"
@@ -557,24 +548,23 @@ export async function postReviewForRun(
         return shortFormNote(error.message);
       }
     };
-    const writeWhileHeld = (bodyToken: string) =>
+    const takeOver = (bodyToken: string) =>
       db.transaction(async (tx) => {
         await lockPullRequest(tx, armedPr);
-        const [held] = await tx
-          .select({ id: reviewPosted.id })
-          .from(reviewPosted)
-          .where(and(eq(reviewPosted.id, reservation.id), eq(reviewPosted.runId, input.runId)));
-        return held ? { shortForm: await writeBody(bodyToken) } : undefined;
+        if (await postedForHeadSinceJob(tx, armedPr, headSha, input.jobId)) return undefined;
+        const shortForm = await writeBody(bodyToken);
+        await tx
+          .update(reviewPosted)
+          .set({ runId: input.runId })
+          .where(eq(reviewPosted.id, reservation.id));
+        return { shortForm };
       });
-    const written =
-      replacedRunId === undefined
-        ? { shortForm: await writeBody(token) }
-        : await writeWhileHeld(token);
+    const written = takeover ? await takeOver(token) : { shortForm: await writeBody(token) };
     if (!written) {
       log(
-        `living body not patched for run ${input.runId}: a newer round from scratch took the head`,
+        `living body not patched for run ${input.runId}: a newer round from scratch reviewed the head`,
       );
-      return githubWrote ? "posted" : "superseded";
+      return githubWrote ? "posted" : "already-posted";
     }
     if (written.shortForm !== undefined)
       await db.update(run).set({ error: written.shortForm }).where(eq(run.id, input.runId));

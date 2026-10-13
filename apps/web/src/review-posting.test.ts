@@ -622,7 +622,7 @@ describe("postReviewForRun", () => {
     await expect(post()).resolves.toBe("already-posted");
   });
 
-  it("gives the head back to the earlier round when a round from scratch fails to post", async () => {
+  it("leaves the head with the earlier round when a round from scratch fails to post", async () => {
     github.updateReview = vi.fn(async () => {
       throw new Error("GitHub is down");
     });
@@ -635,7 +635,7 @@ describe("postReviewForRun", () => {
     ]);
   });
 
-  it("leaves the living review to a newer round from scratch that took the head first", async () => {
+  it("leaves the living review to a newer round from scratch that wrote it first", async () => {
     github.updateReview = vi.fn(async () => {});
     await seedLivingReview(result, headSha);
     await db.update(schema.job).set({ fromScratch: true }).where(eq(schema.job.id, jobId));
@@ -645,25 +645,47 @@ describe("postReviewForRun", () => {
       return "ghs_token";
     });
 
-    await expect(post({})).resolves.toBe("superseded");
+    await expect(post({})).resolves.toBe("already-posted");
     expect(github.updateReview).not.toHaveBeenCalled();
     expect(await db.select().from(schema.reviewPosted)).toEqual([
       expect.objectContaining({ runId: newerRunId, headSha, githubReviewId: "5" }),
     ]);
   });
 
-  it("keeps the head with a newer round from scratch when this one fails to post", async () => {
+  it("keeps the head with an older round from scratch that wrote while a newer one failed", async () => {
+    github.updateReview = vi.fn(async () => {});
     await seedLivingReview(result, headSha);
     await db.update(schema.job).set({ fromScratch: true }).where(eq(schema.job.id, jobId));
     const newerRunId = await seedNewerRoundFromScratch();
+    const [newer] = await db
+      .select({ jobId: schema.run.jobId })
+      .from(schema.run)
+      .where(eq(schema.run.id, newerRunId));
+    let olderOutcome: string | undefined;
     github.postReview = vi.fn(async () => {
-      await db.update(schema.reviewPosted).set({ runId: newerRunId });
+      olderOutcome = await post({});
       throw new Error("GitHub is down");
     });
 
-    await expect(post()).resolves.toBe("failed");
+    await expect(
+      postReviewForRun(
+        { db, github },
+        {
+          runId: newerRunId,
+          jobId: newer!.jobId,
+          armedPr,
+          headSha,
+          result,
+          commentable: {
+            "a.txt": [1, 2],
+          },
+        },
+      ),
+    ).resolves.toBe("failed");
+    expect(olderOutcome).toBe("posted");
+    expect(github.updateReview).toHaveBeenCalledTimes(1);
     expect(await db.select().from(schema.reviewPosted)).toEqual([
-      expect.objectContaining({ runId: newerRunId, headSha, githubReviewId: "5" }),
+      expect.objectContaining({ runId, headSha, githubReviewId: "5" }),
     ]);
   });
 
