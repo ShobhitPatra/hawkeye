@@ -12,13 +12,13 @@
     "readme": "tsx --tsconfig packages/runner/tsconfig.json packages/runner/scripts/write-readme.ts"
   },
   "devDependencies": {
-    "@types/node": "^24.19.0",
-    "oxfmt": "^0.70.0",
-    "oxlint": "^1.85.0",
+    "@types/node": "^24.19.2",
+    "oxfmt": "^0.74.0",
+    "oxlint": "^1.89.0",
     "tsup": "^8.5.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.2"
+    "vitest": "^5.0.5"
   },
   "engines": {
     "node": ">=22.12"
