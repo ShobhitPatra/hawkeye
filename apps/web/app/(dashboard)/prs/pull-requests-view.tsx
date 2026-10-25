@@ -2,8 +2,10 @@ import Link from "next/link";
 import { formatUpdated } from "@/format-updated";
 import type { InstallationFailure, ListedPullRequest } from "@/pull-requests";
 import type { PullRequestStatus } from "@/pull-request-status";
+import { findRepository, listRepositories, narrowToRepository } from "@/repository-filter";
 import type { RunnerStatus } from "@/runner-status";
 import { PullRequestTable } from "./pull-request-table";
+import { RepositoryFilter } from "./repository-filter";
 
 export function PullRequestsView({
   pullRequests,
@@ -13,6 +15,7 @@ export function PullRequestsView({
   syncFailed,
   statuses,
   runner,
+  repository,
   now,
 }: {
   pullRequests: ListedPullRequest[];
@@ -22,16 +25,24 @@ export function PullRequestsView({
   syncFailed: boolean;
   statuses: Map<string, PullRequestStatus>;
   runner: RunnerStatus;
+  repository: string | undefined;
   now: number;
 }) {
-  const reviewing = [...statuses.values()].filter((status) => status.kind === "reviewing").length;
+  const repositories = listRepositories(pullRequests);
+  const shown =
+    repository === undefined
+      ? { pullRequests, statuses }
+      : narrowToRepository({ pullRequests, statuses }, repository);
+  const reviewing = [...shown.statuses.values()].filter(
+    (status) => status.kind === "reviewing",
+  ).length;
   return (
     <main className="hk-page">
       <div className="hk-header">
         <h1 className="hk-title">Pull requests</h1>
         <div className="hk-meta">
           <span>
-            reviews on for <b>{statuses.size}</b>
+            reviews on for <b>{shown.statuses.size}</b>
           </span>
           {reviewing > 0 && (
             <span>
@@ -105,12 +116,32 @@ export function PullRequestsView({
           )}
         </div>
       ) : (
-        <PullRequestTable
-          pullRequests={pullRequests}
-          statuses={statuses}
-          runnerOnline={runner.online}
-          now={now}
-        />
+        <div className="hk-section">
+          {repositories.length > 1 && (
+            <RepositoryFilter
+              repositories={repositories}
+              current={
+                repository === undefined ? undefined : findRepository(repositories, repository)
+              }
+              all={repository === undefined}
+            />
+          )}
+          {shown.pullRequests.length === 0 ? (
+            <div className="hk-state">
+              <p>No open pull requests of yours in {repository}.</p>
+              <p>
+                <Link href="/prs">Show every repository</Link>
+              </p>
+            </div>
+          ) : (
+            <PullRequestTable
+              pullRequests={shown.pullRequests}
+              statuses={shown.statuses}
+              runnerOnline={runner.online}
+              now={now}
+            />
+          )}
+        </div>
       )}
 
       {failures.map((failure) => (

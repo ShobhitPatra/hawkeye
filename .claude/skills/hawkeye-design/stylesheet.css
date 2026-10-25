@@ -167,6 +167,7 @@ html {
   text-underline-offset: 0.15em;
 }
 .hk-nav a,
+.hk-filter a,
 .hk-topbar-end a,
 .hk-wordmark,
 .hk-crumb a,
@@ -302,13 +303,16 @@ html {
   display: flex;
   gap: var(--hk-space-4);
 }
-.hk-nav a {
+.hk-nav a,
+.hk-filter a {
   color: var(--hk-fg-2);
   white-space: nowrap;
   transition: color var(--hk-duration) var(--hk-ease-color);
 }
 .hk-nav a:focus-visible,
-.hk-nav a[aria-current="page"] {
+.hk-nav a[aria-current="page"],
+.hk-filter a:focus-visible,
+.hk-filter a[aria-current="page"] {
   color: var(--hk-fg);
 }
 .hk-topbar-end a {
@@ -319,6 +323,7 @@ html {
 }
 @media (hover: hover) and (pointer: fine) {
   .hk-nav a:hover,
+  .hk-filter a:hover,
   .hk-topbar-end a:hover {
     color: var(--hk-fg);
   }
@@ -1124,6 +1129,13 @@ html {
   gap: var(--hk-space-4);
   flex-wrap: wrap;
 }
+.hk-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hk-space-1) var(--hk-space-4);
+  font-size: var(--hk-type-compact);
+  line-height: var(--hk-leading-compact);
+}
 .hk-cell-stack {
   display: flex;
   flex-direction: column;
@@ -1446,6 +1458,15 @@ span.hk-arrive {
     overflow-x: auto;
     scrollbar-width: none;
   }
+  .hk-filter {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: var(--hk-space-1);
+    margin: calc(-1 * var(--hk-space-1));
+  }
+  .hk-filter a {
+    flex: none;
+  }
   .hk-headline {
     font-size: var(--hk-type-display);
     line-height: var(--hk-leading-display);
@@ -1482,7 +1503,8 @@ span.hk-arrive {
   .hk-input {
     height: 44px;
   }
-  .hk-nav a {
+  .hk-nav a,
+  .hk-filter a {
     padding-block: var(--hk-space-3);
   }
   .hk-menu > summary {
