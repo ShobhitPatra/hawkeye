@@ -19,12 +19,14 @@ export function RepositoryFilter({
     const nav = line.current;
     const link = nav?.querySelector('[aria-current="page"]');
     if (!nav || !link) return;
-    const overflow =
-      link.getBoundingClientRect().right -
-      nav.getBoundingClientRect().right +
-      Number.parseFloat(getComputedStyle(nav).paddingRight);
-    if (overflow > 0) nav.scrollLeft += overflow;
-  }, [current]);
+    const box = nav.getBoundingClientRect();
+    const item = link.getBoundingClientRect();
+    const style = getComputedStyle(nav);
+    const before = item.left - box.left - Number.parseFloat(style.paddingLeft);
+    const after = item.right - box.right + Number.parseFloat(style.paddingRight);
+    if (before < 0) nav.scrollLeft += before;
+    else if (after > 0) nav.scrollLeft += after;
+  }, [current, all]);
   return (
     <nav ref={line} className="hk-filter" aria-label="Repositories">
       <Link href={pathname} aria-current={all ? "page" : undefined}>
