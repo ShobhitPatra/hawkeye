@@ -112,7 +112,7 @@ The signed-in root. It answers, in order: is the runner up and is anything waiti
 
 ### Dashboard lists
 
-A list is a table at compact size. Text columns left, numbers right, header alignment matches its cells. The title is the link; hover shifts its color, never underlines. No row carries a control. Under 760px the Round and Reviewed columns (`data-secondary`) hide so the title and the status word fit a phone. Status is one word about the review itself: Reviews on when nothing has been reviewed yet, Queued, Waiting with runner offline in amber (also for a review whose runner has sent no heartbeat for 90 seconds), In review with the shimmer, Run failed in red (with Usage limit or Model at capacity beneath it as metadata when the plan stopped the run), the verdict word, or Off on a pull request whose reviews are paused. A cell that needs a second line (repo under a title) stacks it as metadata, never as a second column. Status is a word, colored only by the rules above. Rows for unarmed or closed pull requests dim to secondary text. No row hover surfaces, no zebra stripes.
+A list is a table at compact size. Text columns left, numbers right, header alignment matches its cells. The title is the link; hover shifts its color, never underlines. No row carries a control. Under 760px the Round and Reviewed columns (`data-secondary`) hide so the title and the status word fit a phone. Status is one word about the review itself: Reviews on when nothing has been reviewed yet, Queued, Waiting with runner offline in amber (also for a review whose runner has sent no heartbeat for 90 seconds), In review with the shimmer, Run failed in red (with Usage limit or Model at capacity beneath it as metadata when the plan stopped the run), the verdict word, or Off on a pull request whose reviews are paused. A cell that needs a second line (repo under a title) stacks it as metadata, never as a second column. Status is a word, colored only by the rules above. Rows for unarmed or closed pull requests dim to secondary text. No row hover surfaces, no zebra stripes. A list that spans several repositories carries a filter line above the table (`hk-filter`, a `<nav>` of links): All, then each `owner/repo`, the current one marked `aria-current="page"` in the foreground colour, the rest secondary, never underlined. It wraps on a wide screen and scrolls sideways under 760px with the current link scrolled into view. The choice lives in the URL, never in a control's state.
 
 ### Dashboard detail pages
 
@@ -194,7 +194,7 @@ Figures and the year grid: `hk-figures`, `hk-figure`, `hk-figure-label`, `hk-fig
 
 Facts: `hk-facts` (a `<dl>` whose rows are `<div>`s holding a `dt` and a `dd`: a name beside what is true of it, with no header and no rules, for a short list that is read and not compared), `hk-unit` (a run inside a `dd` that wraps as one piece).
 
-Tables: `hk-table-header`, `hk-table-wrap`, `hk-table`, `hk-numeric`, `hk-cell-stack`, `tr[data-dim]`.
+Tables: `hk-table-header`, `hk-table-wrap`, `hk-table`, `hk-numeric`, `hk-cell-stack`, `tr[data-dim]`, `hk-filter` (a `<nav>` of links above a table, the current one `aria-current="page"`).
 
 Surfaces and states: `hk-surface`, `hk-disclosure`, `hk-rule`, `hk-state`, `hk-skeleton[data-rows]`.
 

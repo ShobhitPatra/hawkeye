@@ -9,7 +9,12 @@ import { requestRunnerStatus } from "@/request-runner-status";
 import { requireSession } from "@/session";
 import { PullRequestsView } from "./pull-requests-view";
 
-export default async function PullRequestsPage() {
+export default async function PullRequestsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ repo?: string | string[] }>;
+}) {
+  const { repo } = await searchParams;
   const session = await requireSession();
   const login = session.user.githubLogin;
 
@@ -61,6 +66,7 @@ export default async function PullRequestsPage() {
       syncFailed={syncFailed}
       statuses={statuses}
       runner={runner}
+      repository={(Array.isArray(repo) ? repo[0] : repo) || undefined}
       now={Date.now()}
     />
   );
