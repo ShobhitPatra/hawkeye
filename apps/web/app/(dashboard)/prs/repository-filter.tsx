@@ -16,9 +16,14 @@ export function RepositoryFilter({
   const pathname = usePathname();
   const line = useRef<HTMLElement>(null);
   useEffect(() => {
-    line.current
-      ?.querySelector('[aria-current="page"]')
-      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const nav = line.current;
+    const link = nav?.querySelector('[aria-current="page"]');
+    if (!nav || !link) return;
+    const overflow =
+      link.getBoundingClientRect().right -
+      nav.getBoundingClientRect().right +
+      Number.parseFloat(getComputedStyle(nav).paddingRight);
+    if (overflow > 0) nav.scrollLeft += overflow;
   }, [current]);
   return (
     <nav ref={line} className="hk-filter" aria-label="Repositories">
